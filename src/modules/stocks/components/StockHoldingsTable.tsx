@@ -18,7 +18,7 @@ import {
   resolvePriceSource,
 } from "@/core/calculations/stocks/price-normalize";
 import type { PriceDisplaySource } from "@/core/domain/types";
-import { TrendingUp, Wallet, RefreshCw, PiggyBank } from "lucide-react";
+import { TrendingUp, RefreshCw, PiggyBank } from "lucide-react";
 
 type MarketFilter = "ALL" | StockMarket;
 
@@ -249,61 +249,9 @@ export function StockHoldingsTable() {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="min-w-0 space-y-6">
       {!fxRateValid && holdings.some((h) => h.market === "US") && (
         <FxRateErrorBanner />
-      )}
-
-      {marketFilter === "ALL" && (
-        <div className="space-y-4">
-          <div className="grid gap-4 sm:grid-cols-2">
-            <SummaryCard
-              label="Total Stock Value"
-              value={formatSgd(summary.allMarketTotalValueSgd)}
-              highlight
-              icon={<Wallet size={18} />}
-              subValue={`Holdings ${formatSgd(summary.totalStockHoldingsSgd)}`}
-            />
-            <SummaryCard
-              label="Stock P/L"
-              value={formatSgd(summary.allMarketPLSgd)}
-              trend={plTrend(summary.allMarketPLSgd)}
-              icon={<TrendingUp size={18} />}
-            />
-          </div>
-          <div className="grid gap-4 sm:grid-cols-2">
-            <SummaryCard
-              label="Total Stock Contribution"
-              value={formatSgd(summary.totalStockContributionSgd)}
-              icon={<PiggyBank size={18} />}
-              trend="neutral"
-            />
-          </div>
-          <div className="grid gap-4 sm:grid-cols-2">
-            <SummaryCard
-              label="US Total Value"
-              value={formatSgd(summary.usTotalValueSgd)}
-              subValue={formatUsd(summary.usTotalValueUsd)}
-            />
-            <SummaryCard
-              label="US Available Cash"
-              value={formatSgd(summary.usAvailableTradingCashSgd)}
-              subValue={formatUsd(summary.usAvailableTradingCashUsd)}
-              trend="neutral"
-            />
-          </div>
-          <div className="grid gap-4 sm:grid-cols-2">
-            <SummaryCard
-              label="SG Total Value"
-              value={formatSgd(summary.sgTotalValueSgd)}
-            />
-            <SummaryCard
-              label="SG Available Cash"
-              value={formatSgd(summary.sgAvailableTradingCashSgd)}
-              trend="neutral"
-            />
-          </div>
-        </div>
       )}
 
       {marketFilter === "US" && (

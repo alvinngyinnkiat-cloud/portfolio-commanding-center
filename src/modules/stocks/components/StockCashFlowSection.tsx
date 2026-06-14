@@ -158,7 +158,7 @@ export function StockCashFlowSection() {
   };
 
   return (
-    <div className="space-y-8">
+    <div className="min-w-0 space-y-8">
       {!fxRateValid && <FxRateErrorBanner />}
 
       <section className="space-y-4">

@@ -19,9 +19,9 @@ export function Tabs({ items, defaultTab }: TabsProps) {
   const active = items.find((t) => t.id === activeId) ?? items[0];
 
   return (
-    <div className="space-y-4">
+    <div className="min-w-0 space-y-4">
       <div
-        className="-mx-1 flex gap-1 overflow-x-auto pb-1 scrollbar-thin sm:mx-0"
+        className="-mx-1 flex min-w-0 gap-1 overflow-x-auto pb-1 scrollbar-thin sm:mx-0"
         role="tablist"
       >
         {items.map((tab) => {
@@ -46,7 +46,7 @@ export function Tabs({ items, defaultTab }: TabsProps) {
       </div>
 
       {active && (
-        <div key={active.id} role="tabpanel">
+        <div key={active.id} role="tabpanel" className="min-w-0">
           {active.content}
         </div>
       )}
