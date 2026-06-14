@@ -12,6 +12,7 @@ import {
   calculateStockFxRate,
 } from "@/core/calculations/stocks/cash-flow";
 import { createStockFxConversionId } from "@/core/calculations/stocks/migrate-stock-cash-flow";
+import { getPersistenceManager } from "@/core/database/supabase";
 import { generateId } from "@/core/database/local/local-storage";
 import { formatDate, formatSgd, formatUsd } from "@/shared/lib/format";
 import { toLocalDateString } from "@/shared/lib/date";
@@ -143,17 +144,19 @@ export function StockCashFlowSection() {
     });
   };
 
-  const handleDeleteDeposit = (id: string) => {
+  const handleDeleteDeposit = async (id: string) => {
     if (!services || !window.confirm("Delete this deposit/withdrawal?")) return;
     services.contributions.delete(id);
     if (editingDepositId === id) resetDepositForm();
+    await getPersistenceManager()?.drainSyncQueue();
     refresh();
   };
 
-  const handleDeleteFx = (id: string) => {
+  const handleDeleteFx = async (id: string) => {
     if (!services || !window.confirm("Delete this FX conversion?")) return;
     services.stockFxConversions.delete(id);
     if (editingFxId === id) resetFxForm();
+    await getPersistenceManager()?.drainSyncQueue();
     refresh();
   };
 

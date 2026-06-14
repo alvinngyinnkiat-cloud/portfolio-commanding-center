@@ -31,8 +31,6 @@ import { normalizeDailySnapshot } from "@/core/calculations/snapshots";
 import { normalizeOptionsSettings } from "@/core/domain/defaults-options";
 import { normalizeScannerScanRun } from "@/core/calculations/scanner/normalize-scan-result";
 import { normalizeStockPrice } from "@/core/calculations/stocks/price-normalize";
-import { migrateLegacyStockDepositsToCashFlow } from "@/core/calculations/stocks/migrate-stock-cash-flow";
-import { normalizeStockUsdAllocationPercent } from "@/core/calculations/contribution-cash";
 
 export interface ScannerResultsStore {
   latest: ScannerScanRun | null;
@@ -99,7 +97,7 @@ export function createEmptyCache(): PersistenceCache {
 }
 
 export function normalizeCache(cache: PersistenceCache): PersistenceCache {
-  const normalized = {
+  return {
     ...cache,
     dashboardSettings: normalizeDashboardSettings(cache.dashboardSettings),
     snapshots: cache.snapshots.map((row) => normalizeDailySnapshot(row)),
@@ -116,32 +114,5 @@ export function normalizeCache(cache: PersistenceCache): PersistenceCache {
     cryptoHoldings: normalizeCryptoHoldings(cache.cryptoHoldings),
     cryptoAllocation: normalizeCryptoAllocationSettings(cache.cryptoAllocation),
     stockFxConversions: cache.stockFxConversions ?? [],
-  };
-
-  const hasLegacyStockAllocation = normalized.contributions.some(
-    (tx: ContributionTransaction) =>
-      tx.category === "stock" &&
-      normalizeStockUsdAllocationPercent(tx.usdAllocationPercent) > 0
-  );
-
-  if (!hasLegacyStockAllocation) {
-    return normalized;
-  }
-
-  const fallbackFx =
-    normalized.dashboardSettings.usdSgdFxRate != null &&
-    normalized.dashboardSettings.usdSgdFxRate > 0
-      ? normalized.dashboardSettings.usdSgdFxRate
-      : 1.32;
-  const migrated = migrateLegacyStockDepositsToCashFlow(
-    normalized.contributions,
-    normalized.stockFxConversions,
-    fallbackFx
-  );
-
-  return {
-    ...normalized,
-    contributions: migrated.contributions,
-    stockFxConversions: migrated.fxConversions,
   };
 }

@@ -26,6 +26,10 @@ import {
   syncStockTransactions,
   syncWatchlist,
 } from "./sync";
+import {
+  hasLegacyStockDeposits,
+  migrateLegacyStockDepositsToCashFlow,
+} from "@/core/calculations/stocks/migrate-stock-cash-flow";
 
 export type PersistenceStatus = "local" | "supabase" | "supabase_migrated";
 
@@ -93,7 +97,35 @@ export class PersistenceManager {
     if (this.status === "supabase_migrated") {
       this.cache.migratedFromLocal = true;
     }
+    await this.applyStockCashFlowMigrationIfNeeded();
     this.cache = normalizeCache(this.cache);
+  }
+
+  /** One-time legacy deposit split — persisted to Supabase, not re-run on every load. */
+  private async applyStockCashFlowMigrationIfNeeded(): Promise<void> {
+    if (!hasLegacyStockDeposits(this.cache.contributions)) {
+      return;
+    }
+
+    const fallbackFx =
+      this.cache.dashboardSettings.usdSgdFxRate != null &&
+      this.cache.dashboardSettings.usdSgdFxRate > 0
+        ? this.cache.dashboardSettings.usdSgdFxRate
+        : 1.32;
+
+    const migrated = migrateLegacyStockDepositsToCashFlow(
+      this.cache.contributions,
+      this.cache.stockFxConversions,
+      fallbackFx
+    );
+
+    this.cache.contributions = migrated.contributions;
+    this.cache.stockFxConversions = migrated.fxConversions;
+
+    if (!this.client) return;
+
+    await syncContributions(this.client, this.cache.contributions);
+    await syncStockFxConversions(this.client, this.cache.stockFxConversions);
   }
 
   private async bootstrapServer(): Promise<void> {
@@ -107,6 +139,7 @@ export class PersistenceManager {
     this.client = client;
     this.status = "supabase";
     this.cache = await hydrateCacheFromSupabase(this.client);
+    await this.applyStockCashFlowMigrationIfNeeded();
     this.cache = normalizeCache(this.cache);
   }
 

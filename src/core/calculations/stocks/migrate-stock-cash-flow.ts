@@ -2,7 +2,6 @@ import type { ContributionTransaction } from "@/core/domain/types";
 import type { StockFxConversion } from "@/core/domain/types/stock-fx-conversion";
 import {
   calculateStockAllocation,
-  normalizeStockUsdAllocationPercent,
   resolveContributionFxRate,
 } from "@/core/calculations/contribution-cash";
 import { generateId } from "@/core/database/local/local-storage";
@@ -11,8 +10,14 @@ export const MIGRATED_STOCK_FX_ID_PREFIX = "migrated-fx-";
 
 function hasLegacyStockAllocation(tx: ContributionTransaction): boolean {
   if (tx.category !== "stock") return false;
-  const usdPct = normalizeStockUsdAllocationPercent(tx.usdAllocationPercent);
-  return usdPct > 0;
+  // New cash-flow deposits omit this field; only legacy rows stored USD allocation %.
+  return tx.usdAllocationPercent !== undefined;
+}
+
+export function hasLegacyStockDeposits(
+  contributions: ContributionTransaction[]
+): boolean {
+  return contributions.some(hasLegacyStockAllocation);
 }
 
 /**
