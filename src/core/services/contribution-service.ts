@@ -5,9 +5,7 @@ export class ContributionService {
   constructor(private repo: ContributionRepository) {}
 
   list(): ContributionTransaction[] {
-    return this.repo
-      .list()
-      .sort((a, b) => b.date.localeCompare(a.date));
+    return this.repo.list().sort((a, b) => b.date.localeCompare(a.date));
   }
 
   upsert(transaction: ContributionTransaction): void {

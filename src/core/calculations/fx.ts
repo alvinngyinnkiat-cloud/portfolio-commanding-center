@@ -2,10 +2,16 @@ export function usdToSgd(usd: number, fxRate: number): number {
   return usd * fxRate;
 }
 
+export function sgdToUsd(sgd: number, fxRate: number): number {
+  if (fxRate <= 0) return 0;
+  return sgd / fxRate;
+}
+
 export function calculateTotalCashSgd(
-  stockCashUsd: number,
+  usdTradingCashUsd: number,
+  sgdTradingCashSgd: number,
   cryptoCashSgd: number,
   fxRate: number
 ): number {
-  return stockCashUsd * fxRate + cryptoCashSgd;
+  return usdTradingCashUsd * fxRate + sgdTradingCashSgd + cryptoCashSgd;
 }

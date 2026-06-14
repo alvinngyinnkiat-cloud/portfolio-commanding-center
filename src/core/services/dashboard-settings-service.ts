@@ -8,18 +8,11 @@ export class DashboardSettingsService {
     return this.repo.get();
   }
 
-  updateFxAndCash(
-    usdSgdFxRate: number,
-    stockCashUsd: number,
-    cryptoCashSgd: number
+  updatePortfolioValues(
+    usdSgdFxRate: number | null,
+    manualValues: ManualPortfolioValues
   ): void {
-    const current = this.repo.get();
-    this.repo.save({
-      ...current,
-      usdSgdFxRate,
-      stockCashUsd,
-      cryptoCashSgd,
-    });
+    this.repo.save({ usdSgdFxRate, manualValues });
   }
 
   updateManualValues(manualValues: ManualPortfolioValues): void {

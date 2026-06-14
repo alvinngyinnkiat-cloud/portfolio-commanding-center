@@ -1,0 +1,51 @@
+import { describe, expect, it } from "vitest";
+import {
+  compareOpenTradesByDte,
+  deriveDteStatus,
+  summarizeActionRequiredOpenRisk,
+} from "./dte-status";
+
+describe("deriveDteStatus", () => {
+  it("DTE > 21 is Normal", () => {
+    expect(deriveDteStatus(22)).toBe("NORMAL");
+    expect(deriveDteStatus(45)).toBe("NORMAL");
+  });
+
+  it("DTE 8-21 is Watch", () => {
+    expect(deriveDteStatus(8)).toBe("WATCH");
+    expect(deriveDteStatus(21)).toBe("WATCH");
+  });
+
+  it("DTE <= 7 is Action Required", () => {
+    expect(deriveDteStatus(7)).toBe("ACTION_REQUIRED");
+    expect(deriveDteStatus(0)).toBe("ACTION_REQUIRED");
+  });
+});
+
+describe("compareOpenTradesByDte", () => {
+  it("sorts lowest DTE first", () => {
+    const sorted = [
+      { daysToExpiration: 14 },
+      { daysToExpiration: 5 },
+      { daysToExpiration: 30 },
+      { daysToExpiration: 7 },
+      { daysToExpiration: 10 },
+    ].sort(compareOpenTradesByDte);
+
+    expect(sorted.map((r) => r.daysToExpiration)).toEqual([5, 7, 10, 14, 30]);
+  });
+});
+
+describe("summarizeActionRequiredOpenRisk", () => {
+  it("counts trades and sums risk where DTE <= 7", () => {
+    const result = summarizeActionRequiredOpenRisk([
+      { daysToExpiration: 5, maxRiskUsd: 400 },
+      { daysToExpiration: 7, maxRiskUsd: 200 },
+      { daysToExpiration: 8, maxRiskUsd: 999 },
+      { daysToExpiration: 21, maxRiskUsd: 100 },
+    ]);
+
+    expect(result.tradesRequiringActionCount).toBe(2);
+    expect(result.openRiskRequiringActionUsd).toBe(600);
+  });
+});

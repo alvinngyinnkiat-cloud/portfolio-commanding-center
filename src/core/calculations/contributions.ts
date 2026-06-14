@@ -1,4 +1,9 @@
 import type { ContributionTransaction } from "@/core/domain/types";
+import { parseLocalDate } from "@/shared/lib/date";
+import { getContributionCashImpact, resolveContributionFxRate } from "./contribution-cash";
+import { calculateNetStockCashContributedSgd } from "./stocks/contributions";
+import { calculateTotalCryptoCashContributed } from "./crypto/contributions";
+import { calculatePersonalCashContributionSgd } from "./personal-cash/contributions";
 
 export function calculateStockDeposits(
   contributions: ContributionTransaction[]
@@ -24,39 +29,61 @@ export function calculateWithdrawals(
     .reduce((sum, c) => sum + c.amountSgd, 0);
 }
 
-export function calculateTotalContribution(
+/** Net cash contributed across stock + crypto deposit transactions (chart helper). */
+export function calculateTotalCashContributed(
   contributions: ContributionTransaction[]
 ): number {
   return (
-    calculateStockDeposits(contributions) +
-    calculateCryptoDeposits(contributions) -
-    calculateWithdrawals(contributions)
+    calculateNetStockCashContributedSgd(contributions) +
+    calculateTotalCryptoCashContributed(contributions) +
+    calculatePersonalCashContributionSgd(contributions)
   );
 }
 
-export function calculateMonthlyContributions(
+export interface MonthlyCashContribution {
+  month: string;
+  usdTradingCashSgd: number;
+  sgdTradingCashSgd: number;
+  cryptoCashSgd: number;
+}
+
+export function calculateMonthlyCashContributions(
   contributions: ContributionTransaction[],
+  fxRate: number,
   year?: number,
   month?: number
-): { month: string; amount: number }[] {
+): MonthlyCashContribution[] {
   const filtered = contributions.filter((c) => {
-    const d = new Date(c.date);
+    const d = parseLocalDate(c.date);
     if (year && d.getFullYear() !== year) return false;
     if (month && d.getMonth() + 1 !== month) return false;
     return true;
   });
 
-  const byMonth: Record<string, number> = {};
+  const byMonth: Record<string, MonthlyCashContribution> = {};
+
   for (const c of filtered) {
-    const d = new Date(c.date);
+    const d = parseLocalDate(c.date);
     const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
-    const amount = c.type === "deposit" ? c.amountSgd : -c.amountSgd;
-    byMonth[key] = (byMonth[key] ?? 0) + amount;
+    if (!byMonth[key]) {
+      byMonth[key] = {
+        month: key,
+        usdTradingCashSgd: 0,
+        sgdTradingCashSgd: 0,
+        cryptoCashSgd: 0,
+      };
+    }
+
+    const sign = c.type === "deposit" ? 1 : -1;
+    const impact = getContributionCashImpact(c, fxRate);
+    const resolvedFx = resolveContributionFxRate(c, fxRate);
+
+    byMonth[key].usdTradingCashSgd += sign * impact.usdTradingCashUsd * resolvedFx;
+    byMonth[key].sgdTradingCashSgd += sign * impact.sgdTradingCashSgd;
+    byMonth[key].cryptoCashSgd += sign * impact.cryptoCashSgd;
   }
 
-  return Object.entries(byMonth)
-    .sort(([a], [b]) => a.localeCompare(b))
-    .map(([month, amount]) => ({ month, amount }));
+  return Object.values(byMonth).sort((a, b) => a.month.localeCompare(b.month));
 }
 
 export function calculateYtdContribution(
@@ -64,7 +91,7 @@ export function calculateYtdContribution(
   year: number
 ): number {
   return contributions
-    .filter((c) => new Date(c.date).getFullYear() === year)
+    .filter((c) => parseLocalDate(c.date).getFullYear() === year)
     .reduce((sum, c) => {
       return c.type === "deposit" ? sum + c.amountSgd : sum - c.amountSgd;
     }, 0);

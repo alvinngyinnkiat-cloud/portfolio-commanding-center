@@ -5,7 +5,6 @@ import { usePortfolio } from "@/context/PortfolioContext";
 import type { Goal } from "@/core/domain/types";
 import { generateId } from "@/core/database/local/local-storage";
 import { formatSgd, formatDate } from "@/shared/lib/format";
-import { Card } from "@/shared/components/ui/Card";
 import { Input } from "@/shared/components/ui/Input";
 import { Select } from "@/shared/components/ui/Select";
 import { Button } from "@/shared/components/ui/Button";
@@ -62,8 +61,8 @@ export function GoalsTable() {
   };
 
   return (
-    <Card title="Goals">
-      <div className="mb-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+    <div className="space-y-6">
+      <div className="grid gap-4 rounded-xl border border-surface-border/60 bg-surface/30 p-4 sm:grid-cols-2 lg:grid-cols-4">
         <Input
           label="Goal Name"
           value={form.name}
@@ -92,7 +91,7 @@ export function GoalsTable() {
           ]}
         />
       </div>
-      <div className="mb-4 flex gap-2">
+      <div className="flex flex-wrap gap-2">
         <Button onClick={handleSubmit}>
           {editingId ? "Update Goal" : "Add Goal"}
         </Button>
@@ -109,44 +108,49 @@ export function GoalsTable() {
         )}
       </div>
 
-      <div className="overflow-x-auto">
+      <div className="overflow-x-auto rounded-xl border border-surface-border/60">
         <table className="w-full text-sm">
-          <thead>
-            <tr className="border-b border-surface-border text-left text-xs text-slate-500">
-              <th className="pb-2 pr-4">Name</th>
-              <th className="pb-2 pr-4">Target</th>
-              <th className="pb-2 pr-4">Target Date</th>
-              <th className="pb-2 pr-4">Status</th>
-              <th className="pb-2">Actions</th>
+          <thead className="bg-surface/60">
+            <tr className="border-b border-surface-border text-left text-xs font-medium uppercase tracking-wide text-slate-500">
+              <th className="px-4 py-3">Name</th>
+              <th className="px-4 py-3">Target</th>
+              <th className="px-4 py-3">Target Date</th>
+              <th className="px-4 py-3">Status</th>
+              <th className="px-4 py-3">Actions</th>
             </tr>
           </thead>
           <tbody>
             {goals.length === 0 ? (
               <tr>
-                <td colSpan={5} className="py-4 text-slate-500">
+                <td colSpan={5} className="px-4 py-8 text-center text-slate-500">
                   No goals yet.
                 </td>
               </tr>
             ) : (
               goals.map((g) => (
-                <tr key={g.id} className="border-b border-surface-border/50">
-                  <td className="py-2 pr-4 font-medium text-white">{g.name}</td>
-                  <td className="py-2 pr-4 text-slate-300">
+                <tr
+                  key={g.id}
+                  className="border-b border-surface-border/40 last:border-0 hover:bg-surface/30"
+                >
+                  <td className="px-4 py-3 font-medium text-white">{g.name}</td>
+                  <td className="px-4 py-3 text-slate-300">
                     {formatSgd(g.targetAmountSgd)}
                   </td>
-                  <td className="py-2 pr-4 text-slate-400">
+                  <td className="px-4 py-3 text-slate-400">
                     {g.targetDate ? formatDate(g.targetDate) : "—"}
                   </td>
-                  <td className="py-2 pr-4">
+                  <td className="px-4 py-3">
                     <span
-                      className={
-                        g.active ? "text-accent-green" : "text-slate-500"
-                      }
+                      className={`rounded-md px-2 py-0.5 text-xs font-medium ${
+                        g.active
+                          ? "bg-accent-green/15 text-accent-green"
+                          : "bg-surface-border/50 text-slate-500"
+                      }`}
                     >
                       {g.active ? "Active" : "Inactive"}
                     </span>
                   </td>
-                  <td className="py-2">
+                  <td className="px-4 py-3">
                     <div className="flex gap-1">
                       <Button size="sm" variant="ghost" onClick={() => handleEdit(g)}>
                         Edit
@@ -166,6 +170,6 @@ export function GoalsTable() {
           </tbody>
         </table>
       </div>
-    </Card>
+    </div>
   );
 }

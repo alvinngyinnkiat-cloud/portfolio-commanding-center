@@ -14,25 +14,30 @@ export function AssetAllocationChart({ data, total }: AssetAllocationChartProps)
   const chartData = data.filter((d) => d.value > 0);
 
   return (
-    <Card title="Asset Allocation" subtitle="Based on Own Portfolio (excludes Client Portfolio)">
+    <Card
+      title="Asset Allocation"
+      subtitle="Module-owned holdings and available cash — Stock + Crypto"
+    >
       {chartData.length === 0 ? (
-        <p className="text-sm text-slate-500">No assets to display.</p>
+        <div className="flex h-48 items-center justify-center rounded-xl border border-dashed border-surface-border bg-surface/40">
+          <p className="text-sm text-slate-500">No assets to display.</p>
+        </div>
       ) : (
-        <div className="h-72">
+        <div className="h-64 sm:h-72">
           <ResponsiveContainer width="100%" height="100%">
             <PieChart>
               <Pie
                 data={chartData}
                 cx="50%"
                 cy="50%"
-                innerRadius={60}
-                outerRadius={100}
-                paddingAngle={2}
+                innerRadius="55%"
+                outerRadius="80%"
+                paddingAngle={3}
                 dataKey="value"
                 nameKey="name"
               >
                 {chartData.map((entry) => (
-                  <Cell key={entry.name} fill={entry.color} />
+                  <Cell key={entry.name} fill={entry.color} stroke="transparent" />
                 ))}
               </Pie>
               <Tooltip
@@ -40,32 +45,38 @@ export function AssetAllocationChart({ data, total }: AssetAllocationChartProps)
                 contentStyle={{
                   backgroundColor: "#1e293b",
                   border: "1px solid #334155",
-                  borderRadius: "8px",
+                  borderRadius: "12px",
                   color: "#fff",
+                  fontSize: "13px",
                 }}
               />
               <Legend
+                layout="horizontal"
+                verticalAlign="bottom"
                 formatter={(value) => (
-                  <span className="text-sm text-slate-300">{value}</span>
+                  <span className="text-xs text-slate-400 sm:text-sm">{value}</span>
                 )}
               />
             </PieChart>
           </ResponsiveContainer>
         </div>
       )}
-      <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-4">
+      <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
         {data.map((item) => {
           const pct = total > 0 ? (item.value / total) * 100 : 0;
           return (
-            <div key={item.name} className="rounded-lg bg-surface p-3">
+            <div
+              key={item.name}
+              className="rounded-xl border border-surface-border/60 bg-surface/50 p-3"
+            >
               <div className="flex items-center gap-2">
                 <div
-                  className="h-2 w-2 rounded-full"
+                  className="h-2.5 w-2.5 rounded-full"
                   style={{ backgroundColor: item.color }}
                 />
                 <span className="text-xs text-slate-400">{item.name}</span>
               </div>
-              <p className="mt-1 text-sm font-semibold text-white">
+              <p className="mt-2 text-sm font-semibold text-white">
                 {formatSgd(item.value)}
               </p>
               <p className="text-xs text-slate-500">{pct.toFixed(1)}%</p>

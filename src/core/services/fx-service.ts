@@ -3,7 +3,7 @@ import type { DashboardSettingsRepository } from "@/core/database/repositories/d
 export class FxService {
   constructor(private settingsRepo: DashboardSettingsRepository) {}
 
-  getActiveRate(): number {
+  getActiveRate(): number | null {
     return this.settingsRepo.get().usdSgdFxRate;
   }
 }

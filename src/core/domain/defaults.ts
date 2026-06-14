@@ -2,74 +2,109 @@ import type { ContributionTransaction } from "./types/contribution";
 import type { Goal } from "./types/goal";
 import type { DailySnapshot } from "./types/snapshot";
 import type { DashboardSettings } from "./types/settings";
+import type { CashBalances, ManualPortfolioValues } from "./types/portfolio";
+
+export const DEFAULT_CASH_BALANCES: CashBalances = {
+  usdTradingCashUsd: 0,
+  sgdTradingCashSgd: 0,
+  cryptoCashSgd: 0,
+};
+
+function safeNumber(value: unknown, fallback = 0): number {
+  return typeof value === "number" && !Number.isNaN(value) ? value : fallback;
+}
+
+/** Backward-compatible cash balances (legacy stored cash fields are ignored). */
+export function normalizeCashBalances(
+  raw?: Partial<CashBalances> | null
+): CashBalances {
+  return {
+    usdTradingCashUsd: safeNumber(raw?.usdTradingCashUsd),
+    sgdTradingCashSgd: safeNumber(raw?.sgdTradingCashSgd),
+    cryptoCashSgd: safeNumber(raw?.cryptoCashSgd),
+  };
+}
+
+export const DEFAULT_MANUAL_VALUES: ManualPortfolioValues = {
+  usStocksEtfUsd: 0,
+  sgStocksSgd: 0,
+  cryptoSgd: 0,
+  clientPortfolioUsd: 0,
+};
 
 export const DEFAULT_DASHBOARD_SETTINGS: DashboardSettings = {
   usdSgdFxRate: 1.35,
-  stockCashUsd: 5000,
-  cryptoCashSgd: 2000,
-  manualValues: {
-    usStocksEtfUsd: 50000,
-    sgStocksSgd: 30000,
-    cryptoSgd: 15000,
-    clientPortfolioSgd: 20000,
-    clientPortfolioUsd: 15000,
-  },
+  manualValues: DEFAULT_MANUAL_VALUES,
 };
 
-export const DEFAULT_CONTRIBUTIONS: ContributionTransaction[] = [
-  {
-    id: "contrib-1",
-    date: "2025-01-15",
-    type: "deposit",
-    category: "stock",
-    amountSgd: 10000,
-    notes: "Initial stock deposit",
-  },
-  {
-    id: "contrib-2",
-    date: "2025-02-10",
-    type: "deposit",
-    category: "crypto",
-    amountSgd: 5000,
-    notes: "Crypto deposit",
-  },
-  {
-    id: "contrib-3",
-    date: "2025-03-05",
-    type: "deposit",
-    category: "stock",
-    amountSgd: 8000,
-    notes: "Monthly stock deposit",
-  },
-];
+export function normalizeManualPortfolioValues(
+  raw?: Partial<ManualPortfolioValues> | null
+): ManualPortfolioValues {
+  const defaults = DEFAULT_MANUAL_VALUES;
+  return {
+    usStocksEtfUsd: safeNumber(raw?.usStocksEtfUsd, defaults.usStocksEtfUsd),
+    sgStocksSgd: safeNumber(raw?.sgStocksSgd, defaults.sgStocksSgd),
+    cryptoSgd: safeNumber(raw?.cryptoSgd, defaults.cryptoSgd),
+    clientPortfolioUsd: safeNumber(
+      raw?.clientPortfolioUsd,
+      defaults.clientPortfolioUsd
+    ),
+  };
+}
 
-export const DEFAULT_GOALS: Goal[] = [
-  {
-    id: "goal-1",
-    name: "First $100K",
-    targetAmountSgd: 100000,
-    targetDate: "2026-12-31",
-    active: true,
-  },
-  {
-    id: "goal-2",
-    name: "Retirement Fund",
-    targetAmountSgd: 500000,
-    active: true,
-  },
-];
+/** @deprecated Demo seed removed — returns empty list for fresh installs. */
+export function generateDefaultContributions(): ContributionTransaction[] {
+  return [];
+}
 
-export const DEFAULT_SNAPSHOTS: DailySnapshot[] = [
-  { date: "2025-06-01", ownPortfolio: 85000, totalPortfolio: 105000, clientPortfolio: 20000, totalContribution: 20000 },
-  { date: "2025-06-02", ownPortfolio: 85200, totalPortfolio: 105200, clientPortfolio: 20000, totalContribution: 20000 },
-  { date: "2025-06-03", ownPortfolio: 84800, totalPortfolio: 104800, clientPortfolio: 20000, totalContribution: 20000 },
-  { date: "2025-06-04", ownPortfolio: 85500, totalPortfolio: 105500, clientPortfolio: 20000, totalContribution: 20000 },
-  { date: "2025-06-05", ownPortfolio: 86000, totalPortfolio: 106000, clientPortfolio: 20000, totalContribution: 20000 },
-  { date: "2025-06-06", ownPortfolio: 85800, totalPortfolio: 105800, clientPortfolio: 20000, totalContribution: 20000 },
-  { date: "2025-06-07", ownPortfolio: 86200, totalPortfolio: 106200, clientPortfolio: 20000, totalContribution: 20000 },
-  { date: "2025-06-08", ownPortfolio: 86500, totalPortfolio: 106500, clientPortfolio: 20000, totalContribution: 20000 },
-  { date: "2025-06-09", ownPortfolio: 86300, totalPortfolio: 106300, clientPortfolio: 20000, totalContribution: 20000 },
-  { date: "2025-06-10", ownPortfolio: 86800, totalPortfolio: 106800, clientPortfolio: 20000, totalContribution: 20000 },
-  { date: "2025-06-11", ownPortfolio: 87000, totalPortfolio: 107000, clientPortfolio: 20000, totalContribution: 20000 },
-  { date: "2025-06-12", ownPortfolio: 87200, totalPortfolio: 107200, clientPortfolio: 20000, totalContribution: 23000 },
-];
+export const DEFAULT_CONTRIBUTIONS: ContributionTransaction[] = [];
+
+export const DEFAULT_GOALS: Goal[] = [];
+
+/** @deprecated Demo seed removed — returns empty list for fresh installs. */
+export function generateDefaultSnapshots(): DailySnapshot[] {
+  return [];
+}
+
+export const DEFAULT_SNAPSHOTS: DailySnapshot[] = [];
+
+const DEMO_CONTRIBUTION_IDS = new Set(["contrib-1", "contrib-2", "contrib-3"]);
+const DEMO_GOAL_IDS = new Set(["goal-1", "goal-2"]);
+
+const LEGACY_DEMO_MANUAL_VALUES: ManualPortfolioValues = {
+  usStocksEtfUsd: 50_000,
+  sgStocksSgd: 30_000,
+  cryptoSgd: 15_000,
+  clientPortfolioUsd: 15_000,
+};
+
+export function isDemoContributions(
+  contributions: ContributionTransaction[]
+): boolean {
+  if (contributions.length !== 3) return false;
+  return contributions.every((c) => DEMO_CONTRIBUTION_IDS.has(c.id));
+}
+
+export function isDemoGoals(goals: Goal[]): boolean {
+  if (goals.length !== 2) return false;
+  return goals.every((g) => DEMO_GOAL_IDS.has(g.id));
+}
+
+export function isDemoSnapshots(snapshots: DailySnapshot[]): boolean {
+  if (snapshots.length !== 12) return false;
+  return snapshots.every(
+    (s) => s.clientPortfolio === 20_000 && s.snapshotType === "manual"
+  );
+}
+
+export function isDemoManualValues(
+  manualValues: ManualPortfolioValues
+): boolean {
+  return (
+    manualValues.usStocksEtfUsd === LEGACY_DEMO_MANUAL_VALUES.usStocksEtfUsd &&
+    manualValues.sgStocksSgd === LEGACY_DEMO_MANUAL_VALUES.sgStocksSgd &&
+    manualValues.cryptoSgd === LEGACY_DEMO_MANUAL_VALUES.cryptoSgd &&
+    manualValues.clientPortfolioUsd ===
+      LEGACY_DEMO_MANUAL_VALUES.clientPortfolioUsd
+  );
+}

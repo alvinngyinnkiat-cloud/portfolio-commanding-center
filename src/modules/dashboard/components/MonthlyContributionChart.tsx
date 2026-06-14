@@ -8,29 +8,36 @@ import {
   YAxis,
   CartesianGrid,
   Tooltip,
+  Legend,
   ResponsiveContainer,
 } from "recharts";
 import type { ContributionTransaction } from "@/core/domain/types";
 import {
-  calculateTotalContribution,
-  calculateMonthlyContributions,
+  calculateMonthlyCashContributions,
   calculateYtdContribution,
 } from "@/core/calculations";
 import { formatSgd } from "@/shared/lib/format";
+import { parseLocalDate } from "@/shared/lib/date";
 import { Card } from "@/shared/components/ui/Card";
 import { Select } from "@/shared/components/ui/Select";
 
 interface MonthlyContributionChartProps {
   contributions: ContributionTransaction[];
+  fxRate: number;
+  totalContribution: number;
 }
 
 export function MonthlyContributionChart({
   contributions,
+  fxRate,
+  totalContribution,
 }: MonthlyContributionChartProps) {
   const currentYear = new Date().getFullYear();
   const years = useMemo(() => {
     const set = new Set<number>();
-    contributions.forEach((c) => set.add(new Date(c.date).getFullYear()));
+    contributions.forEach((c) =>
+      set.add(parseLocalDate(c.date).getFullYear())
+    );
     if (set.size === 0) set.add(currentYear);
     return Array.from(set).sort();
   }, [contributions, currentYear]);
@@ -40,21 +47,21 @@ export function MonthlyContributionChart({
   );
   const [selectedMonth, setSelectedMonth] = useState<string>("all");
 
-  const totalContribution = calculateTotalContribution(contributions);
   const ytdContribution = calculateYtdContribution(contributions, selectedYear);
 
   const monthlyData = useMemo(() => {
     const monthNum =
       selectedMonth === "all" ? undefined : parseInt(selectedMonth, 10);
-    return calculateMonthlyContributions(
+    return calculateMonthlyCashContributions(
       contributions,
+      fxRate,
       selectedYear,
       monthNum
     ).map((d) => ({
       ...d,
       label: d.month,
     }));
-  }, [contributions, selectedYear, selectedMonth]);
+  }, [contributions, fxRate, selectedYear, selectedMonth]);
 
   const monthOptions = [
     { value: "all", label: "All Months" },
@@ -65,23 +72,27 @@ export function MonthlyContributionChart({
   ];
 
   return (
-    <Card title="Monthly Contribution" subtitle="Deposit and withdrawal history">
+    <Card
+      title="Monthly Contribution"
+      subtitle="Cash impact by account (SGD amounts)"
+    >
       <div className="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-3">
-        <div className="rounded-lg bg-surface p-3">
-          <p className="text-xs text-slate-500">Total Contribution</p>
-          <p className="text-sm font-semibold text-white">
+        <div className="rounded-xl border border-surface-border/60 bg-surface/50 p-3">
+          <p className="text-xs font-medium text-slate-500">Total Contribution</p>
+          <p className="mt-1 text-sm font-semibold text-white">
             {formatSgd(totalContribution)}
           </p>
+          <p className="mt-0.5 text-xs text-slate-500">Stock + Crypto (Module adapters)</p>
         </div>
-        <div className="rounded-lg bg-surface p-3">
-          <p className="text-xs text-slate-500">YTD Contribution</p>
-          <p className="text-sm font-semibold text-white">
+        <div className="rounded-xl border border-surface-border/60 bg-surface/50 p-3">
+          <p className="text-xs font-medium text-slate-500">YTD Contribution</p>
+          <p className="mt-1 text-sm font-semibold text-white">
             {formatSgd(ytdContribution)}
           </p>
         </div>
-        <div className="rounded-lg bg-surface p-3">
-          <p className="text-xs text-slate-500">Transactions</p>
-          <p className="text-sm font-semibold text-white">
+        <div className="rounded-xl border border-surface-border/60 bg-surface/50 p-3">
+          <p className="text-xs font-medium text-slate-500">Transactions</p>
+          <p className="mt-1 text-sm font-semibold text-white">
             {contributions.length}
           </p>
         </div>
@@ -103,9 +114,13 @@ export function MonthlyContributionChart({
       </div>
 
       {monthlyData.length === 0 ? (
-        <p className="text-sm text-slate-500">No contribution data for this period.</p>
+        <div className="flex h-48 items-center justify-center rounded-xl border border-dashed border-surface-border bg-surface/40">
+          <p className="text-sm text-slate-500">
+            No contribution data for this period.
+          </p>
+        </div>
       ) : (
-        <div className="h-64">
+        <div className="h-56 sm:h-72">
           <ResponsiveContainer width="100%" height="100%">
             <BarChart data={monthlyData}>
               <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
@@ -124,14 +139,33 @@ export function MonthlyContributionChart({
                 contentStyle={{
                   backgroundColor: "#1e293b",
                   border: "1px solid #334155",
-                  borderRadius: "8px",
+                  borderRadius: "12px",
                   color: "#fff",
                 }}
               />
+              <Legend
+                formatter={(value) => (
+                  <span className="text-xs text-slate-400">{value}</span>
+                )}
+              />
               <Bar
-                dataKey="amount"
-                name="Net Contribution"
+                dataKey="usdTradingCashSgd"
+                name="USD Trading Cash"
+                stackId="cash"
                 fill="#3b82f6"
+                radius={[0, 0, 0, 0]}
+              />
+              <Bar
+                dataKey="sgdTradingCashSgd"
+                name="SGD Trading Cash"
+                stackId="cash"
+                fill="#8b5cf6"
+              />
+              <Bar
+                dataKey="cryptoCashSgd"
+                name="Crypto Cash"
+                stackId="cash"
+                fill="#f59e0b"
                 radius={[4, 4, 0, 0]}
               />
             </BarChart>

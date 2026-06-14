@@ -3,15 +3,23 @@ import type { DashboardSettingsRepository } from "../repositories/dashboard-sett
 import { DEFAULT_DASHBOARD_SETTINGS } from "@/core/domain/defaults";
 import { STORAGE_KEYS } from "./storage-keys";
 import { readJson, writeJson } from "./local-storage";
+import { normalizeDashboardSettings } from "./normalize-settings";
 
 export class LocalDashboardSettingsRepository
   implements DashboardSettingsRepository
 {
   get(): DashboardSettings {
-    return readJson(STORAGE_KEYS.dashboardSettings, DEFAULT_DASHBOARD_SETTINGS);
+    const raw = readJson(
+      STORAGE_KEYS.dashboardSettings,
+      DEFAULT_DASHBOARD_SETTINGS
+    );
+    return normalizeDashboardSettings(raw);
   }
 
   save(settings: DashboardSettings): void {
-    writeJson(STORAGE_KEYS.dashboardSettings, settings);
+    writeJson(
+      STORAGE_KEYS.dashboardSettings,
+      normalizeDashboardSettings(settings)
+    );
   }
 }

@@ -1,6 +1,11 @@
 import type { DailySnapshot } from "@/core/domain/types";
 import type { SnapshotRepository } from "@/core/database/repositories/snapshot-repository";
 import { createDailySnapshot } from "@/core/calculations/snapshots";
+import {
+  getSingaporeDateString,
+  isSingaporeEndOfDayCaptureWindow,
+  hasSnapshotForDate,
+} from "@/core/calculations/snapshot-schedule";
 import type { PortfolioAggregator } from "./portfolio-aggregator";
 
 export class SnapshotService {
@@ -10,12 +15,58 @@ export class SnapshotService {
   ) {}
 
   list(): DailySnapshot[] {
-    return this.repo.list();
+    return this.repo.list().sort((a, b) => b.date.localeCompare(a.date));
   }
 
-  captureNow(): DailySnapshot {
-    const { inputs, metrics } = this.aggregator.getPortfolioState();
-    const snapshot = createDailySnapshot(inputs, metrics);
+  delete(date: string): void {
+    this.repo.delete(date);
+  }
+
+  /** Manual capture from Settings → Snapshots (v1.1 localStorage). */
+  captureNow(): DailySnapshot | null {
+    const state = this.aggregator.getPortfolioState();
+    if (!state.fxRateValid || !state.inputs || !state.metrics) {
+      return null;
+    }
+
+    const snapshot = createDailySnapshot(state.inputs, state.metrics, {
+      snapshotType: "manual",
+      createdAt: new Date().toISOString(),
+    });
+    this.repo.upsert(snapshot);
+    return snapshot;
+  }
+
+  /**
+   * End-of-day auto capture at 11:59pm Singapore time.
+   *
+   * v1.1 (localStorage): polled client-side while the dashboard is open.
+   * Future: replace with a server scheduled job (Supabase cron / edge function)
+   * calling the same capture logic once per day at 23:59 Asia/Singapore.
+   *
+   * Returns the new snapshot when captured; null when not due or already captured today.
+   */
+  captureEndOfDayIfDue(): DailySnapshot | null {
+    if (!isSingaporeEndOfDayCaptureWindow()) {
+      return null;
+    }
+
+    const date = getSingaporeDateString();
+    const existing = this.repo.list();
+    if (hasSnapshotForDate(existing, date)) {
+      return null;
+    }
+
+    const state = this.aggregator.getPortfolioState();
+    if (!state.fxRateValid || !state.inputs || !state.metrics) {
+      return null;
+    }
+
+    const snapshot = createDailySnapshot(state.inputs, state.metrics, {
+      date,
+      snapshotType: "automatic",
+      createdAt: new Date().toISOString(),
+    });
     this.repo.upsert(snapshot);
     return snapshot;
   }
