@@ -286,6 +286,7 @@ export function OpenTradeModal({
     if (!optionsData || !data || !stockData) return null;
     const cash = buildUsAvailableCashResult({
       contributions: data.contributions,
+      fxConversions: stockData?.cashFlow.fxConversions ?? [],
       stockTransactions: stockData.transactions,
       fxRate: optionsData.fxRate,
       realizedOptionsPlUsd: optionsData.summary.totalRealizedPlUsd,

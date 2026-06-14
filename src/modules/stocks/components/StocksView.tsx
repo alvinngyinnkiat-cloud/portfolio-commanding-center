@@ -5,6 +5,8 @@ import { SectionHeader } from "@/shared/components/ui/SectionHeader";
 import { Tabs } from "@/shared/components/ui/Tabs";
 import { StockHoldingsTable } from "./StockHoldingsTable";
 import { StockTransactionsTable } from "./StockTransactionsTable";
+import { StockCashFlowSection } from "./StockCashFlowSection";
+import { StockMarketAllocationSection } from "./StockMarketAllocationSection";
 
 function StocksSkeleton() {
   return (
@@ -32,6 +34,22 @@ export function StocksView() {
           Transaction ledger · Derived holdings · Auto price updates
         </p>
       </header>
+
+      <section>
+        <SectionHeader
+          title="Stock Tracker Cash Flow"
+          description="Deposits increase SGD cash and contribution. FX conversions move cash between SGD and USD pools without changing contribution."
+        />
+        <StockCashFlowSection />
+      </section>
+
+      <section>
+        <SectionHeader
+          title="Stock Market Allocation"
+          description="Holdings plus available cash per market — target 75% US / 25% SG"
+        />
+        <StockMarketAllocationSection />
+      </section>
 
       <Tabs
         defaultTab="holdings"

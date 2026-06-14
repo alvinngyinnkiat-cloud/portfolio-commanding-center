@@ -26,6 +26,11 @@
 --       quantity, price, grossAmount, fees, netAmount, currency, notes?, createdAt }
 --     All stock is personal/own portfolio — no personal/client field by design.
 --
+--   stock_fx_conversions.data → StockFxConversion (SGD ↔ USD pool transfers)
+--     { id, date, direction: sgd_to_usd|usd_to_sgd, sgdAmount, usdAmount,
+--       notes?, createdAt }
+--     FX rate is derived at runtime: sgdAmount / usdAmount. Does not affect contribution.
+--
 --   crypto_transactions.data → CryptoHolding (manual valuation rows, NOT a cash ledger)
 --     { id, assetName, investedSgd, feesSgd?, currentValueSgd, notes? }
 --     Crypto deposits/withdrawals are in contributions (category=crypto).
@@ -101,6 +106,15 @@ CREATE TABLE IF NOT EXISTS stock_transactions (
 );
 
 -- ---------------------------------------------------------------------------
+-- stock_fx_conversions (Stock Tracker cash flow — SGD ↔ USD conversions)
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS stock_fx_conversions (
+  id text PRIMARY KEY,
+  data jsonb NOT NULL,
+  updated_at timestamptz NOT NULL DEFAULT now()
+);
+
+-- ---------------------------------------------------------------------------
 -- crypto_transactions (Crypto Tracker holdings — manual valuation rows)
 -- ---------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS crypto_transactions (
@@ -139,6 +153,7 @@ ALTER TABLE contributions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE goals ENABLE ROW LEVEL SECURITY;
 ALTER TABLE portfolio_snapshots ENABLE ROW LEVEL SECURITY;
 ALTER TABLE stock_transactions ENABLE ROW LEVEL SECURITY;
+ALTER TABLE stock_fx_conversions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE crypto_transactions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE options_trades ENABLE ROW LEVEL SECURITY;
 ALTER TABLE watchlist_items ENABLE ROW LEVEL SECURITY;
@@ -148,6 +163,7 @@ CREATE POLICY "pcc_contributions_all" ON contributions FOR ALL USING (true) WITH
 CREATE POLICY "pcc_goals_all" ON goals FOR ALL USING (true) WITH CHECK (true);
 CREATE POLICY "pcc_snapshots_all" ON portfolio_snapshots FOR ALL USING (true) WITH CHECK (true);
 CREATE POLICY "pcc_stock_tx_all" ON stock_transactions FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "pcc_stock_fx_all" ON stock_fx_conversions FOR ALL USING (true) WITH CHECK (true);
 CREATE POLICY "pcc_crypto_tx_all" ON crypto_transactions FOR ALL USING (true) WITH CHECK (true);
 CREATE POLICY "pcc_options_trades_all" ON options_trades FOR ALL USING (true) WITH CHECK (true);
 CREATE POLICY "pcc_watchlist_all" ON watchlist_items FOR ALL USING (true) WITH CHECK (true);

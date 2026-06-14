@@ -4,6 +4,11 @@ import type {
   ContributionCashImpact,
   CashBalances,
 } from "@/core/domain/types";
+import type { StockFxConversion } from "@/core/domain/types/stock-fx-conversion";
+import {
+  calculateSgStockFxCashSgd,
+  calculateUsStockFxCashUsd,
+} from "@/core/calculations/stocks/cash-flow";
 import { sgdToUsd } from "./fx";
 import { isValidFxRate } from "./fx-validation";
 
@@ -73,16 +78,9 @@ export function getContributionCashImpact(
     };
   }
 
-  const fxRate = resolveContributionFxRate(transaction, fallbackFxRate);
-  const allocation = calculateStockAllocation(
-    transaction.amountSgd,
-    transaction.usdAllocationPercent,
-    fxRate
-  );
-
   return {
-    usdTradingCashUsd: allocation.usdAmountUsd,
-    sgdTradingCashSgd: allocation.sgdAmountSgd,
+    usdTradingCashUsd: 0,
+    sgdTradingCashSgd: transaction.amountSgd,
     cryptoCashSgd: 0,
   };
 }
@@ -126,18 +124,11 @@ export function getContributionCashDisplay(
     };
   }
 
-  const fxRate = resolveContributionFxRate(transaction, fallbackFxRate);
-  const allocation = calculateStockAllocation(
-    transaction.amountSgd,
-    transaction.usdAllocationPercent,
-    fxRate
-  );
-
   return {
-    fxRate,
-    usdAllocationPercent: allocation.usdAllocationPercent,
-    sgdAllocationPercent: allocation.sgdAllocationPercent,
-    usdCashAddedUsd: sign * impact.usdTradingCashUsd,
+    fxRate: null,
+    usdAllocationPercent: null,
+    sgdAllocationPercent: null,
+    usdCashAddedUsd: 0,
     sgdCashAddedSgd: sign * impact.sgdTradingCashSgd,
     cryptoCashAddedSgd: 0,
   };
@@ -161,13 +152,14 @@ export function calculateUsdOverdeployment(
   return excess > 0 ? excess : 0;
 }
 
-/** Cash balances derived from contribution transactions (not manually stored). */
+/** Cash balances derived from contribution transactions and stock FX conversions. */
 export function calculateCashBalancesFromContributions(
   contributions: ContributionTransaction[],
-  fallbackFxRate: number
+  fallbackFxRate: number,
+  fxConversions: StockFxConversion[] = []
 ): CashBalances {
-  let usdTradingCashUsd = 0;
-  let sgdTradingCashSgd = 0;
+  let usdTradingCashUsd = calculateUsStockFxCashUsd(fxConversions);
+  let sgdTradingCashSgd = calculateSgStockFxCashSgd(fxConversions);
   let cryptoCashSgd = 0;
 
   for (const transaction of contributions) {

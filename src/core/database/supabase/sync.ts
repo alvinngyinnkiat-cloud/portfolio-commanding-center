@@ -66,6 +66,13 @@ export async function syncOptionsTrades(
   await replaceTable(client, "options_trades", "id", rows);
 }
 
+export async function syncStockFxConversions(
+  client: SupabaseClient,
+  rows: PersistenceCache["stockFxConversions"]
+): Promise<void> {
+  await replaceTable(client, "stock_fx_conversions", "id", rows);
+}
+
 export async function syncWatchlist(
   client: SupabaseClient,
   rows: PersistenceCache["scannerWatchlist"]
@@ -95,7 +102,8 @@ async function replaceTable<T extends { id?: string; date?: string }>(
     | "portfolio_snapshots"
     | "stock_transactions"
     | "crypto_transactions"
-    | "options_trades",
+    | "options_trades"
+    | "stock_fx_conversions",
   key: "id" | "date",
   rows: T[]
 ): Promise<void> {

@@ -127,6 +127,8 @@ export function calculatePortfolioMetrics(
     stockHoldingsValueSgd: inputs.stockHoldingsValueSgd,
     stockProfitLossSgd: inputs.stockProfitLossSgd,
     stockAvailableTradingCashSgd: inputs.stockAvailableTradingCashSgd,
+    usMarketValueSgd: inputs.usMarketValueSgd,
+    sgMarketValueSgd: inputs.sgMarketValueSgd,
     cryptoContributionSgd: inputs.cryptoContributionSgd,
     totalCryptoValueSgd: inputs.totalCryptoValueSgd,
     cryptoHoldingsValueSgd: inputs.cryptoHoldingsValueSgd,

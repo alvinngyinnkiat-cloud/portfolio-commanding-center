@@ -21,6 +21,7 @@ import { runScannerManualRefresh } from "./scanner-refresh-service";
 import { OptionsTradeService } from "./options-trade-service";
 import { OptionsSettingsService } from "./options-settings-service";
 import { OptionsTrackerService } from "./options-tracker-service";
+import { StockFxConversionService } from "./stock-fx-conversion-service";
 
 export interface PortfolioServiceFetchers {
   stockQuoteFetcher?: ReturnType<typeof createBrowserStockQuoteFetcher>;
@@ -39,7 +40,9 @@ export function createPortfolioServices(
   const stockTracker = new StockTrackerService(
     repos.stockTransactions,
     repos.stockPrices,
-    repos.dashboardSettings
+    repos.dashboardSettings,
+    repos.contributions,
+    repos.stockFxConversions
   );
 
   const stockPriceUpdates = new StockPriceUpdateService(
@@ -90,7 +93,8 @@ export function createPortfolioServices(
     repos.scannerWatchlist,
     repos.stockPrices,
     repos.stockDailyCandles,
-    repos.scannerResults
+    repos.scannerResults,
+    repos.stockFxConversions
   );
 
   const aggregator = new PortfolioAggregator(
@@ -129,6 +133,7 @@ export function createPortfolioServices(
     ),
     optionsSettings: new OptionsSettingsService(repos.optionsSettings),
     optionsTracker,
+    stockFxConversions: new StockFxConversionService(repos.stockFxConversions),
     refreshScannerNow: async (date: Date = new Date()) =>
       runScannerManualRefresh(
         (refreshDate) => stockCandleUpdates.updateUsCandles(refreshDate),

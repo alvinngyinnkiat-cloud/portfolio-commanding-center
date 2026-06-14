@@ -220,9 +220,10 @@ export function StockHoldingsTable() {
         contributions,
         transactions,
         fxRate,
-        sumRealizedOptionsPlUsd(optionsData?.trades ?? [])
+        sumRealizedOptionsPlUsd(optionsData?.trades ?? []),
+        stockData?.cashFlow.fxConversions ?? []
       ),
-    [holdings, contributions, transactions, fxRate, optionsData?.trades]
+    [holdings, contributions, transactions, fxRate, optionsData?.trades, stockData?.cashFlow.fxConversions]
   );
 
   const handleRefreshPrices = async () => {

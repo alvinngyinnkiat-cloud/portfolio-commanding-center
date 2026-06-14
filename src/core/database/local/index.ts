@@ -19,6 +19,7 @@ import { LocalCryptoHoldingRepository } from "./local-crypto-holding-repository"
 import { LocalCryptoAllocationRepository } from "./local-crypto-allocation-repository";
 import { LocalOptionsTradeRepository } from "./local-options-trade-repository";
 import { LocalOptionsSettingsRepository } from "./local-options-settings-repository";
+import { LocalStockFxConversionRepository } from "./local-stock-fx-conversion-repository";
 
 export function createLocalRepositories() {
   migrateLegacyStorageIfNeeded();
@@ -41,6 +42,7 @@ export function createLocalRepositories() {
     cryptoAllocation: new LocalCryptoAllocationRepository(),
     optionsTrades: new LocalOptionsTradeRepository(),
     optionsSettings: new LocalOptionsSettingsRepository(),
+    stockFxConversions: new LocalStockFxConversionRepository(),
   };
 }
 

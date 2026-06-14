@@ -10,6 +10,8 @@ export function emptyModuleContributionInputs(): Pick<
   | "stockHoldingsValueSgd"
   | "stockProfitLossSgd"
   | "stockAvailableTradingCashSgd"
+  | "usMarketValueSgd"
+  | "sgMarketValueSgd"
   | "usAvailableTradingCashUsd"
   | "sgAvailableTradingCashSgd"
   | "cryptoContributionSgd"
@@ -32,6 +34,8 @@ export function emptyModuleContributionInputs(): Pick<
     stockHoldingsValueSgd: 0,
     stockProfitLossSgd: 0,
     stockAvailableTradingCashSgd: 0,
+    usMarketValueSgd: 0,
+    sgMarketValueSgd: 0,
     usAvailableTradingCashUsd: 0,
     sgAvailableTradingCashSgd: 0,
     cryptoContributionSgd: 0,

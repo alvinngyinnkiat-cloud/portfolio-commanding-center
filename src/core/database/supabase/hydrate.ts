@@ -113,7 +113,7 @@ export async function hydrateCacheFromSupabase(
     cache.migratedFromLocal = row.migrated_from_local === true;
   }
 
-  const [contributionsRes, goalsRes, snapshotsRes, stockRes, cryptoRes, optionsRes, watchlistRes] =
+  const [contributionsRes, goalsRes, snapshotsRes, stockRes, cryptoRes, optionsRes, fxRes, watchlistRes] =
     await Promise.all([
       client.from("contributions").select("data"),
       client.from("goals").select("data"),
@@ -121,6 +121,7 @@ export async function hydrateCacheFromSupabase(
       client.from("stock_transactions").select("data"),
       client.from("crypto_transactions").select("data"),
       client.from("options_trades").select("data"),
+      client.from("stock_fx_conversions").select("data"),
       client.from("watchlist_items").select("data, sort_order").order("sort_order"),
     ]);
 
@@ -131,6 +132,7 @@ export async function hydrateCacheFromSupabase(
     stockRes,
     cryptoRes,
     optionsRes,
+    fxRes,
     watchlistRes,
   ]) {
     if (res.error) throw res.error;
@@ -145,6 +147,7 @@ export async function hydrateCacheFromSupabase(
     cryptoRes.data?.map((row) => row.data) ?? []
   );
   cache.optionsTrades = optionsRes.data?.map((row) => row.data) ?? [];
+  cache.stockFxConversions = fxRes.data?.map((row) => row.data) ?? [];
 
   const watchlistRows = watchlistRes.data ?? [];
   if (watchlistRows.length > 0) {
@@ -202,6 +205,12 @@ export async function importCacheToSupabase(
     (row) => row.id
   );
   await replaceJsonRows(client, "options_trades", cache.optionsTrades, (row) => row.id);
+  await replaceJsonRows(
+    client,
+    "stock_fx_conversions",
+    cache.stockFxConversions,
+    (row) => row.id
+  );
 
   const watchlistRows = cache.scannerWatchlist.map((entry, index) => ({
     id: watchlistStorageKey(entry, index),
@@ -231,7 +240,8 @@ async function replaceJsonRows<T>(
     | "portfolio_snapshots"
     | "stock_transactions"
     | "crypto_transactions"
-    | "options_trades",
+    | "options_trades"
+    | "stock_fx_conversions",
   rows: T[],
   idFor: (row: T) => string
 ): Promise<void> {

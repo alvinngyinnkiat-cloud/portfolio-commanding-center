@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { ContributionTransaction } from "@/core/domain/types";
+import type { StockFxConversion } from "@/core/domain/types/stock-fx-conversion";
 import {
   calculateNetStockCashContributedSgd,
   calculateSgNetStockCashContributedSgd,
@@ -19,71 +20,52 @@ function stockTx(
 }
 
 describe("Module 2 net stock cash", () => {
-  it("acceptance: US/SG allocation from stock deposits only", () => {
+  it("deposits add to SGD pool; US SGD leg is zero", () => {
     const contributions: ContributionTransaction[] = [
-      stockTx({
-        id: "c1",
-        type: "deposit",
-        amountSgd: 10_800,
-        usdAllocationPercent: 100,
-      }),
-      stockTx({
-        id: "c2",
-        type: "deposit",
-        amountSgd: 4_000,
-        usdAllocationPercent: 0,
-      }),
+      stockTx({ id: "c1", type: "deposit", amountSgd: 10_800 }),
+      stockTx({ id: "c2", type: "deposit", amountSgd: 4_000 }),
     ];
 
-    expect(calculateUsNetStockCashContributedSgd(contributions)).toBe(10_800);
-    expect(calculateSgNetStockCashContributedSgd(contributions)).toBe(4_000);
+    expect(calculateUsNetStockCashContributedSgd(contributions)).toBe(0);
+    expect(calculateSgNetStockCashContributedSgd(contributions)).toBe(14_800);
     expect(calculateNetStockCashContributedSgd(contributions)).toBe(14_800);
   });
 
-  it("acceptance: 75/25 split allocates SGD legs without FX conversion", () => {
+  it("FX conversions adjust SGD pool without changing contribution total", () => {
     const contributions: ContributionTransaction[] = [
-      stockTx({
-        id: "c1",
-        type: "deposit",
-        amountSgd: 10_000,
-        usdAllocationPercent: 75,
-      }),
+      stockTx({ id: "c1", type: "deposit", amountSgd: 10_000 }),
+    ];
+    const fxConversions: StockFxConversion[] = [
+      {
+        id: "fx-1",
+        date: "2025-01-02",
+        direction: "sgd_to_usd",
+        sgdAmount: 7_500,
+        usdAmount: 5_769.23,
+        createdAt: "2025-01-02T00:00:00.000Z",
+      },
     ];
 
-    expect(calculateUsNetStockCashContributedSgd(contributions)).toBe(7_500);
-    expect(calculateSgNetStockCashContributedSgd(contributions)).toBe(2_500);
+    expect(calculateSgNetStockCashContributedSgd(contributions, fxConversions)).toBe(
+      2_500
+    );
     expect(calculateNetStockCashContributedSgd(contributions)).toBe(10_000);
   });
 
-  it("acceptance: stock withdrawals reduce allocated legs", () => {
+  it("stock withdrawals reduce deposit net and SGD pool", () => {
     const contributions: ContributionTransaction[] = [
-      stockTx({
-        id: "c1",
-        type: "deposit",
-        amountSgd: 10_000,
-        usdAllocationPercent: 100,
-      }),
-      stockTx({
-        id: "c2",
-        type: "withdrawal",
-        amountSgd: 2_000,
-        usdAllocationPercent: 50,
-      }),
+      stockTx({ id: "c1", type: "deposit", amountSgd: 10_000 }),
+      stockTx({ id: "c2", type: "withdrawal", amountSgd: 2_000 }),
     ];
 
-    expect(calculateUsNetStockCashContributedSgd(contributions)).toBe(9_000);
-    expect(calculateSgNetStockCashContributedSgd(contributions)).toBe(-1_000);
+    expect(calculateUsNetStockCashContributedSgd(contributions)).toBe(0);
+    expect(calculateSgNetStockCashContributedSgd(contributions)).toBe(8_000);
     expect(calculateNetStockCashContributedSgd(contributions)).toBe(8_000);
   });
 
   it("excludes crypto deposits and non-stock activity", () => {
     const contributions: ContributionTransaction[] = [
-      stockTx({
-        id: "c1",
-        type: "deposit",
-        amountSgd: 5_000,
-        usdAllocationPercent: 100,
-      }),
+      stockTx({ id: "c1", type: "deposit", amountSgd: 5_000 }),
       {
         id: "c2",
         date: "2025-01-02",
@@ -95,8 +77,8 @@ describe("Module 2 net stock cash", () => {
 
     const summary = summarizeNetStockCashBreakdown(contributions);
 
-    expect(summary.usNetStockCashContributedSgd).toBe(5_000);
-    expect(summary.sgNetStockCashContributedSgd).toBe(0);
+    expect(summary.usNetStockCashContributedSgd).toBe(0);
+    expect(summary.sgNetStockCashContributedSgd).toBe(5_000);
     expect(summary.netStockCashContributedSgd).toBe(5_000);
   });
 });

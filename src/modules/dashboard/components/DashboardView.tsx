@@ -180,9 +180,16 @@ export function DashboardView() {
           <SummaryCard
             compact
             label="Total Stock Value"
-            value={formatSgd(metrics.stockHoldingsValueSgd)}
-            subValue={`US Holdings: ${formatSgd(metrics.usStocksEtfSgd)}\nSG Holdings: ${formatSgd(metrics.sgStocksSgd)}`}
+            value={formatSgd(metrics.totalStockValueSgd)}
+            subValue={`US Market: ${formatSgd(metrics.usMarketValueSgd)}\nSG Market: ${formatSgd(metrics.sgMarketValueSgd)}`}
             icon={<Globe size={16} />}
+          />
+          <SummaryCard
+            compact
+            label="Stock Contribution"
+            value={formatSgd(metrics.totalStockContributionSgd)}
+            subValue={`Stock P/L: ${formatSgd(metrics.stockProfitLossSgd)}`}
+            icon={<PiggyBank size={16} />}
           />
           <SummaryCard
             compact

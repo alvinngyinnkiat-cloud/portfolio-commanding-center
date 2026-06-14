@@ -20,6 +20,7 @@ import {
   syncCryptoHoldings,
   syncGoals,
   syncOptionsTrades,
+  syncStockFxConversions,
   syncSettingsRow,
   syncSnapshots,
   syncStockTransactions,
@@ -171,6 +172,14 @@ export class PersistenceManager {
     void this.runSync(() =>
       this.client
         ? syncOptionsTrades(this.client, this.cache.optionsTrades)
+        : Promise.resolve()
+    );
+  }
+
+  queueStockFxConversionsSync(): void {
+    void this.runSync(() =>
+      this.client
+        ? syncStockFxConversions(this.client, this.cache.stockFxConversions)
         : Promise.resolve()
     );
   }

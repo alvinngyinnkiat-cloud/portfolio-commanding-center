@@ -19,6 +19,7 @@ import type {
   OptionsTradeRepository,
   OptionsSettingsRepository,
 } from "./repositories/options-repository";
+import type { StockFxConversionRepository } from "./repositories/stock-fx-conversion-repository";
 
 export interface RepositoryBundle {
   contributions: ContributionRepository;
@@ -38,4 +39,5 @@ export interface RepositoryBundle {
   cryptoAllocation: CryptoAllocationRepository;
   optionsTrades: OptionsTradeRepository;
   optionsSettings: OptionsSettingsRepository;
+  stockFxConversions: StockFxConversionRepository;
 }

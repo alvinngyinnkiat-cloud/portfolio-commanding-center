@@ -6,6 +6,7 @@ import type {
   StockTransaction,
 } from "@/core/domain/types";
 import type { OptionsSettings, OptionsTrade } from "@/core/domain/types/options";
+import type { StockFxConversion } from "@/core/domain/types/stock-fx-conversion";
 import { buildStockTrackerSummary } from "@/core/calculations/stocks/summary";
 import { buildCryptoTrackerSummary } from "@/core/calculations/crypto/summary";
 import { calculateTotalCryptoCashContributed } from "@/core/calculations/crypto/contributions";
@@ -126,22 +127,36 @@ function optionsTrade(overrides: Partial<OptionsTrade>): OptionsTrade {
   };
 }
 
+function fxToUsd(usdAmount: number, sgdAmount: number, id = "fx-1"): StockFxConversion {
+  return {
+    id,
+    date: "2025-01-01",
+    direction: "sgd_to_usd",
+    sgdAmount,
+    usdAmount,
+    createdAt: "2025-01-01T00:00:00.000Z",
+  };
+}
+
 function assembleDashboardMetrics(input: {
   holdings: CalculatedHolding[];
   stockTransactions: StockTransaction[];
   contributions: ContributionTransaction[];
+  fxConversions?: StockFxConversion[];
   cryptoHoldings: CryptoHolding[];
   optionsTrades: OptionsTrade[];
   optionsSettings?: OptionsSettings;
 }) {
   const contributions = input.contributions;
+  const fxConversions = input.fxConversions ?? [];
   const realizedOptionsPlUsd = sumRealizedOptionsPlUsd(input.optionsTrades);
   const stockSummary = buildStockTrackerSummary(
     input.holdings,
     contributions,
     input.stockTransactions,
     FX,
-    realizedOptionsPlUsd
+    realizedOptionsPlUsd,
+    fxConversions
   );
   const stockValues = deriveDashboardStockValues(input.holdings, FX);
   const cryptoCash = calculateTotalCryptoCashContributed(contributions);
@@ -160,6 +175,7 @@ function assembleDashboardMetrics(input: {
   );
   const optionsSummary = buildOptionsTrackerSummary({
     contributions,
+    fxConversions,
     stockTransactions: input.stockTransactions,
     optionsTrades: input.optionsTrades,
     fxRate: FX,
@@ -282,6 +298,7 @@ describe("dashboard integration QA — 9-step plan", () => {
         holdings,
         stockTransactions,
         contributions,
+        fxConversions: [fxToUsd(10_000, 13_500)],
         cryptoHoldings: [],
         optionsTrades: [],
       });
@@ -516,6 +533,7 @@ describe("dashboard integration QA — 9-step plan", () => {
       holdings: [],
       stockTransactions: [],
       contributions,
+      fxConversions: [fxToUsd(10_000, 13_500)],
       cryptoHoldings: [],
       optionsTrades: trades,
     });

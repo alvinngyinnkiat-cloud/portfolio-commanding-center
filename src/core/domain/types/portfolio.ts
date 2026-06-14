@@ -47,6 +47,8 @@ export interface PortfolioInputs {
   stockHoldingsValueSgd: number;
   stockProfitLossSgd: number;
   stockAvailableTradingCashSgd: number;
+  usMarketValueSgd: number;
+  sgMarketValueSgd: number;
   /** Module 3 — capital deployed (buy + fees) */
   cryptoContributionSgd: number;
   /** Module 3 — capital model outputs (adapter pass-through) */
@@ -87,6 +89,8 @@ export interface PortfolioMetrics {
   stockHoldingsValueSgd: number;
   stockProfitLossSgd: number;
   stockAvailableTradingCashSgd: number;
+  usMarketValueSgd: number;
+  sgMarketValueSgd: number;
   /** Module 3 — capital deployed */
   cryptoContributionSgd: number;
   /** Module 3 — capital model (adapter pass-through) */

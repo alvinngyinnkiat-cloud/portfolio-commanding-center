@@ -86,6 +86,7 @@ export function exportLocalStorageCache(): PersistenceCache {
   cache.optionsSettings = normalizeOptionsSettings(
     readJson(STORAGE_KEYS.optionsSettings, DEFAULT_OPTIONS_SETTINGS)
   );
+  cache.stockFxConversions = readJson(STORAGE_KEYS.stockFxConversions, []);
 
   return normalizeCache(cache);
 }

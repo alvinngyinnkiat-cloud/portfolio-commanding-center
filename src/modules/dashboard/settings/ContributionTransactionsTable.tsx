@@ -1,16 +1,13 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useState } from "react";
 import { usePortfolio } from "@/context/PortfolioContext";
 import type {
   ContributionTransaction,
   ContributionType,
   ContributionCategory,
 } from "@/core/domain/types";
-import {
-  calculateStockAllocation,
-  getContributionCashDisplay,
-} from "@/core/calculations/contribution-cash";
+import { getContributionCashDisplay } from "@/core/calculations/contribution-cash";
 import { isValidFxRate } from "@/core/calculations/fx-validation";
 import { generateId } from "@/core/database/local/local-storage";
 import { formatSgd, formatUsd, formatDate } from "@/shared/lib/format";
@@ -26,22 +23,15 @@ interface ContributionForm {
   type: ContributionType;
   category: ContributionCategory;
   amountSgd: string;
-  usdAllocationPercent: string;
-  fxRate: string;
   notes: string;
 }
 
-function emptyForm(globalFxRate?: number | null): ContributionForm {
+function emptyForm(): ContributionForm {
   return {
     date: toLocalDateString(),
     type: "deposit",
-    category: "stock",
+    category: "crypto",
     amountSgd: "",
-    usdAllocationPercent: "75",
-    fxRate:
-      globalFxRate != null && isValidFxRate(globalFxRate)
-        ? String(globalFxRate)
-        : "",
     notes: "",
   };
 }
@@ -55,35 +45,7 @@ export function ContributionTransactionsTable() {
   const fxRateValid = data?.fxRateValid ?? isValidFxRate(fxRate);
   const contributions = data?.contributions ?? [];
   const cashBalances = normalizeCashBalances(data?.cashBalances);
-
-  useEffect(() => {
-    if (editingId != null) return;
-    if (fxRate == null || !isValidFxRate(fxRate)) return;
-    setForm((current) =>
-      current.fxRate ? current : { ...current, fxRate: String(fxRate) }
-    );
-  }, [fxRate, editingId]);
-
-  const formFxRate = parseFloat(form.fxRate);
-  const previewFxValid = isValidFxRate(formFxRate);
-
-  const stockPreview = useMemo(() => {
-    if (!previewFxValid) return null;
-    const amount = parseFloat(form.amountSgd);
-    if (form.category !== "stock" || !amount) return null;
-    const usdPct = parseFloat(form.usdAllocationPercent) || 0;
-    return calculateStockAllocation(amount, usdPct, formFxRate);
-  }, [
-    form.category,
-    form.amountSgd,
-    form.usdAllocationPercent,
-    form.fxRate,
-    previewFxValid,
-  ]);
-
-  const sgdAllocationPercent =
-    stockPreview?.sgdAllocationPercent ??
-    100 - (parseFloat(form.usdAllocationPercent) || 0);
+  const settingsContributions = contributions.filter((c) => c.category !== "stock");
 
   const handleSubmit = () => {
     const amount = parseFloat(form.amountSgd);
@@ -98,17 +60,9 @@ export function ContributionTransactionsTable() {
       notes: form.notes || undefined,
     };
 
-    if (form.category === "stock") {
-      entry.usdAllocationPercent = parseFloat(form.usdAllocationPercent) || 0;
-      const txFx = parseFloat(form.fxRate);
-      if (isValidFxRate(txFx)) {
-        entry.fxRate = txFx;
-      }
-    }
-
     services.contributions.upsert(entry);
     setEditingId(null);
-    setForm(emptyForm(fxRate));
+    setForm(emptyForm());
     refresh();
   };
 
@@ -119,16 +73,6 @@ export function ContributionTransactionsTable() {
       type: c.type,
       category: c.category,
       amountSgd: String(c.amountSgd),
-      usdAllocationPercent:
-        c.category === "stock"
-          ? String(c.usdAllocationPercent ?? 100)
-          : "75",
-      fxRate:
-        c.fxRate != null
-          ? String(c.fxRate)
-          : fxRate != null && isValidFxRate(fxRate)
-            ? String(fxRate)
-            : "",
       notes: c.notes ?? "",
     });
   };
@@ -137,7 +81,7 @@ export function ContributionTransactionsTable() {
     services.contributions.delete(id);
     if (editingId === id) {
       setEditingId(null);
-      setForm(emptyForm(fxRate));
+      setForm(emptyForm());
     }
     refresh();
   };
@@ -198,7 +142,6 @@ export function ContributionTransactionsTable() {
             })
           }
           options={[
-            { value: "stock", label: "Stock" },
             { value: "crypto", label: "Crypto" },
             { value: "cash", label: "Personal Cash" },
           ]}
@@ -209,70 +152,14 @@ export function ContributionTransactionsTable() {
           step="0.01"
           value={form.amountSgd}
           onChange={(e) => setForm({ ...form, amountSgd: e.target.value })}
-          hint="Total Contribution uses this original SGD amount"
+          hint="Stock deposits are managed in Stock Tracker → Cash Flow"
         />
-        {form.category === "stock" && (
-          <>
-            <Input
-              label="USD allocation %"
-              type="number"
-              step="1"
-              min="0"
-              max="100"
-              value={form.usdAllocationPercent}
-              onChange={(e) =>
-                setForm({ ...form, usdAllocationPercent: e.target.value })
-              }
-            />
-            <Input
-              label="SGD allocation %"
-              type="number"
-              value={String(sgdAllocationPercent)}
-              readOnly
-              hint="Auto-calculated: 100% − USD %"
-            />
-            <Input
-              label="USD/SGD FX Rate"
-              type="number"
-              step="0.0001"
-              min="0"
-              value={form.fxRate}
-              onChange={(e) => setForm({ ...form, fxRate: e.target.value })}
-              hint="FX rate used for this transaction's USD conversion"
-            />
-          </>
-        )}
         <Input
           label="Notes"
           value={form.notes}
           onChange={(e) => setForm({ ...form, notes: e.target.value })}
         />
       </div>
-
-      {form.category === "stock" && stockPreview && (
-        <div className="grid gap-3 rounded-xl border border-surface-border/60 bg-surface/40 p-4 sm:grid-cols-2">
-          <div>
-            <p className="text-xs font-medium text-slate-500">
-              USD Trading Cash preview
-            </p>
-            <p className="mt-1 text-sm font-semibold text-white">
-              {formatUsd(stockPreview.usdAmountUsd)} USD
-            </p>
-            <p className="text-xs text-slate-500">
-              ({formatSgd(stockPreview.usdAmountSgd)} SGD allocated @ FX{" "}
-              {form.fxRate})
-            </p>
-          </div>
-          <div>
-            <p className="text-xs font-medium text-slate-500">
-              SGD Trading Cash preview
-            </p>
-            <p className="mt-1 text-sm font-semibold text-white">
-              {formatSgd(stockPreview.sgdAmountSgd)}
-            </p>
-          </div>
-        </div>
-      )}
 
       <div className="flex flex-wrap gap-2">
         <Button onClick={handleSubmit}>
@@ -283,7 +170,7 @@ export function ContributionTransactionsTable() {
             variant="ghost"
             onClick={() => {
               setEditingId(null);
-              setForm(emptyForm(fxRate));
+              setForm(emptyForm());
             }}
           >
             Cancel
@@ -299,31 +186,31 @@ export function ContributionTransactionsTable() {
               <th className="px-4 py-3">Type</th>
               <th className="px-4 py-3">Category</th>
               <th className="px-4 py-3">Amount SGD</th>
-              <th className="px-4 py-3">USD %</th>
-              <th className="px-4 py-3">SGD %</th>
-              <th className="px-4 py-3">FX Rate</th>
-              <th className="px-4 py-3">USD Cash Added</th>
-              <th className="px-4 py-3">SGD Cash Added</th>
+              <th className="px-4 py-3">Cash Impact</th>
               <th className="px-4 py-3">Notes</th>
               <th className="px-4 py-3">Actions</th>
             </tr>
           </thead>
           <tbody>
-            {contributions.length === 0 ? (
+            {settingsContributions.length === 0 ? (
               <tr>
                 <td
-                  colSpan={11}
+                  colSpan={7}
                   className="px-4 py-8 text-center text-slate-500"
                 >
-                  No transactions yet.
+                  No crypto or personal cash transactions yet.
                 </td>
               </tr>
             ) : (
-              contributions.map((c) => {
+              settingsContributions.map((c) => {
                 const display =
                   fxRateValid && fxRate != null
                     ? getContributionCashDisplay(c, fxRate)
                     : null;
+                const cashImpact =
+                  c.category === "crypto"
+                    ? formatSgd(display?.cryptoCashAddedSgd ?? 0)
+                    : "—";
 
                 return (
                   <tr
@@ -348,29 +235,7 @@ export function ContributionTransactionsTable() {
                     <td className="px-4 py-3 font-medium text-white">
                       {formatSgd(c.amountSgd)}
                     </td>
-                    <td className="px-4 py-3 text-slate-400">
-                      {display?.usdAllocationPercent != null
-                        ? `${display.usdAllocationPercent}%`
-                        : "—"}
-                    </td>
-                    <td className="px-4 py-3 text-slate-400">
-                      {display?.sgdAllocationPercent != null
-                        ? `${display.sgdAllocationPercent}%`
-                        : "—"}
-                    </td>
-                    <td className="px-4 py-3 text-slate-400">
-                      {display?.fxRate != null ? display.fxRate.toFixed(4) : "—"}
-                    </td>
-                    <td className="px-4 py-3 text-slate-300">
-                      {display && c.category === "stock"
-                        ? formatUsd(display.usdCashAddedUsd)
-                        : "—"}
-                    </td>
-                    <td className="px-4 py-3 text-slate-300">
-                      {display && c.category === "stock"
-                        ? formatSgd(display.sgdCashAddedSgd)
-                        : "—"}
-                    </td>
+                    <td className="px-4 py-3 text-slate-300">{cashImpact}</td>
                     <td className="px-4 py-3 text-slate-400">
                       {c.notes ?? "—"}
                     </td>

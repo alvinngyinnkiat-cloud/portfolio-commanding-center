@@ -80,4 +80,8 @@ export type {
   OptionsTrade,
   OptionsTrackerData,
 } from "./options";
+export type {
+  StockFxDirection,
+  StockFxConversion,
+} from "./stock-fx-conversion";
 export type { StockPriceScheduleState } from "@/core/database/repositories/stock-price-schedule-repository";

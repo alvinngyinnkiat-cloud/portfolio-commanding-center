@@ -9,32 +9,23 @@ import type {
  * Shared US Available Cash — single source of truth for Module 2 and Module 5.
  *
  * US Available Cash (USD) =
- *   US deposits − US withdrawals (USD legs at each deposit's FX rate)
+ *   net USD from FX conversion transactions
  *   − US buy cash effect (buy amount + fees)
  *   + US sell cash effect (sell proceeds − fees)
  *   + dividends
  *   − standalone fees
  *   + full realized options P/L (closed trades — shared trades use full amount)
- *
- * Never convert the US SGD allocation leg with the current FX rate — USD cash is
- * stored in USD using the FX rate recorded on each contribution transaction.
- *
- * Never add holdings realisedPL separately; sell proceeds already embed sale P/L.
  */
 export function buildUsAvailableCashResult(
   input: UsCashLedgerInput
 ): UsAvailableCashResult {
   const {
-    contributions,
+    fxConversions = [],
     stockTransactions,
-    fxRate,
     realizedOptionsPlUsd = 0,
   } = input;
 
-  const usNetStockCashUsd = calculateUsNetStockCashContributedUsd(
-    contributions,
-    fxRate
-  );
+  const usNetStockCashUsd = calculateUsNetStockCashContributedUsd(fxConversions);
   const flow = summarizeMarketTradingCashFlow(stockTransactions, "US");
 
   const breakdown = {

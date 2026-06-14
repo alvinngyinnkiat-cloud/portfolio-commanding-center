@@ -79,10 +79,11 @@ export class PortfolioAggregator {
 
   deriveCashBalances(
     contributions: ContributionTransaction[],
-    fxRate: number
+    fxRate: number,
+    fxConversions = this.stockTracker.getData().cashFlow.fxConversions
   ): CashBalances {
     return normalizeCashBalances(
-      calculateCashBalancesFromContributions(contributions, fxRate)
+      calculateCashBalancesFromContributions(contributions, fxRate, fxConversions)
     );
   }
 
@@ -103,7 +104,8 @@ export class PortfolioAggregator {
       contributions,
       stockData.transactions,
       fxRate,
-      realizedOptionsPlUsd
+      realizedOptionsPlUsd,
+      stockData.cashFlow.fxConversions
     );
     const stockOutputs = deriveDashboardStockOutputs(stockSummary);
     const cryptoData = this.cryptoTracker.getData();
@@ -116,6 +118,7 @@ export class PortfolioAggregator {
     );
     const optionsSummary = buildOptionsTrackerSummary({
       contributions,
+      fxConversions: stockData.cashFlow.fxConversions,
       stockTransactions: stockData.transactions,
       optionsTrades,
       fxRate,
@@ -158,6 +161,8 @@ export class PortfolioAggregator {
       stockHoldingsValueSgd: stockOutputs.stockHoldingsValueSgd,
       stockProfitLossSgd: stockOutputs.stockProfitLossSgd,
       stockAvailableTradingCashSgd: stockOutputs.availableTradingCashSgd,
+      usMarketValueSgd: stockOutputs.usMarketValueSgd,
+      sgMarketValueSgd: stockOutputs.sgMarketValueSgd,
       cryptoContributionSgd: cryptoOutputs.cryptoContributionSgd,
       totalCryptoValueSgd: cryptoOutputs.cryptoTotalValueSgd,
       cryptoHoldingsValueSgd: cryptoOutputs.cryptoHoldingsValueSgd,

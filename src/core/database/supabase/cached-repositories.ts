@@ -32,6 +32,7 @@ import type {
 import type { ScannerWatchlistRepository } from "../repositories/scanner-watchlist-repository";
 import type { CryptoHoldingRepository } from "../repositories/crypto-holding-repository";
 import type { CryptoAllocationRepository } from "../repositories/crypto-allocation-repository";
+import type { StockFxConversionRepository } from "../repositories/stock-fx-conversion-repository";
 import type {
   OptionsTradeRepository,
   OptionsSettingsRepository,
@@ -137,6 +138,30 @@ class CachedSnapshotRepository implements SnapshotRepository {
       normalizeDailySnapshot(row)
     );
     this.manager.queueSnapshotsSync();
+  }
+}
+
+class CachedStockFxConversionRepository implements StockFxConversionRepository {
+  constructor(private readonly manager: PersistenceManager) {}
+  list() {
+    return [...this.manager.getCache().stockFxConversions];
+  }
+  upsert(conversion: Parameters<StockFxConversionRepository["upsert"]>[0]) {
+    const list = this.manager.getCache().stockFxConversions;
+    const idx = list.findIndex((row) => row.id === conversion.id);
+    if (idx >= 0) list[idx] = conversion;
+    else list.push(conversion);
+    this.manager.queueStockFxConversionsSync();
+  }
+  delete(id: string) {
+    this.manager.getCache().stockFxConversions = this.manager
+      .getCache()
+      .stockFxConversions.filter((row) => row.id !== id);
+    this.manager.queueStockFxConversionsSync();
+  }
+  replaceAll(conversions: Parameters<StockFxConversionRepository["replaceAll"]>[0]) {
+    this.manager.getCache().stockFxConversions = [...conversions];
+    this.manager.queueStockFxConversionsSync();
   }
 }
 
@@ -437,5 +462,6 @@ export function createCachedRepositories(
     cryptoAllocation: new CachedCryptoAllocationRepository(manager),
     optionsTrades: new CachedOptionsTradeRepository(manager),
     optionsSettings: new CachedOptionsSettingsRepository(manager),
+    stockFxConversions: new CachedStockFxConversionRepository(manager),
   };
 }

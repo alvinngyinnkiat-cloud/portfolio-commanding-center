@@ -90,6 +90,8 @@ export interface StockTrackerSummary {
   usAvailableTradingCashUsd: number;
   usAvailableTradingCashSgd: number;
   sgAvailableTradingCashSgd: number;
+  usMarketValueSgd: number;
+  sgMarketValueSgd: number;
   totalStockValueSgd: number;
   netStockCashContributedSgd: number;
   usStockContributionSgd: number;
@@ -104,6 +106,8 @@ export interface DashboardStockOutputs {
   stockProfitLossSgd: number;
   availableTradingCashSgd: number;
   totalStockValueSgd: number;
+  usMarketValueSgd: number;
+  sgMarketValueSgd: number;
 }
 
 /** Daily OHLC bar — owned by Module 2 market data layer. */

@@ -4,6 +4,7 @@ import type {
   StockTrackerSummary,
   StockTransaction,
 } from "@/core/domain/types";
+import type { StockFxConversion } from "@/core/domain/types/stock-fx-conversion";
 import { usdToSgd } from "@/core/calculations/fx";
 import { isValidFxRate } from "@/core/calculations/fx-validation";
 import { summarizeStockContributionFromDeposits } from "@/core/calculations/stocks/contributions";
@@ -85,14 +86,16 @@ export function buildStockTrackerSummary(
   contributions: ContributionTransaction[],
   transactions: StockTransaction[],
   fxRate: number | null,
-  realizedOptionsPlUsd = 0
+  realizedOptionsPlUsd = 0,
+  fxConversions: StockFxConversion[] = []
 ): StockTrackerSummary {
   const holdingsSummary = summarizeStockHoldings(holdings, fxRate);
-  const netCash = summarizeNetStockCashBreakdown(contributions);
-  const contribution = summarizeStockContributionFromDeposits(contributions, fxRate);
+  const netCash = summarizeNetStockCashBreakdown(contributions, fxConversions);
+  const contribution = summarizeStockContributionFromDeposits(contributions);
 
   const usAvailableTradingCashUsd = calculateUsAvailableCashUsd({
     contributions,
+    fxConversions,
     stockTransactions: transactions,
     fxRate,
     realizedOptionsPlUsd,
@@ -105,12 +108,13 @@ export function buildStockTrackerSummary(
     isValidFxRate(fxRate) && fxRate != null
       ? usdToSgd(usAvailableTradingCashUsd, fxRate)
       : 0;
+  const usMarketValueSgd =
+    holdingsSummary.usMarketValueSgd + usAvailableTradingCashSgd;
+  const sgMarketValueSgd =
+    holdingsSummary.sgMarketValueSgd + sgAvailableTradingCashSgd;
   const availableTradingCashSgd =
     usAvailableTradingCashSgd + sgAvailableTradingCashSgd;
-  const totalStockValueSgd = calculateTotalStockValueSgd(
-    holdingsSummary.totalStockHoldingsSgd,
-    availableTradingCashSgd
-  );
+  const totalStockValueSgd = usMarketValueSgd + sgMarketValueSgd;
   const stockProfitLossSgd = calculateStockProfitLossSgd(
     totalStockValueSgd,
     contribution.totalStockContributionSgd
@@ -124,6 +128,8 @@ export function buildStockTrackerSummary(
     usAvailableTradingCashUsd,
     usAvailableTradingCashSgd,
     sgAvailableTradingCashSgd,
+    usMarketValueSgd,
+    sgMarketValueSgd,
     totalStockValueSgd,
     netStockCashContributedSgd: netCash.netStockCashContributedSgd,
     usStockContributionSgd: contribution.usStockContributionSgd,
@@ -137,15 +143,17 @@ export function buildStockPortfolioSummary(
   contributions: ContributionTransaction[],
   transactions: StockTransaction[],
   fxRate: number | null,
-  realizedOptionsPlUsd = 0
+  realizedOptionsPlUsd = 0,
+  fxConversions: StockFxConversion[] = []
 ): StockPortfolioSummary {
   const fxRateValid = isValidFxRate(fxRate);
   const holdingsSummary = summarizeStockHoldings(holdings, fxRate);
-  const netCash = summarizeNetStockCashBreakdown(contributions);
-  const contribution = summarizeStockContributionFromDeposits(contributions, fxRate);
+  const netCash = summarizeNetStockCashBreakdown(contributions, fxConversions);
+  const contribution = summarizeStockContributionFromDeposits(contributions);
 
   const usAvailableTradingCashUsd = calculateUsAvailableCashUsd({
     contributions,
+    fxConversions,
     stockTransactions: transactions,
     fxRate,
     realizedOptionsPlUsd,

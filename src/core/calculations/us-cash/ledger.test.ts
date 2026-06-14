@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { StockTransaction } from "@/core/domain/types";
+import type { StockFxConversion } from "@/core/domain/types/stock-fx-conversion";
 import {
   buildUsAvailableCashResult,
   calculateUsAvailableCashUsd,
@@ -26,19 +27,22 @@ function tx(
   };
 }
 
+function fxToUsd(usdAmount: number, sgdAmount: number, id = "fx-1"): StockFxConversion {
+  return {
+    id,
+    date: "2025-01-01",
+    direction: "sgd_to_usd",
+    sgdAmount,
+    usdAmount,
+    createdAt: "2025-01-01T00:00:00.000Z",
+  };
+}
+
 describe("calculateUsAvailableCashUsd", () => {
-  it("acceptance: net cash 18k USD, 10k buys → 8k available at FX 1.35", () => {
+  it("acceptance: net cash 18k USD, 10k buys → 8k available", () => {
     const available = calculateUsAvailableCashUsd({
-      contributions: [
-        {
-          id: "c1",
-          date: "2025-01-01",
-          type: "deposit",
-          category: "stock",
-          amountSgd: 24_300,
-          usdAllocationPercent: 100,
-        },
-      ],
+      contributions: [],
+      fxConversions: [fxToUsd(18_000, 24_300)],
       stockTransactions: [
         tx({
           id: "buy-1",
@@ -55,16 +59,8 @@ describe("calculateUsAvailableCashUsd", () => {
 
   it("includes sell proceeds and dividends in available cash", () => {
     const result = buildUsAvailableCashResult({
-      contributions: [
-        {
-          id: "c1",
-          date: "2025-01-01",
-          type: "deposit",
-          category: "stock",
-          amountSgd: 6_750,
-          usdAllocationPercent: 100,
-        },
-      ],
+      contributions: [],
+      fxConversions: [fxToUsd(5_000, 6_750)],
       stockTransactions: [
         tx({
           id: "buy-1",
@@ -97,45 +93,31 @@ describe("calculateUsAvailableCashUsd", () => {
     expect(result.usAvailableCashUsd).toBe(4_643);
   });
 
-  it("subtracts US withdrawals from net stock cash", () => {
+  it("subtracts USD→SGD conversions from net stock cash", () => {
     const available = calculateUsAvailableCashUsd({
-      contributions: [
+      contributions: [],
+      fxConversions: [
+        fxToUsd(10_000, 13_500, "fx-in"),
         {
-          id: "c1",
-          date: "2025-01-01",
-          type: "deposit",
-          category: "stock",
-          amountSgd: 13_500,
-          usdAllocationPercent: 100,
-        },
-        {
-          id: "c2",
+          id: "fx-out",
           date: "2025-02-01",
-          type: "withdrawal",
-          category: "stock",
-          amountSgd: 2_700,
-          usdAllocationPercent: 100,
+          direction: "usd_to_sgd",
+          sgdAmount: 2_700,
+          usdAmount: 2_000,
+          createdAt: "2025-02-01T00:00:00.000Z",
         },
       ],
       stockTransactions: [],
       fxRate: 1.35,
     });
 
-    expect(available).toBeCloseTo(8_000, 2);
+    expect(available).toBe(8_000);
   });
 
   it("adds realized options P/L when provided", () => {
     const available = calculateUsAvailableCashUsd({
-      contributions: [
-        {
-          id: "c1",
-          date: "2025-01-01",
-          type: "deposit",
-          category: "stock",
-          amountSgd: 13_500,
-          usdAllocationPercent: 100,
-        },
-      ],
+      contributions: [],
+      fxConversions: [fxToUsd(10_000, 13_500)],
       stockTransactions: [],
       fxRate: 1.35,
       realizedOptionsPlUsd: 345,
@@ -146,16 +128,8 @@ describe("calculateUsAvailableCashUsd", () => {
 
   it("scopes stock flows to US market only", () => {
     const available = calculateUsAvailableCashUsd({
-      contributions: [
-        {
-          id: "c1",
-          date: "2025-01-01",
-          type: "deposit",
-          category: "stock",
-          amountSgd: 13_500,
-          usdAllocationPercent: 100,
-        },
-      ],
+      contributions: [],
+      fxConversions: [fxToUsd(10_000, 13_500)],
       stockTransactions: [
         tx({
           id: "us-buy",
@@ -182,16 +156,8 @@ describe("calculateUsAvailableCashUsd", () => {
 
   it("subtracts standalone US fees from available cash", () => {
     const available = calculateUsAvailableCashUsd({
-      contributions: [
-        {
-          id: "c1",
-          date: "2025-01-01",
-          type: "deposit",
-          category: "stock",
-          amountSgd: 6_750,
-          usdAllocationPercent: 100,
-        },
-      ],
+      contributions: [],
+      fxConversions: [fxToUsd(5_000, 6_750)],
       stockTransactions: [
         tx({
           id: "fee-1",
@@ -207,7 +173,7 @@ describe("calculateUsAvailableCashUsd", () => {
     expect(available).toBe(4_985);
   });
 
-  it("returns 0 USD net cash when FX rate is invalid and deposit has no stored FX", () => {
+  it("returns 0 USD net cash when no FX conversions exist", () => {
     const available = calculateUsAvailableCashUsd({
       contributions: [
         {
@@ -216,29 +182,20 @@ describe("calculateUsAvailableCashUsd", () => {
           type: "deposit",
           category: "stock",
           amountSgd: 13_500,
-          usdAllocationPercent: 100,
         },
       ],
+      fxConversions: [],
       stockTransactions: [],
-      fxRate: 0,
+      fxRate: 1.35,
     });
 
     expect(available).toBe(0);
   });
 
-  it("uses deposit-day FX when current FX is invalid", () => {
+  it("uses FX conversion USD amount independent of current FX", () => {
     const available = calculateUsAvailableCashUsd({
-      contributions: [
-        {
-          id: "c1",
-          date: "2025-01-01",
-          type: "deposit",
-          category: "stock",
-          amountSgd: 1_000,
-          usdAllocationPercent: 75,
-          fxRate: 1.32,
-        },
-      ],
+      contributions: [],
+      fxConversions: [fxToUsd(568.18, 750, "fx-75")],
       stockTransactions: [],
       fxRate: 0,
     });

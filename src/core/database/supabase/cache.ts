@@ -16,6 +16,7 @@ import type {
   StockTransaction,
   StockWeeklyCandle,
 } from "@/core/domain/types";
+import type { StockFxConversion } from "@/core/domain/types/stock-fx-conversion";
 import type { StockPriceScheduleState } from "@/core/database/repositories/stock-price-schedule-repository";
 import { DEFAULT_CRYPTO_ALLOCATION } from "@/core/calculations/crypto/allocation";
 import {
@@ -30,6 +31,8 @@ import { normalizeDailySnapshot } from "@/core/calculations/snapshots";
 import { normalizeOptionsSettings } from "@/core/domain/defaults-options";
 import { normalizeScannerScanRun } from "@/core/calculations/scanner/normalize-scan-result";
 import { normalizeStockPrice } from "@/core/calculations/stocks/price-normalize";
+import { migrateLegacyStockDepositsToCashFlow } from "@/core/calculations/stocks/migrate-stock-cash-flow";
+import { normalizeStockUsdAllocationPercent } from "@/core/calculations/contribution-cash";
 
 export interface ScannerResultsStore {
   latest: ScannerScanRun | null;
@@ -54,6 +57,7 @@ export interface PersistenceCache {
   cryptoAllocation: CryptoAllocationSettings;
   optionsTrades: OptionsTrade[];
   optionsSettings: OptionsSettings;
+  stockFxConversions: StockFxConversion[];
   migratedFromLocal: boolean;
 }
 
@@ -89,12 +93,13 @@ export function createEmptyCache(): PersistenceCache {
     cryptoAllocation: { ...DEFAULT_CRYPTO_ALLOCATION },
     optionsTrades: [],
     optionsSettings: { ...DEFAULT_OPTIONS_SETTINGS },
+    stockFxConversions: [],
     migratedFromLocal: false,
   };
 }
 
 export function normalizeCache(cache: PersistenceCache): PersistenceCache {
-  return {
+  const normalized = {
     ...cache,
     dashboardSettings: normalizeDashboardSettings(cache.dashboardSettings),
     snapshots: cache.snapshots.map((row) => normalizeDailySnapshot(row)),
@@ -106,9 +111,37 @@ export function normalizeCache(cache: PersistenceCache): PersistenceCache {
       previous: cache.scannerResults.previous
         ? normalizeScannerScanRun(cache.scannerResults.previous)
         : null,
-    },
+      },
     optionsSettings: normalizeOptionsSettings(cache.optionsSettings),
     cryptoHoldings: normalizeCryptoHoldings(cache.cryptoHoldings),
     cryptoAllocation: normalizeCryptoAllocationSettings(cache.cryptoAllocation),
+    stockFxConversions: cache.stockFxConversions ?? [],
+  };
+
+  const hasLegacyStockAllocation = normalized.contributions.some(
+    (tx: ContributionTransaction) =>
+      tx.category === "stock" &&
+      normalizeStockUsdAllocationPercent(tx.usdAllocationPercent) > 0
+  );
+
+  if (!hasLegacyStockAllocation) {
+    return normalized;
+  }
+
+  const fallbackFx =
+    normalized.dashboardSettings.usdSgdFxRate != null &&
+    normalized.dashboardSettings.usdSgdFxRate > 0
+      ? normalized.dashboardSettings.usdSgdFxRate
+      : 1.32;
+  const migrated = migrateLegacyStockDepositsToCashFlow(
+    normalized.contributions,
+    normalized.stockFxConversions,
+    fallbackFx
+  );
+
+  return {
+    ...normalized,
+    contributions: migrated.contributions,
+    stockFxConversions: migrated.fxConversions,
   };
 }

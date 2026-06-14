@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { CalculatedHolding, StockTransaction } from "@/core/domain/types";
+import type { StockFxConversion } from "@/core/domain/types/stock-fx-conversion";
 import {
   buildStockPortfolioSummary,
   buildStockTrackerSummary,
@@ -140,7 +141,16 @@ describe("buildStockPortfolioSummary", () => {
         type: "deposit" as const,
         category: "stock" as const,
         amountSgd: 24_300,
-        usdAllocationPercent: 100,
+      },
+    ];
+    const fxConversions: StockFxConversion[] = [
+      {
+        id: "fx-1",
+        date: "2025-01-01",
+        direction: "sgd_to_usd",
+        sgdAmount: 24_300,
+        usdAmount: 18_000,
+        createdAt: "2025-01-01T00:00:00.000Z",
       },
     ];
 
@@ -148,15 +158,18 @@ describe("buildStockPortfolioSummary", () => {
       holdings,
       contributions,
       transactions,
-      1.35
+      1.35,
+      0,
+      fxConversions
     );
 
-    expect(full.usStockContributionUsd).toBeCloseTo(18_000, 2);
-    expect(full.usStockContributionSgd).toBe(24_300);
+    expect(full.usStockContributionUsd).toBe(0);
+    expect(full.usStockContributionSgd).toBe(0);
+    expect(full.totalStockContributionSgd).toBe(24_300);
     expect(full.usAvailableTradingCashUsd).toBe(8_100);
     expect(full.usTotalValueUsd).toBeCloseTo(18_359.5, 2);
-    expect(full.usMarketPLUsd).toBeCloseTo(359.5, 2);
-    expect(full.usMarketPLSgd).toBeCloseTo(485.33, 2);
+    expect(full.usMarketPLUsd).toBeCloseTo(18_359.5, 2);
+    expect(full.usMarketPLSgd).toBeCloseTo(24_785.33, 1);
 
     expect(full.usTotalValueUsd).toBeCloseTo(
       full.usMarketValueUsd + full.usAvailableTradingCashUsd,
@@ -183,7 +196,6 @@ describe("buildStockPortfolioSummary", () => {
           type: "deposit",
           category: "stock",
           amountSgd: 10_800,
-          usdAllocationPercent: 100,
         },
         {
           id: "c2",
@@ -191,7 +203,6 @@ describe("buildStockPortfolioSummary", () => {
           type: "deposit",
           category: "stock",
           amountSgd: 4_000,
-          usdAllocationPercent: 0,
         },
       ],
       [],
@@ -240,7 +251,16 @@ describe("buildStockTrackerSummary", () => {
         type: "deposit" as const,
         category: "stock" as const,
         amountSgd: 13_500,
-        usdAllocationPercent: 100,
+      },
+    ];
+    const fxConversions: StockFxConversion[] = [
+      {
+        id: "fx-1",
+        date: "2025-01-01",
+        direction: "sgd_to_usd",
+        sgdAmount: 13_500,
+        usdAmount: 10_000,
+        createdAt: "2025-01-01T00:00:00.000Z",
       },
     ];
 
@@ -248,7 +268,9 @@ describe("buildStockTrackerSummary", () => {
       holdings,
       contributions,
       transactions,
-      1.35
+      1.35,
+      0,
+      fxConversions
     );
 
     expect(summary.stockHoldingsValueSgd).toBe(13_500);

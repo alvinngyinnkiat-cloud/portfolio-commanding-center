@@ -11,14 +11,16 @@ import {
   isDemoManualValues,
   isDemoSnapshots,
 } from "@/core/domain/defaults";
-import { DEFAULT_STOCK_USD_ALLOCATION_PERCENT } from "@/core/calculations/contribution-cash";
+import { migrateLegacyStockDepositsToCashFlow } from "@/core/calculations/stocks/migrate-stock-cash-flow";
+import { normalizeStockUsdAllocationPercent } from "@/core/calculations/contribution-cash";
+import type { StockFxConversion } from "@/core/domain/types/stock-fx-conversion";
 import { STORAGE_KEYS } from "./storage-keys";
 import { readJson, writeJson } from "./local-storage";
 import { normalizeDashboardSettings } from "./normalize-settings";
 import { normalizeDailySnapshot } from "@/core/calculations/snapshots";
 
 const SCHEMA_VERSION_KEY = "portfolio:schema_version";
-const CURRENT_SCHEMA_VERSION = 9;
+const CURRENT_SCHEMA_VERSION = 10;
 
 interface LegacyBlob {
   usdSgdFxRate?: number;
@@ -38,12 +40,7 @@ function hasNewStorage(): boolean {
 function normalizeContributions(
   contributions: ContributionTransaction[]
 ): ContributionTransaction[] {
-  return contributions.map((c) => {
-    if (c.category === "stock" && c.usdAllocationPercent === undefined) {
-      return { ...c, usdAllocationPercent: DEFAULT_STOCK_USD_ALLOCATION_PERCENT };
-    }
-    return c;
-  });
+  return contributions;
 }
 
 function purgeDemoSeedDataIfNeeded(): void {
@@ -159,6 +156,32 @@ export function migrateSchemaIfNeeded(): void {
 
   if (version < 9) {
     purgeDemoSeedDataIfNeeded();
+  }
+
+  if (version < 10) {
+    const contributions = readJson<ContributionTransaction[]>(
+      STORAGE_KEYS.contributions,
+      []
+    );
+    const fxConversions = readJson<StockFxConversion[]>(
+      STORAGE_KEYS.stockFxConversions,
+      []
+    );
+    const settings = readJson<DashboardSettings>(
+      STORAGE_KEYS.dashboardSettings,
+      DEFAULT_DASHBOARD_SETTINGS
+    );
+    const fallbackFx =
+      settings.usdSgdFxRate != null && settings.usdSgdFxRate > 0
+        ? settings.usdSgdFxRate
+        : 1.32;
+    const migrated = migrateLegacyStockDepositsToCashFlow(
+      contributions,
+      fxConversions,
+      fallbackFx
+    );
+    writeJson(STORAGE_KEYS.contributions, migrated.contributions);
+    writeJson(STORAGE_KEYS.stockFxConversions, migrated.fxConversions);
   }
 
   if (version < CURRENT_SCHEMA_VERSION) {

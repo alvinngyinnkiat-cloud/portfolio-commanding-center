@@ -1,10 +1,10 @@
 import type { ContributionTransaction } from "@/core/domain/types";
+import type { StockFxConversion } from "@/core/domain/types/stock-fx-conversion";
 import {
-  calculateCashBalancesFromContributions,
-  getContributionCashImpact,
-  normalizeStockUsdAllocationPercent,
-} from "@/core/calculations/contribution-cash";
-import { isValidFxRate } from "@/core/calculations/fx-validation";
+  calculateSgStockFxCashSgd,
+  calculateStockDepositNetSgd,
+  calculateUsStockFxCashUsd,
+} from "@/core/calculations/stocks/cash-flow";
 
 /** Net stock cash from deposit/withdrawal transactions (US/SG allocation split). */
 export interface NetStockCashBreakdown {
@@ -13,94 +13,51 @@ export interface NetStockCashBreakdown {
   netStockCashContributedSgd: number;
 }
 
-function stockAllocationLegs(amountSgd: number, usdAllocationPercent?: number) {
-  const usdPct = normalizeStockUsdAllocationPercent(usdAllocationPercent);
-  const usNetStockCashContributedSgd = amountSgd * (usdPct / 100);
-  const sgNetStockCashContributedSgd = amountSgd - usNetStockCashContributedSgd;
-  return { usNetStockCashContributedSgd, sgNetStockCashContributedSgd };
-}
-
-/** US net stock cash = stock deposits/withdrawals allocated to US (SGD keyed). */
-export function calculateUsNetStockCashContributedSgd(
-  contributions: ContributionTransaction[]
-): number {
-  let total = 0;
-  for (const tx of contributions) {
-    if (tx.category !== "stock") continue;
-    const sign = tx.type === "deposit" ? 1 : -1;
-    const { usNetStockCashContributedSgd } = stockAllocationLegs(
-      tx.amountSgd,
-      tx.usdAllocationPercent
-    );
-    total += sign * usNetStockCashContributedSgd;
-  }
-  return total;
-}
-
-/** SG net stock cash = stock deposits/withdrawals allocated to SG (SGD keyed). */
+/** SG pool seed from deposits and FX conversions — used for SG available cash. */
 export function calculateSgNetStockCashContributedSgd(
-  contributions: ContributionTransaction[]
+  contributions: ContributionTransaction[],
+  fxConversions: StockFxConversion[] = []
 ): number {
-  let total = 0;
-  for (const tx of contributions) {
-    if (tx.category !== "stock") continue;
-    const sign = tx.type === "deposit" ? 1 : -1;
-    const { sgNetStockCashContributedSgd } = stockAllocationLegs(
-      tx.amountSgd,
-      tx.usdAllocationPercent
-    );
-    total += sign * sgNetStockCashContributedSgd;
-  }
-  return total;
+  return (
+    calculateStockDepositNetSgd(contributions) +
+    calculateSgStockFxCashSgd(fxConversions)
+  );
+}
+
+/** Deposits no longer allocate to US in SGD terms. */
+export function calculateUsNetStockCashContributedSgd(
+  _contributions: ContributionTransaction[]
+): number {
+  return 0;
 }
 
 /** Net stock cash contributed = stock deposits − stock withdrawals. */
 export function calculateNetStockCashContributedSgd(
   contributions: ContributionTransaction[]
 ): number {
-  return (
-    calculateUsNetStockCashContributedSgd(contributions) +
-    calculateSgNetStockCashContributedSgd(contributions)
-  );
+  return calculateStockDepositNetSgd(contributions);
 }
 
 export function summarizeNetStockCashBreakdown(
-  contributions: ContributionTransaction[]
+  contributions: ContributionTransaction[],
+  fxConversions: StockFxConversion[] = []
 ): NetStockCashBreakdown {
-  const usNetStockCashContributedSgd =
-    calculateUsNetStockCashContributedSgd(contributions);
-  const sgNetStockCashContributedSgd =
-    calculateSgNetStockCashContributedSgd(contributions);
+  const sgNetStockCashContributedSgd = calculateSgNetStockCashContributedSgd(
+    contributions,
+    fxConversions
+  );
   return {
-    usNetStockCashContributedSgd,
+    usNetStockCashContributedSgd: 0,
     sgNetStockCashContributedSgd,
-    netStockCashContributedSgd:
-      usNetStockCashContributedSgd + sgNetStockCashContributedSgd,
+    netStockCashContributedSgd: calculateNetStockCashContributedSgd(contributions),
   };
 }
 
-/** US net stock cash in USD — each deposit converted at its own FX rate. */
+/** US net stock cash in USD — sourced from FX conversion transactions. */
 export function calculateUsNetStockCashContributedUsd(
-  contributions: ContributionTransaction[],
-  fallbackFxRate: number | null
+  fxConversions: StockFxConversion[]
 ): number {
-  const fallback =
-    isValidFxRate(fallbackFxRate) && fallbackFxRate != null ? fallbackFxRate : 0;
-
-  if (fallback > 0) {
-    return calculateCashBalancesFromContributions(contributions, fallback)
-      .usdTradingCashUsd;
-  }
-
-  let total = 0;
-  for (const tx of contributions) {
-    if (tx.category !== "stock") continue;
-    if (!isValidFxRate(tx.fxRate)) continue;
-    const impact = getContributionCashImpact(tx, tx.fxRate!);
-    const sign = tx.type === "deposit" ? 1 : -1;
-    total += sign * impact.usdTradingCashUsd;
-  }
-  return total;
+  return calculateUsStockFxCashUsd(fxConversions);
 }
 
 export interface StockContributionFromDeposits {
@@ -110,19 +67,15 @@ export interface StockContributionFromDeposits {
   usStockContributionUsd: number;
 }
 
-/** Historical SGD deposit amounts — not recalculated when FX changes. */
+/** Historical SGD deposit amounts — FX conversions do not change contribution. */
 export function summarizeStockContributionFromDeposits(
-  contributions: ContributionTransaction[],
-  fallbackFxRate: number | null
+  contributions: ContributionTransaction[]
 ): StockContributionFromDeposits {
-  const netCash = summarizeNetStockCashBreakdown(contributions);
+  const totalStockContributionSgd = calculateStockDepositNetSgd(contributions);
   return {
-    usStockContributionSgd: netCash.usNetStockCashContributedSgd,
-    sgStockContributionSgd: netCash.sgNetStockCashContributedSgd,
-    totalStockContributionSgd: netCash.netStockCashContributedSgd,
-    usStockContributionUsd: calculateUsNetStockCashContributedUsd(
-      contributions,
-      fallbackFxRate
-    ),
+    usStockContributionSgd: 0,
+    sgStockContributionSgd: totalStockContributionSgd,
+    totalStockContributionSgd,
+    usStockContributionUsd: 0,
   };
 }

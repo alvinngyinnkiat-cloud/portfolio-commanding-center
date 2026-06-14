@@ -1,4 +1,5 @@
 import type { StockDailyCandle, StockPrice, ContributionTransaction } from "@/core/domain/types";
+import type { StockFxConversion } from "@/core/domain/types/stock-fx-conversion";
 import type { StockTransaction } from "@/core/domain/types/stock";
 import type { ScannerScanRun } from "@/core/domain/types/scanner";
 import type { WatchlistEntry } from "@/core/calculations/scanner/watchlist";
@@ -152,6 +153,7 @@ export function buildClosedTradeRows(trades: OptionsTrade[]): OptionsClosedTrade
 
 function buildUsCashSnapshot(input: {
   contributions: ContributionTransaction[];
+  fxConversions?: StockFxConversion[];
   stockTransactions: StockTransaction[];
   optionsTrades: OptionsTrade[];
   fxRate: number | null;
@@ -159,6 +161,7 @@ function buildUsCashSnapshot(input: {
   const realizedOptionsPlUsd = sumRealizedOptionsPlUsd(input.optionsTrades);
   const usAvailableCashUsd = calculateUsAvailableCashUsd({
     contributions: input.contributions,
+    fxConversions: input.fxConversions ?? [],
     stockTransactions: input.stockTransactions,
     fxRate: input.fxRate,
     realizedOptionsPlUsd,
@@ -172,6 +175,7 @@ function buildUsCashSnapshot(input: {
 
 export function buildOptionsCapitalReadiness(input: {
   contributions: ContributionTransaction[];
+  fxConversions?: StockFxConversion[];
   stockTransactions: StockTransaction[];
   optionsTrades: OptionsTrade[];
   fxRate: number | null;
@@ -198,6 +202,7 @@ export function buildOptionsCapitalReadiness(input: {
 
 export function buildOptionsTrackerSummary(input: {
   contributions: ContributionTransaction[];
+  fxConversions?: StockFxConversion[];
   stockTransactions: StockTransaction[];
   optionsTrades: OptionsTrade[];
   fxRate: number | null;
@@ -288,6 +293,7 @@ export function buildOptionsTrackerSummary(input: {
 
 export function buildOptionsRiskSummary(input: {
   contributions: ContributionTransaction[];
+  fxConversions?: StockFxConversion[];
   stockTransactions: StockTransaction[];
   optionsTrades: OptionsTrade[];
   fxRate: number | null;
