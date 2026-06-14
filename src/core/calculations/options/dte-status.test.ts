@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   compareOpenTradesByDte,
+  compareOpenTradesByOpenDate,
   deriveDteStatus,
   summarizeActionRequiredOpenRisk,
 } from "./dte-status";
@@ -33,6 +34,24 @@ describe("compareOpenTradesByDte", () => {
     ].sort(compareOpenTradesByDte);
 
     expect(sorted.map((r) => r.daysToExpiration)).toEqual([5, 7, 10, 14, 30]);
+  });
+});
+
+describe("compareOpenTradesByOpenDate", () => {
+  it("sorts newest open date first", () => {
+    const sorted = [
+      { trade: { openDate: "2024-10-21", createdAt: "2024-10-21T10:00:00Z" } },
+      { trade: { openDate: "2025-01-10", createdAt: "2025-01-10T10:00:00Z" } },
+      { trade: { openDate: "2024-12-11", createdAt: "2024-12-11T10:00:00Z" } },
+      { trade: { openDate: "2024-11-06", createdAt: "2024-11-06T10:00:00Z" } },
+    ].sort(compareOpenTradesByOpenDate);
+
+    expect(sorted.map((row) => row.trade.openDate)).toEqual([
+      "2025-01-10",
+      "2024-12-11",
+      "2024-11-06",
+      "2024-10-21",
+    ]);
   });
 });
 

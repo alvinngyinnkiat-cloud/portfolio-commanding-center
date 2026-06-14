@@ -48,7 +48,7 @@ import {
 import { splitForTrade, splitTradeAmount } from "./split";
 import { calculateUnrealizedPlUsd } from "./unrealized-pl";
 import {
-  compareOpenTradesByDte,
+  compareOpenTradesByOpenDate,
   deriveDteStatus,
   summarizeActionRequiredOpenRisk,
 } from "./dte-status";
@@ -118,13 +118,17 @@ export function buildOpenTradeRows(
       };
     });
 
-  return rows.sort(compareOpenTradesByDte);
+  return rows.sort(compareOpenTradesByOpenDate);
 }
 
 export function buildClosedTradeRows(trades: OptionsTrade[]): OptionsClosedTradeRow[] {
   return trades
     .filter((trade) => trade.status === "closed")
-    .sort((a, b) => (b.closeDate ?? "").localeCompare(a.closeDate ?? ""))
+    .sort((a, b) => {
+      const byCloseDate = (b.closeDate ?? "").localeCompare(a.closeDate ?? "");
+      if (byCloseDate !== 0) return byCloseDate;
+      return (b.createdAt ?? "").localeCompare(a.createdAt ?? "");
+    })
     .map((trade) => {
       const realized = trade.realizedPlUsd ?? 0;
       const legs = splitForTrade(trade, realized);

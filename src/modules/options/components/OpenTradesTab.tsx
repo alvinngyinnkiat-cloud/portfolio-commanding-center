@@ -10,7 +10,7 @@ import type { ResolvedScannerPrice } from "@/core/calculations/scanner/price-eng
 import { formatScannerPriceSourceLabel } from "@/core/calculations/scanner/price-engine";
 import {
   buildStackedOptionPrice,
-  compareOpenTradesByDte,
+  compareOpenTradesByOpenDate,
   formatTargetExit,
   hasBreakevenMetrics,
   resolveBreakevenDifference,
@@ -294,7 +294,7 @@ export function OpenTradesTab({
   const personalRows = useMemo(
     () =>
       [...rows.filter((row) => row.trade.tradeType === "personal")].sort(
-        compareOpenTradesByDte
+        compareOpenTradesByOpenDate
       ),
     [rows]
   );
@@ -302,7 +302,7 @@ export function OpenTradesTab({
   const sharedRows = useMemo(
     () =>
       [...rows.filter((row) => row.trade.tradeType === "shared")].sort(
-        compareOpenTradesByDte
+        compareOpenTradesByOpenDate
       ),
     [rows]
   );

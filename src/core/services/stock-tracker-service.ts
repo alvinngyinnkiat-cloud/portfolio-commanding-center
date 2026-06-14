@@ -11,6 +11,7 @@ import { normalizeStockPrices } from "@/core/calculations/stocks/price-normalize
 import { normalizeTicker } from "@/core/calculations/stocks/normalize";
 import { isValidFxRate } from "@/core/calculations/fx-validation";
 import { toLocalDateString } from "@/shared/lib/date";
+import { compareDateDescWithCreatedAt } from "@/shared/lib/sort";
 
 export interface StockTrackerData {
   transactions: StockTransaction[];
@@ -40,9 +41,7 @@ export class StockTrackerService {
     );
 
     return {
-      transactions: [...transactions].sort(
-        (a, b) => b.date.localeCompare(a.date) || b.createdAt.localeCompare(a.createdAt)
-      ),
+      transactions: [...transactions].sort(compareDateDescWithCreatedAt),
       holdings,
       prices,
       fxRate,

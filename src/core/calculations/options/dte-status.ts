@@ -29,6 +29,16 @@ export function compareOpenTradesByDte(
   return a.daysToExpiration - b.daysToExpiration;
 }
 
+/** Newest open date first — transaction history tables show latest entries at the top. */
+export function compareOpenTradesByOpenDate(
+  a: { trade: { openDate: string; createdAt?: string } },
+  b: { trade: { openDate: string; createdAt?: string } }
+): number {
+  const byDate = b.trade.openDate.localeCompare(a.trade.openDate);
+  if (byDate !== 0) return byDate;
+  return (b.trade.createdAt ?? "").localeCompare(a.trade.createdAt ?? "");
+}
+
 export function summarizeActionRequiredOpenRisk(
   openTrades: Array<{ daysToExpiration: number; maxRiskUsd: number }>
 ): { tradesRequiringActionCount: number; openRiskRequiringActionUsd: number } {

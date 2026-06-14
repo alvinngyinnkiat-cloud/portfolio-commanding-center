@@ -7,6 +7,7 @@ import {
   hasSnapshotForDate,
 } from "@/core/calculations/snapshot-schedule";
 import type { PortfolioAggregator } from "./portfolio-aggregator";
+import { sortByDateDesc } from "@/shared/lib/sort";
 
 export class SnapshotService {
   constructor(
@@ -15,7 +16,7 @@ export class SnapshotService {
   ) {}
 
   list(): DailySnapshot[] {
-    return this.repo.list().sort((a, b) => b.date.localeCompare(a.date));
+    return sortByDateDesc(this.repo.list());
   }
 
   delete(date: string): void {

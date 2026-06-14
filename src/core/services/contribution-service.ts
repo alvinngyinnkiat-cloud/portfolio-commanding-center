@@ -1,11 +1,12 @@
 import type { ContributionTransaction } from "@/core/domain/types";
 import type { ContributionRepository } from "@/core/database/repositories/contribution-repository";
+import { sortByDateDesc } from "@/shared/lib/sort";
 
 export class ContributionService {
   constructor(private repo: ContributionRepository) {}
 
   list(): ContributionTransaction[] {
-    return this.repo.list().sort((a, b) => b.date.localeCompare(a.date));
+    return sortByDateDesc(this.repo.list());
   }
 
   upsert(transaction: ContributionTransaction): void {

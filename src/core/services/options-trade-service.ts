@@ -20,6 +20,15 @@ import {
   type MarkTradeUpdate,
 } from "@/core/calculations/options";
 import { generateId } from "@/core/database/local/local-storage";
+import { compareDateDesc } from "@/shared/lib/sort";
+
+function compareOptionsTradesByDate(a: OptionsTrade, b: OptionsTrade): number {
+  const dateA = a.status === "closed" && a.closeDate ? a.closeDate : a.openDate;
+  const dateB = b.status === "closed" && b.closeDate ? b.closeDate : b.openDate;
+  const byDate = compareDateDesc(dateA, dateB);
+  if (byDate !== 0) return byDate;
+  return (b.updatedAt ?? b.createdAt).localeCompare(a.updatedAt ?? a.createdAt);
+}
 
 export type OptionsMutationResult =
   | { ok: true; trade: OptionsTrade }
@@ -32,12 +41,7 @@ export class OptionsTradeService {
   ) {}
 
   list(): OptionsTrade[] {
-    return this.tradeRepo
-      .list()
-      .sort(
-        (a, b) =>
-          (b.updatedAt ?? b.createdAt).localeCompare(a.updatedAt ?? a.createdAt)
-      );
+    return this.tradeRepo.list().sort(compareOptionsTradesByDate);
   }
 
   openTrade(draft: OpenTradeDraft): OptionsMutationResult {

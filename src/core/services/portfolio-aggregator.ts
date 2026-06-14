@@ -24,6 +24,7 @@ import {
   deriveDashboardOptionsValue,
 } from "@/core/adapters/dashboard-client-adapter";
 import { calculatePersonalCashContributionSgd } from "@/core/calculations/personal-cash/contributions";
+import { sortByDateDesc } from "@/shared/lib/sort";
 import {
   sumRealizedOptionsPlUsd,
   buildClosedTradeRows,
@@ -183,8 +184,9 @@ export class PortfolioAggregator {
     metrics: PortfolioMetrics | null;
   } {
     const resolvedSettings = settings ?? this.settingsRepo.get();
-    const resolvedContributions =
-      contributions ?? this.contributionRepo.list();
+    const resolvedContributions = sortByDateDesc(
+      contributions ?? this.contributionRepo.list()
+    );
     const fxRate = resolvedSettings.usdSgdFxRate;
 
     if (!isValidFxRate(fxRate)) {
@@ -234,7 +236,7 @@ export class PortfolioAggregator {
         goalProgress: calculateGoalProgress(goals, 0),
         contributions: state.contributions,
         goals,
-        snapshots: this.snapshotRepo.list(),
+        snapshots: sortByDateDesc(this.snapshotRepo.list()),
       };
     }
 
@@ -251,7 +253,7 @@ export class PortfolioAggregator {
       ),
       contributions: state.contributions,
       goals,
-      snapshots: this.snapshotRepo.list(),
+      snapshots: sortByDateDesc(this.snapshotRepo.list()),
     };
   }
 }

@@ -8,6 +8,7 @@ import {
   validateStockTransactionUpsert,
 } from "@/core/calculations/stocks/validation";
 import { generateId } from "@/core/database/local/local-storage";
+import { compareDateDescWithCreatedAt } from "@/shared/lib/sort";
 
 export type StockUpsertResult =
   | { ok: true; transaction: StockTransaction }
@@ -22,7 +23,7 @@ export class StockTransactionService {
   list(): StockTransaction[] {
     return this.transactionRepo
       .list()
-      .sort((a, b) => b.date.localeCompare(a.date) || b.createdAt.localeCompare(a.createdAt));
+      .sort(compareDateDescWithCreatedAt);
   }
 
   upsert(draft: StockTransactionDraft): StockUpsertResult {
