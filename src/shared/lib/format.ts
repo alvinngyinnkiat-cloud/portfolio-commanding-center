@@ -1,19 +1,33 @@
-export function formatSgd(value: number, decimals = 2): string {
-  return `S$${value.toLocaleString("en-SG", {
+import { coerceNumber } from "./coerce-number";
+
+export function formatSgd(
+  value: number | null | undefined,
+  decimals = 2
+): string {
+  const n = coerceNumber(value);
+  return `S$${n.toLocaleString("en-SG", {
     minimumFractionDigits: decimals,
     maximumFractionDigits: decimals,
   })}`;
 }
 
-export function formatUsd(value: number, decimals = 2): string {
-  return `US$${value.toLocaleString("en-US", {
+export function formatUsd(
+  value: number | null | undefined,
+  decimals = 2
+): string {
+  const n = coerceNumber(value);
+  return `US$${n.toLocaleString("en-US", {
     minimumFractionDigits: decimals,
     maximumFractionDigits: decimals,
   })}`;
 }
 
-export function formatPercent(value: number, decimals = 2): string {
-  return `${value.toLocaleString("en-SG", {
+export function formatPercent(
+  value: number | null | undefined,
+  decimals = 2
+): string {
+  const n = coerceNumber(value);
+  return `${n.toLocaleString("en-SG", {
     minimumFractionDigits: decimals,
     maximumFractionDigits: decimals,
   })}%`;

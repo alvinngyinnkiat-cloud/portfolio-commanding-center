@@ -1,5 +1,9 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { getSupabaseClient, isSupabaseConfigured } from "@/lib/supabase";
+import {
+  getServerSupabaseClient,
+  getSupabaseClient,
+  isSupabaseConfigured,
+} from "@/lib/supabase";
 import type { PersistenceCache } from "./cache";
 import { createEmptyCache, normalizeCache } from "./cache";
 import {
@@ -35,6 +39,13 @@ export class PersistenceManager {
   static async initialize(): Promise<PersistenceManager> {
     const manager = new PersistenceManager();
     await manager.bootstrap();
+    return manager;
+  }
+
+  /** Server-only bootstrap — Supabase required, no localStorage migration. */
+  static async initializeForServer(): Promise<PersistenceManager> {
+    const manager = new PersistenceManager();
+    await manager.bootstrapServer();
     return manager;
   }
 
@@ -82,6 +93,34 @@ export class PersistenceManager {
       this.cache.migratedFromLocal = true;
     }
     this.cache = normalizeCache(this.cache);
+  }
+
+  private async bootstrapServer(): Promise<void> {
+    const client = getServerSupabaseClient();
+    if (!client) {
+      throw new Error(
+        "Supabase is not configured — set NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY"
+      );
+    }
+
+    this.client = client;
+    this.status = "supabase";
+    this.cache = await hydrateCacheFromSupabase(this.client);
+    this.cache = normalizeCache(this.cache);
+  }
+
+  /** Wait for queued Supabase writes to finish (used by cron routes). */
+  async drainSyncQueue(timeoutMs = 30_000): Promise<void> {
+    const started = Date.now();
+    while (this.syncing || this.pendingSync) {
+      if (Date.now() - started > timeoutMs) {
+        throw new Error("Timed out waiting for Supabase sync");
+      }
+      await new Promise((resolve) => setTimeout(resolve, 50));
+    }
+    if (this.lastError) {
+      throw new Error(this.lastError);
+    }
   }
 
   queueSettingsSync(): void {

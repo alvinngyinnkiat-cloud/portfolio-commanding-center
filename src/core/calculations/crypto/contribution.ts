@@ -1,4 +1,5 @@
 import type { CryptoHolding } from "@/core/domain/types";
+import { coerceNumber } from "@/shared/lib/coerce-number";
 
 export function normalizeFeesSgd(feesSgd: number | undefined): number {
   if (feesSgd === undefined || Number.isNaN(feesSgd) || feesSgd < 0) {
@@ -9,7 +10,9 @@ export function normalizeFeesSgd(feesSgd: number | undefined): number {
 
 /** Per-holding capital injected = buy amount + associated fees. */
 export function calculateHoldingContribution(holding: CryptoHolding): number {
-  return holding.investedSgd + normalizeFeesSgd(holding.feesSgd);
+  return (
+    coerceNumber(holding.investedSgd) + normalizeFeesSgd(holding.feesSgd)
+  );
 }
 
 /** Crypto Contribution = all buy transactions + associated fees (Module 3 owned). */

@@ -1,4 +1,3 @@
-import { initializeRepositories } from "@/core/database/supabase";
 import type { RepositoryBundle } from "@/core/database/repository-bundle";
 import { FxService } from "./fx-service";
 import { DashboardSettingsService } from "./dashboard-settings-service";
@@ -23,7 +22,19 @@ import { OptionsTradeService } from "./options-trade-service";
 import { OptionsSettingsService } from "./options-settings-service";
 import { OptionsTrackerService } from "./options-tracker-service";
 
-export function createPortfolioServices(repos: RepositoryBundle) {
+export interface PortfolioServiceFetchers {
+  stockQuoteFetcher?: ReturnType<typeof createBrowserStockQuoteFetcher>;
+  stockHistoryFetcher?: ReturnType<typeof createBrowserStockHistoryFetcher>;
+}
+
+export function createPortfolioServices(
+  repos: RepositoryBundle,
+  fetchers: PortfolioServiceFetchers = {}
+) {
+  const stockQuoteFetcher =
+    fetchers.stockQuoteFetcher ?? createBrowserStockQuoteFetcher();
+  const stockHistoryFetcher =
+    fetchers.stockHistoryFetcher ?? createBrowserStockHistoryFetcher();
 
   const stockTracker = new StockTrackerService(
     repos.stockTransactions,
@@ -36,7 +47,7 @@ export function createPortfolioServices(repos: RepositoryBundle) {
     repos.stockPrices,
     repos.stockPriceSchedule,
     repos.scannerWatchlist,
-    createBrowserStockQuoteFetcher()
+    stockQuoteFetcher
   );
 
   const stockCandleUpdates = new StockCandleUpdateService(
@@ -45,7 +56,7 @@ export function createPortfolioServices(repos: RepositoryBundle) {
     repos.stockWeeklyCandles,
     repos.stockPriceSchedule,
     repos.scannerWatchlist,
-    createBrowserStockHistoryFetcher()
+    stockHistoryFetcher
   );
 
   const marketDataReader = createStockMarketDataReader(

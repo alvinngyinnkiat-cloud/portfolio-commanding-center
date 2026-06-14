@@ -20,6 +20,7 @@ import {
   SNAPSHOT_CHART_SERIES,
 } from "@/core/calculations";
 import { formatSgd, formatDate } from "@/shared/lib/format";
+import { coerceNumber } from "@/shared/lib/coerce-number";
 import { Card } from "@/shared/components/ui/Card";
 import { Button } from "@/shared/components/ui/Button";
 
@@ -36,6 +37,7 @@ const PERIODS: { key: FilterPeriod; label: string }[] = [
 ];
 
 export function DailyPortfolioChart({ snapshots }: DailyPortfolioChartProps) {
+  const safeSnapshots = snapshots ?? [];
   const [period, setPeriod] = useState<FilterPeriod>("7d");
   const [series, setSeries] = useState<SnapshotChartSeries>("ownPortfolio");
 
@@ -47,28 +49,28 @@ export function DailyPortfolioChart({ snapshots }: DailyPortfolioChartProps) {
     let result: DailySnapshot[];
     switch (period) {
       case "7d":
-        result = filterSnapshotsByDays(snapshots, 7);
-        if (result.length === 0 && snapshots.length > 0) {
-          result = fallbackRecentSnapshots(snapshots, 7);
+        result = filterSnapshotsByDays(safeSnapshots, 7);
+        if (result.length === 0 && safeSnapshots.length > 0) {
+          result = fallbackRecentSnapshots(safeSnapshots, 7);
         }
         break;
       case "1m":
-        result = filterSnapshotsByMonths(snapshots, 1);
-        if (result.length === 0 && snapshots.length > 0) {
-          result = fallbackRecentSnapshots(snapshots, 30);
+        result = filterSnapshotsByMonths(safeSnapshots, 1);
+        if (result.length === 0 && safeSnapshots.length > 0) {
+          result = fallbackRecentSnapshots(safeSnapshots, 30);
         }
         break;
       case "1y":
-        result = filterSnapshotsByMonths(snapshots, 12);
-        if (result.length === 0 && snapshots.length > 0) {
-          result = fallbackRecentSnapshots(snapshots, snapshots.length);
+        result = filterSnapshotsByMonths(safeSnapshots, 12);
+        if (result.length === 0 && safeSnapshots.length > 0) {
+          result = fallbackRecentSnapshots(safeSnapshots, safeSnapshots.length);
         }
         break;
       default:
         result = [];
     }
     return result;
-  }, [snapshots, period]);
+  }, [safeSnapshots, period]);
 
   const stats = useMemo(
     () => calculateSnapshotStats(filtered, series),
@@ -165,7 +167,9 @@ export function DailyPortfolioChart({ snapshots }: DailyPortfolioChartProps) {
                 <YAxis
                   tick={{ fill: "#94a3b8", fontSize: 11 }}
                   stroke="#334155"
-                  tickFormatter={(v) => `S$${(v / 1000).toFixed(0)}k`}
+                  tickFormatter={(v) =>
+                    `S$${(coerceNumber(v) / 1000).toFixed(0)}k`
+                  }
                 />
                 <Tooltip
                   formatter={(value: number) => formatSgd(value)}

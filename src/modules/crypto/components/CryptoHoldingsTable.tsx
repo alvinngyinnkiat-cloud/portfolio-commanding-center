@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { usePortfolio } from "@/context/PortfolioContext";
 import type { CryptoAllocationSettings, CryptoHoldingRow } from "@/core/domain/types";
 import {
@@ -10,6 +10,7 @@ import {
   validateCryptoHoldingDraft,
 } from "@/core/calculations/crypto";
 import { formatPercent, formatSgd } from "@/shared/lib/format";
+import { coerceNumber } from "@/shared/lib/coerce-number";
 import { SummaryCard } from "@/shared/components/ui/SummaryCard";
 import { Input } from "@/shared/components/ui/Input";
 import { Button } from "@/shared/components/ui/Button";
@@ -23,9 +24,10 @@ const emptyForm = {
   notes: "",
 };
 
-function plColorClass(value: number): string {
-  if (value > 0) return "text-emerald-400";
-  if (value < 0) return "text-accent-red";
+function plColorClass(value: number | null | undefined): string {
+  const n = coerceNumber(value);
+  if (n > 0) return "text-emerald-400";
+  if (n < 0) return "text-accent-red";
   return "text-slate-300";
 }
 
@@ -78,7 +80,7 @@ function CashDeploymentGuide({
             type="number"
             step="1"
             min="0"
-            value={String(settings[key])}
+            value={String(coerceNumber(settings[key]))}
             onChange={(e) => handlePercentChange(key, e.target.value)}
           />
         ))}
@@ -150,9 +152,14 @@ export function CryptoHoldingsTable() {
   const [form, setForm] = useState(emptyForm);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
-  const [allocationSettings, setAllocationSettings] = useState<CryptoAllocationSettings>(
-    () => services.cryptoAllocation.get()
-  );
+  const [allocationSettings, setAllocationSettings] =
+    useState<CryptoAllocationSettings>(() => services.cryptoAllocation.get());
+
+  useEffect(() => {
+    if (cryptoData?.allocationSettings) {
+      setAllocationSettings(cryptoData.allocationSettings);
+    }
+  }, [cryptoData?.allocationSettings]);
 
   const summary = cryptoData?.summary;
   const rows = cryptoData?.rows ?? [];
@@ -244,7 +251,9 @@ export function CryptoHoldingsTable() {
           </div>
           <p
             className={`mt-3 text-2xl font-bold tracking-tight sm:text-3xl ${
-              summary.availableTradingCashSgd >= 0 ? "text-white" : "text-accent-red"
+              coerceNumber(summary.availableTradingCashSgd) >= 0
+                ? "text-white"
+                : "text-accent-red"
             }`}
           >
             {formatSgd(summary.availableTradingCashSgd)}
@@ -375,7 +384,7 @@ export function CryptoHoldingsTable() {
         </table>
       </div>
 
-      {summary.holdingCount > 0 && (
+      {coerceNumber(summary.holdingCount) > 0 && (
         <p className="text-xs text-slate-500">
           Crypto P/L {formatSgd(summary.cryptoProfitLossSgd)} (
           {formatPercent(summary.cryptoProfitLossPercent)}) · Portfolio % uses Crypto

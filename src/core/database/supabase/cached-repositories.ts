@@ -11,6 +11,10 @@ import { normalizeDailySnapshot } from "@/core/calculations/snapshots";
 import { normalizeStockPrice } from "@/core/calculations/stocks/price-normalize";
 import { normalizeOptionsSettings } from "@/core/domain/defaults-options";
 import { normalizeScannerScanRun } from "@/core/calculations/scanner/normalize-scan-result";
+import {
+  normalizeCryptoAllocationSettings,
+  normalizeCryptoHolding,
+} from "@/core/calculations/crypto/normalize";
 import type { DashboardSettingsRepository } from "../repositories/dashboard-settings-repository";
 import type { ContributionRepository } from "../repositories/contribution-repository";
 import type { GoalRepository } from "../repositories/goal-repository";
@@ -332,13 +336,19 @@ class CachedScannerWatchlistRepository implements ScannerWatchlistRepository {
 class CachedCryptoHoldingRepository implements CryptoHoldingRepository {
   constructor(private readonly manager: PersistenceManager) {}
   list() {
-    return [...this.manager.getCache().cryptoHoldings];
+    return this.manager.getCache().cryptoHoldings.map((row) => {
+      const normalized = normalizeCryptoHolding(row);
+      return normalized ?? row;
+    });
   }
   upsert(holding: Parameters<CryptoHoldingRepository["upsert"]>[0]) {
+    const normalized = normalizeCryptoHolding(holding);
+    if (!normalized) return;
+
     const list = this.manager.getCache().cryptoHoldings;
-    const idx = list.findIndex((row) => row.id === holding.id);
-    if (idx >= 0) list[idx] = holding;
-    else list.push(holding);
+    const idx = list.findIndex((row) => row.id === normalized.id);
+    if (idx >= 0) list[idx] = normalized;
+    else list.push(normalized);
     this.manager.queueCryptoHoldingsSync();
   }
   delete(id: string) {
@@ -348,7 +358,9 @@ class CachedCryptoHoldingRepository implements CryptoHoldingRepository {
     this.manager.queueCryptoHoldingsSync();
   }
   replaceAll(holdings: Parameters<CryptoHoldingRepository["replaceAll"]>[0]) {
-    this.manager.getCache().cryptoHoldings = [...holdings];
+    this.manager.getCache().cryptoHoldings = holdings
+      .map((row) => normalizeCryptoHolding(row))
+      .filter((row): row is NonNullable<typeof row> => row != null);
     this.manager.queueCryptoHoldingsSync();
   }
 }
@@ -356,10 +368,13 @@ class CachedCryptoHoldingRepository implements CryptoHoldingRepository {
 class CachedCryptoAllocationRepository implements CryptoAllocationRepository {
   constructor(private readonly manager: PersistenceManager) {}
   get() {
-    return { ...this.manager.getCache().cryptoAllocation };
+    return normalizeCryptoAllocationSettings(
+      this.manager.getCache().cryptoAllocation
+    );
   }
   save(settings: Parameters<CryptoAllocationRepository["save"]>[0]) {
-    this.manager.getCache().cryptoAllocation = { ...settings };
+    this.manager.getCache().cryptoAllocation =
+      normalizeCryptoAllocationSettings(settings);
     this.manager.queueSettingsSync();
   }
 }

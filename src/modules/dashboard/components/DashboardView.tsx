@@ -2,6 +2,7 @@
 
 import { usePortfolio } from "@/context/PortfolioContext";
 import { formatSgd, formatUsd, formatPercent } from "@/shared/lib/format";
+import { coerceNumber } from "@/shared/lib/coerce-number";
 import { SummaryCard } from "@/shared/components/ui/SummaryCard";
 import { SectionHeader } from "@/shared/components/ui/SectionHeader";
 import { FxRateErrorBanner } from "@/shared/components/ui/FxRateErrorBanner";
@@ -76,8 +77,11 @@ export function DashboardView() {
     );
   }
 
-  const plTrend = metrics.totalPL >= 0 ? "positive" : "negative";
-  const assetAllocationTotal = allocation.reduce((sum, item) => sum + item.value, 0);
+  const plTrend = coerceNumber(metrics.totalPL) >= 0 ? "positive" : "negative";
+  const assetAllocationTotal = (allocation ?? []).reduce(
+    (sum, item) => sum + coerceNumber(item?.value),
+    0
+  );
 
   return (
     <div className="space-y-8 pb-8">

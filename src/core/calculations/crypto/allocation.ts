@@ -1,7 +1,5 @@
-import type {
-  CryptoAllocationBucket,
-  CryptoAllocationSettings,
-} from "@/core/domain/types";
+import type { CryptoAllocationBucket, CryptoAllocationSettings } from "@/core/domain/types";
+import { coerceNumber } from "@/shared/lib/coerce-number";
 
 export const DEFAULT_CRYPTO_ALLOCATION: CryptoAllocationSettings = {
   topHolding: 50,
@@ -21,10 +19,10 @@ export function calculateAllocationTotal(
   settings: CryptoAllocationSettings
 ): number {
   return (
-    settings.topHolding +
-    settings.secondToFifth +
-    settings.sixthToTenth +
-    settings.others
+    coerceNumber(settings.topHolding) +
+    coerceNumber(settings.secondToFifth) +
+    coerceNumber(settings.sixthToTenth) +
+    coerceNumber(settings.others)
   );
 }
 
@@ -36,11 +34,15 @@ export function buildCashDeploymentBuckets(
   availableTradingCashSgd: number,
   settings: CryptoAllocationSettings
 ): CryptoAllocationBucket[] {
+  const cash = coerceNumber(availableTradingCashSgd);
   return (Object.keys(BUCKET_LABELS) as (keyof CryptoAllocationSettings)[]).map(
-    (key) => ({
-      label: BUCKET_LABELS[key],
-      percent: settings[key],
-      amountSgd: availableTradingCashSgd * (settings[key] / 100),
-    })
+    (key) => {
+      const percent = coerceNumber(settings[key]);
+      return {
+        label: BUCKET_LABELS[key],
+        percent,
+        amountSgd: cash * (percent / 100),
+      };
+    }
   );
 }

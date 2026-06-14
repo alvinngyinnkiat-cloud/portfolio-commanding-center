@@ -33,7 +33,7 @@ export function RiskManagementTab() {
       <SectionTable
         title="Open risk by trade"
         headers={["Underlying", "Strategy", "Max risk", "Your risk", "% pool"]}
-        rows={risk.byTrade.map((row) => [
+        rows={(risk.byTrade ?? []).map((row) => [
           row.underlying,
           row.strategyDisplay,
           formatUsd(row.maxRiskUsd),
@@ -45,7 +45,7 @@ export function RiskManagementTab() {
       <SectionTable
         title="Open risk by strategy"
         headers={["Strategy", "Open", "Total risk", "Avg risk", "% pool"]}
-        rows={risk.byStrategy.map((row) => [
+        rows={(risk.byStrategy ?? []).map((row) => [
           row.strategyDisplay,
           String(row.openCount),
           formatUsd(row.totalRiskUsd),

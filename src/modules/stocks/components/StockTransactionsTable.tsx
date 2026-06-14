@@ -13,6 +13,7 @@ import {
 } from "@/core/calculations/stocks/validation";
 import { toLocalDateString } from "@/shared/lib/date";
 import { formatDate, formatUsd, formatSgd } from "@/shared/lib/format";
+import { coerceNumber } from "@/shared/lib/coerce-number";
 import { Input } from "@/shared/components/ui/Input";
 import { Select } from "@/shared/components/ui/Select";
 import { Button } from "@/shared/components/ui/Button";
@@ -281,8 +282,9 @@ export function StockTransactionsTable() {
 
         {preview && (
           <div className="rounded-lg border border-surface-border/50 bg-surface/60 px-3 py-2 text-xs text-slate-400">
-            Preview · Gross {preview.gross.toFixed(2)} · Fees{" "}
-            {preview.fees.toFixed(2)} · Net {preview.net.toFixed(2)}{" "}
+            Preview · Gross {coerceNumber(preview.gross).toFixed(2)} · Fees{" "}
+            {coerceNumber(preview.fees).toFixed(2)} · Net{" "}
+            {coerceNumber(preview.net).toFixed(2)}{" "}
             {form.market === "US" ? "USD" : "SGD"}
           </div>
         )}

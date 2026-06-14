@@ -1,5 +1,6 @@
 import type { StockMarket } from "@/core/domain/types";
 import type { StockQuoteFetcher } from "./stock-price-update-service";
+import { fetchYahooQuotes } from "./yahoo-finance-provider";
 
 /** Browser-side fetcher that proxies Yahoo Finance through the Next.js API route. */
 export function createBrowserStockQuoteFetcher(): StockQuoteFetcher {
@@ -25,4 +26,9 @@ export function createBrowserStockQuoteFetcher(): StockQuoteFetcher {
 
     return payload.quotes ?? [];
   };
+}
+
+/** Server-side fetcher for API routes and Vercel Cron. */
+export function createServerStockQuoteFetcher(): StockQuoteFetcher {
+  return async (symbols) => fetchYahooQuotes(symbols);
 }

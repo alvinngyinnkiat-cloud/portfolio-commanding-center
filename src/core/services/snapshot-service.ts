@@ -41,8 +41,7 @@ export class SnapshotService {
    * End-of-day auto capture at 11:59pm Singapore time.
    *
    * v1.1 (localStorage): polled client-side while the dashboard is open.
-   * Future: replace with a server scheduled job (Supabase cron / edge function)
-   * calling the same capture logic once per day at 23:59 Asia/Singapore.
+   * Vercel Cron calls captureEndOfDayForDate at the scheduled time.
    *
    * Returns the new snapshot when captured; null when not due or already captured today.
    */
@@ -50,10 +49,14 @@ export class SnapshotService {
     if (!isSingaporeEndOfDayCaptureWindow()) {
       return null;
     }
+    return this.captureEndOfDayForDate();
+  }
 
-    const date = getSingaporeDateString();
+  /** Server cron capture — skips client-side time-window check. */
+  captureEndOfDayForDate(date: Date = new Date()): DailySnapshot | null {
+    const snapshotDate = getSingaporeDateString(date);
     const existing = this.repo.list();
-    if (hasSnapshotForDate(existing, date)) {
+    if (hasSnapshotForDate(existing, snapshotDate)) {
       return null;
     }
 
@@ -63,7 +66,7 @@ export class SnapshotService {
     }
 
     const snapshot = createDailySnapshot(state.inputs, state.metrics, {
-      date,
+      date: snapshotDate,
       snapshotType: "automatic",
       createdAt: new Date().toISOString(),
     });

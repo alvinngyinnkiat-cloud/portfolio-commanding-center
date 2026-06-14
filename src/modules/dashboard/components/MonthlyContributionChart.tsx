@@ -17,6 +17,7 @@ import {
   calculateYtdContribution,
 } from "@/core/calculations";
 import { formatSgd } from "@/shared/lib/format";
+import { coerceNumber } from "@/shared/lib/coerce-number";
 import { parseLocalDate } from "@/shared/lib/date";
 import { Card } from "@/shared/components/ui/Card";
 import { Select } from "@/shared/components/ui/Select";
@@ -32,28 +33,29 @@ export function MonthlyContributionChart({
   fxRate,
   totalContribution,
 }: MonthlyContributionChartProps) {
+  const safeContributions = contributions ?? [];
   const currentYear = new Date().getFullYear();
   const years = useMemo(() => {
     const set = new Set<number>();
-    contributions.forEach((c) =>
+    safeContributions.forEach((c) =>
       set.add(parseLocalDate(c.date).getFullYear())
     );
     if (set.size === 0) set.add(currentYear);
     return Array.from(set).sort();
-  }, [contributions, currentYear]);
+  }, [safeContributions, currentYear]);
 
   const [selectedYear, setSelectedYear] = useState<number>(
     years[years.length - 1] ?? currentYear
   );
   const [selectedMonth, setSelectedMonth] = useState<string>("all");
 
-  const ytdContribution = calculateYtdContribution(contributions, selectedYear);
+  const ytdContribution = calculateYtdContribution(safeContributions, selectedYear);
 
   const monthlyData = useMemo(() => {
     const monthNum =
       selectedMonth === "all" ? undefined : parseInt(selectedMonth, 10);
     return calculateMonthlyCashContributions(
-      contributions,
+      safeContributions,
       fxRate,
       selectedYear,
       monthNum
@@ -61,7 +63,7 @@ export function MonthlyContributionChart({
       ...d,
       label: d.month,
     }));
-  }, [contributions, fxRate, selectedYear, selectedMonth]);
+  }, [safeContributions, fxRate, selectedYear, selectedMonth]);
 
   const monthOptions = [
     { value: "all", label: "All Months" },
@@ -93,7 +95,7 @@ export function MonthlyContributionChart({
         <div className="rounded-xl border border-surface-border/60 bg-surface/50 p-3">
           <p className="text-xs font-medium text-slate-500">Transactions</p>
           <p className="mt-1 text-sm font-semibold text-white">
-            {contributions.length}
+            {safeContributions.length}
           </p>
         </div>
       </div>
@@ -132,7 +134,9 @@ export function MonthlyContributionChart({
               <YAxis
                 tick={{ fill: "#94a3b8", fontSize: 11 }}
                 stroke="#334155"
-                tickFormatter={(v) => `S$${(v / 1000).toFixed(0)}k`}
+                tickFormatter={(v) =>
+                  `S$${(coerceNumber(v) / 1000).toFixed(0)}k`
+                }
               />
               <Tooltip
                 formatter={(value: number) => formatSgd(value)}

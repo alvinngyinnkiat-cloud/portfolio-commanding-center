@@ -18,6 +18,10 @@ import type {
 } from "@/core/domain/types";
 import type { StockPriceScheduleState } from "@/core/database/repositories/stock-price-schedule-repository";
 import { DEFAULT_CRYPTO_ALLOCATION } from "@/core/calculations/crypto/allocation";
+import {
+  normalizeCryptoAllocationSettings,
+  normalizeCryptoHoldings,
+} from "@/core/calculations/crypto/normalize";
 import { DEFAULT_DASHBOARD_SETTINGS } from "@/core/domain/defaults";
 import { DEFAULT_OPTIONS_SETTINGS } from "@/core/domain/defaults-options";
 import { DEFAULT_SCANNER_WATCHLIST } from "@/core/calculations/scanner/watchlist";
@@ -104,5 +108,7 @@ export function normalizeCache(cache: PersistenceCache): PersistenceCache {
         : null,
     },
     optionsSettings: normalizeOptionsSettings(cache.optionsSettings),
+    cryptoHoldings: normalizeCryptoHoldings(cache.cryptoHoldings),
+    cryptoAllocation: normalizeCryptoAllocationSettings(cache.cryptoAllocation),
   };
 }

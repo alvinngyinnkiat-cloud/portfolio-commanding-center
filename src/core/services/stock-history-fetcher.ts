@@ -1,5 +1,6 @@
 import type { StockMarket } from "@/core/domain/types";
 import type { StockHistoryResult } from "@/core/services/yahoo-history-provider";
+import { fetchYahooHistories } from "@/core/services/yahoo-history-provider";
 
 export type StockHistoryFetcher = (
   symbols: Array<{
@@ -24,4 +25,9 @@ export function createBrowserStockHistoryFetcher(): StockHistoryFetcher {
     const payload = (await response.json()) as { histories?: StockHistoryResult[] };
     return payload.histories ?? [];
   };
+}
+
+/** Server-side fetcher for API routes and Vercel Cron. */
+export function createServerStockHistoryFetcher(): StockHistoryFetcher {
+  return async (symbols) => fetchYahooHistories(symbols);
 }

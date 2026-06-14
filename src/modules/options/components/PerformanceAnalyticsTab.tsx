@@ -22,6 +22,7 @@ import {
   type PerformanceScope,
 } from "@/core/calculations/options";
 import { formatUsd, formatPercent } from "@/shared/lib/format";
+import { coerceNumber } from "@/shared/lib/coerce-number";
 import {
   formatSignedPercent,
   plColorClass,
@@ -58,7 +59,7 @@ function PerformanceStats({
       value: formatUsd(detail.totalRealizedPlUsd),
       className: plColorClass(detail.totalRealizedPlUsd),
     },
-    { label: "Average Days Held", value: detail.avgDaysHeld.toFixed(1) },
+    { label: "Average Days Held", value: coerceNumber(detail.avgDaysHeld).toFixed(1) },
     {
       label: returnLabel,
       value: formatSignedPercent(detail.returnPercent, 1),

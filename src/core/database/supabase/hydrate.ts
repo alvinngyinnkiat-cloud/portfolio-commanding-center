@@ -1,7 +1,10 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { PersistenceCache } from "./cache";
 import { createEmptyCache, normalizeCache } from "./cache";
-import { DEFAULT_CRYPTO_ALLOCATION } from "@/core/calculations/crypto/allocation";
+import {
+  normalizeCryptoAllocationSettings,
+  normalizeCryptoHoldings,
+} from "@/core/calculations/crypto/normalize";
 import { DEFAULT_SCANNER_WATCHLIST } from "@/core/calculations/scanner/watchlist";
 import { normalizeDashboardSettings } from "@/core/database/local/normalize-settings";
 import { normalizeDailySnapshot } from "@/core/calculations/snapshots";
@@ -95,7 +98,9 @@ export async function hydrateCacheFromSupabase(
     cache.optionsSettings = normalizeOptionsSettings(
       row.options_settings ?? cache.optionsSettings
     );
-    cache.cryptoAllocation = row.crypto_allocation_settings ?? DEFAULT_CRYPTO_ALLOCATION;
+    cache.cryptoAllocation = normalizeCryptoAllocationSettings(
+      row.crypto_allocation_settings
+    );
     cache.scannerSchedule = row.scanner_schedule ?? cache.scannerSchedule;
     cache.stockPriceSchedule = row.stock_price_schedule ?? cache.stockPriceSchedule;
     cache.stockInstruments = row.stock_instruments ?? [];
@@ -136,7 +141,9 @@ export async function hydrateCacheFromSupabase(
   cache.snapshots =
     snapshotsRes.data?.map((row) => normalizeDailySnapshot(row.data)) ?? [];
   cache.stockTransactions = stockRes.data?.map((row) => row.data) ?? [];
-  cache.cryptoHoldings = cryptoRes.data?.map((row) => row.data) ?? [];
+  cache.cryptoHoldings = normalizeCryptoHoldings(
+    cryptoRes.data?.map((row) => row.data) ?? []
+  );
   cache.optionsTrades = optionsRes.data?.map((row) => row.data) ?? [];
 
   const watchlistRows = watchlistRes.data ?? [];

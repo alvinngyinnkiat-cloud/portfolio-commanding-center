@@ -9,6 +9,7 @@ import {
   plTrend,
 } from "@/core/calculations/stocks/summary";
 import { formatSgd, formatSingaporeDateTime, formatUsd } from "@/shared/lib/format";
+import { coerceNumber } from "@/shared/lib/coerce-number";
 import { SummaryCard } from "@/shared/components/ui/SummaryCard";
 import { FxRateErrorBanner } from "@/shared/components/ui/FxRateErrorBanner";
 import { Button } from "@/shared/components/ui/Button";
@@ -21,15 +22,17 @@ import { TrendingUp, Wallet, RefreshCw, PiggyBank } from "lucide-react";
 
 type MarketFilter = "ALL" | StockMarket;
 
-function formatNativeValue(holding: CalculatedHolding, value: number): string {
-  return holding.currency === "USD" ? formatUsd(value) : formatSgd(value);
+function formatNativeValue(holding: CalculatedHolding, value: number | null | undefined): string {
+  const safeValue = coerceNumber(value);
+  return holding.currency === "USD" ? formatUsd(safeValue) : formatSgd(safeValue);
 }
 
 /** Display-only: green / red / neutral — does not alter calculated values. */
-function plColorClass(value: number, isMissing = false): string {
+function plColorClass(value: number | null | undefined, isMissing = false): string {
   if (isMissing) return "text-slate-300";
-  if (value > 0) return "text-emerald-400";
-  if (value < 0) return "text-accent-red";
+  const n = coerceNumber(value);
+  if (n > 0) return "text-emerald-400";
+  if (n < 0) return "text-accent-red";
   return "text-slate-300";
 }
 
@@ -357,8 +360,8 @@ export function StockHoldingsTable() {
       )}
 
       <p className="text-xs text-slate-500">
-        {summary.openPositionCount} open position
-        {summary.openPositionCount === 1 ? "" : "s"} · Auto prices (US 6:00 AM
+        {coerceNumber(summary.openPositionCount)} open position
+        {coerceNumber(summary.openPositionCount) === 1 ? "" : "s"} · Auto prices (US 6:00 AM
         SGT · SG 6:00 PM SGT) · Manual override available when auto is missing.
       </p>
 
@@ -441,7 +444,7 @@ export function StockHoldingsTable() {
                       {holding.assetName}
                     </td>
                     <td className="px-4 py-3 text-slate-300">
-                      {holding.quantity}
+                      {coerceNumber(holding.quantity)}
                     </td>
                     <td className="px-4 py-3 text-slate-300">
                       {formatNativeValue(holding, holding.averageCost)}

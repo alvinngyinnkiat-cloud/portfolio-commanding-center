@@ -3,6 +3,7 @@ import type {
   CryptoHoldingCategory,
   CryptoHoldingRow,
 } from "@/core/domain/types";
+import { coerceNumber } from "@/shared/lib/coerce-number";
 import { calculateHoldingContribution } from "./contribution";
 
 export function getHoldingCategory(rank: number): CryptoHoldingCategory {
@@ -40,19 +41,20 @@ export function buildCryptoHoldingRows(
   holdings: CryptoHolding[]
 ): CryptoHoldingRow[] {
   const cryptoHoldingsValueSgd = holdings.reduce(
-    (sum, h) => sum + h.currentValueSgd,
+    (sum, h) => sum + coerceNumber(h.currentValueSgd),
     0
   );
 
   const sorted = [...holdings].sort(
-    (a, b) => b.currentValueSgd - a.currentValueSgd
+    (a, b) => coerceNumber(b.currentValueSgd) - coerceNumber(a.currentValueSgd)
   );
 
   return sorted.map((holding, index) => {
     const rank = index + 1;
     const contributionSgd = calculateHoldingContribution(holding);
+    const currentValueSgd = coerceNumber(holding.currentValueSgd);
     const profitLossSgd = calculateProfitLossSgd(
-      holding.currentValueSgd,
+      currentValueSgd,
       contributionSgd
     );
 
@@ -67,7 +69,7 @@ export function buildCryptoHoldingRows(
         contributionSgd
       ),
       portfolioPercent: calculatePortfolioPercent(
-        holding.currentValueSgd,
+        currentValueSgd,
         cryptoHoldingsValueSgd
       ),
     };

@@ -1,17 +1,22 @@
 import type { OptionsCapacityStatus, OptionsDteStatus } from "@/core/domain/types/options";
 import type { BreakevenDifference } from "@/core/calculations/options/open-trade-display";
 import type { TargetExitKind } from "@/core/calculations/options/open-trade-display";
+import { coerceNumber } from "@/shared/lib/coerce-number";
 
-export function plColorClass(value: number, missing = false): string {
+export function plColorClass(value: number | null | undefined, missing = false): string {
   if (missing) return "text-slate-300";
-  if (value > 0) return "text-emerald-400";
-  if (value < 0) return "text-accent-red";
+  const n = coerceNumber(value);
+  if (n > 0) return "text-emerald-400";
+  if (n < 0) return "text-accent-red";
   return "text-slate-300";
 }
 
-export function plTrend(value: number): "positive" | "negative" | "neutral" {
-  if (value > 0) return "positive";
-  if (value < 0) return "negative";
+export function plTrend(
+  value: number | null | undefined
+): "positive" | "negative" | "neutral" {
+  const n = coerceNumber(value);
+  if (n > 0) return "positive";
+  if (n < 0) return "negative";
   return "neutral";
 }
 
@@ -39,14 +44,19 @@ export function dteStatusBadgeClass(status: OptionsDteStatus): string {
   return "bg-emerald-500/15 text-emerald-400";
 }
 
-export function formatSignedPercent(value: number, decimals = 1): string {
-  const sign = value > 0 ? "+" : "";
-  return `${sign}${value.toFixed(decimals)}%`;
+export function formatSignedPercent(
+  value: number | null | undefined,
+  decimals = 1
+): string {
+  const n = coerceNumber(value);
+  const sign = n > 0 ? "+" : "";
+  return `${sign}${n.toFixed(decimals)}%`;
 }
 
-export function formatSignedUsdCompact(value: number): string {
-  const sign = value > 0 ? "+" : value < 0 ? "-" : "";
-  return `${sign}$${Math.abs(value).toFixed(2)}`;
+export function formatSignedUsdCompact(value: number | null | undefined): string {
+  const n = coerceNumber(value);
+  const sign = n > 0 ? "+" : n < 0 ? "-" : "";
+  return `${sign}$${Math.abs(n).toFixed(2)}`;
 }
 
 export function breakevenDiffColorClass(diff: BreakevenDifference): string {

@@ -2,6 +2,7 @@
 
 import type { GoalProgress } from "@/core/domain/types";
 import { formatSgd, formatDate } from "@/shared/lib/format";
+import { coerceNumber } from "@/shared/lib/coerce-number";
 import { Card } from "@/shared/components/ui/Card";
 import { Target, CheckCircle2 } from "lucide-react";
 
@@ -22,9 +23,10 @@ export function GoalProgressCards({ goals }: GoalProgressCardsProps) {
 
   return (
     <div className="grid gap-4 sm:grid-cols-2">
-      {goals.map(({ goal, currentOwnPortfolio, remaining, progressPercent }) => {
-        const clampedProgress = Math.min(progressPercent, 100);
-        const isComplete = progressPercent >= 100;
+      {(goals ?? []).map(({ goal, currentOwnPortfolio, remaining, progressPercent }) => {
+        const safeProgress = coerceNumber(progressPercent);
+        const clampedProgress = Math.min(safeProgress, 100);
+        const isComplete = safeProgress >= 100;
 
         return (
           <Card key={goal.id} noPadding className="overflow-hidden">
@@ -84,7 +86,7 @@ export function GoalProgressCards({ goals }: GoalProgressCardsProps) {
                       remaining <= 0 ? "text-accent-green" : "text-accent-red"
                     }`}
                   >
-                    {remaining <= 0 ? formatSgd(0) : formatSgd(remaining)}
+                    {coerceNumber(remaining) <= 0 ? formatSgd(0) : formatSgd(remaining)}
                   </dd>
                 </div>
               </dl>
@@ -93,7 +95,7 @@ export function GoalProgressCards({ goals }: GoalProgressCardsProps) {
                 <div className="mb-2 flex justify-between text-xs font-medium">
                   <span className="text-slate-500">Progress</span>
                   <span className="text-slate-300">
-                    {progressPercent.toFixed(1)}%
+                    {safeProgress.toFixed(1)}%
                   </span>
                 </div>
                 <div className="h-2.5 overflow-hidden rounded-full bg-surface">

@@ -19,6 +19,7 @@ import {
 } from "@/core/calculations/options";
 import { formatTradeStrikes } from "@/core/calculations/options/helpers";
 import { formatDate, formatUsd } from "@/shared/lib/format";
+import { coerceNumber } from "@/shared/lib/coerce-number";
 import { Button } from "@/shared/components/ui/Button";
 import {
   breakevenDiffColorClass,
@@ -39,7 +40,7 @@ function StackedPriceCell({ value }: { value: StackedOptionPrice | null }) {
   return (
     <div className="leading-tight">
       <div className="font-medium text-slate-200">
-        {value.pricePerShare.toFixed(2)}
+        {coerceNumber(value.pricePerShare).toFixed(2)}
       </div>
       <div className="text-xs text-slate-500">{formatUsd(value.dollarValueUsd)}</div>
     </div>

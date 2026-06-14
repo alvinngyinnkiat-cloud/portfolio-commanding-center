@@ -3,6 +3,7 @@
 import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from "recharts";
 import type { AssetAllocationItem } from "@/core/domain/types";
 import { formatSgd } from "@/shared/lib/format";
+import { coerceNumber } from "@/shared/lib/coerce-number";
 import { Card } from "@/shared/components/ui/Card";
 
 interface AssetAllocationChartProps {
@@ -11,7 +12,9 @@ interface AssetAllocationChartProps {
 }
 
 export function AssetAllocationChart({ data, total }: AssetAllocationChartProps) {
-  const chartData = data.filter((d) => d.value > 0);
+  const safeData = data ?? [];
+  const safeTotal = coerceNumber(total);
+  const chartData = safeData.filter((d) => coerceNumber(d?.value) > 0);
 
   return (
     <Card
@@ -62,8 +65,11 @@ export function AssetAllocationChart({ data, total }: AssetAllocationChartProps)
         </div>
       )}
       <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
-        {data.map((item) => {
-          const pct = total > 0 ? (item.value / total) * 100 : 0;
+        {safeData.map((item) => {
+          const pct =
+            safeTotal > 0
+              ? (coerceNumber(item?.value) / safeTotal) * 100
+              : 0;
           return (
             <div
               key={item.name}
@@ -79,7 +85,9 @@ export function AssetAllocationChart({ data, total }: AssetAllocationChartProps)
               <p className="mt-2 text-sm font-semibold text-white">
                 {formatSgd(item.value)}
               </p>
-              <p className="text-xs text-slate-500">{pct.toFixed(1)}%</p>
+              <p className="text-xs text-slate-500">
+                {coerceNumber(pct).toFixed(1)}%
+              </p>
             </div>
           );
         })}

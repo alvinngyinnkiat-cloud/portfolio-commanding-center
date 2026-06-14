@@ -1,6 +1,7 @@
 "use client";
 
 import { formatSgd, formatUsd } from "@/shared/lib/format";
+import { coerceNumber } from "@/shared/lib/coerce-number";
 import { SummaryCard } from "@/shared/components/ui/SummaryCard";
 import {
   capacityBadgeClass,
@@ -25,7 +26,8 @@ export function OptionsSummaryCards() {
   if (!summary) return null;
 
   const hasNoTrades =
-    summary.openTradeCount === 0 && summary.closedTradeCount === 0;
+    coerceNumber(summary.openTradeCount) === 0 &&
+    coerceNumber(summary.closedTradeCount) === 0;
 
   return (
     <div className="space-y-4">
@@ -41,7 +43,7 @@ export function OptionsSummaryCards() {
       <div className="grid gap-4 sm:grid-cols-2">
         <SummaryCard
           label="Trades Requiring Action"
-          value={String(summary.tradesRequiringActionCount)}
+          value={String(coerceNumber(summary.tradesRequiringActionCount))}
           subValue="DTE ≤ 7 · review and normally close"
           trend={
             summary.tradesRequiringActionCount > 0 ? "negative" : "neutral"
