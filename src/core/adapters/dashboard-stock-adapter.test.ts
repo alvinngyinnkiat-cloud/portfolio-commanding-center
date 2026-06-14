@@ -205,7 +205,7 @@ describe("deriveDashboardStockValues", () => {
     expect(metrics.totalStockContributionSgd).toBe(
       stockOutputs.stockContributionSgd
     );
-    expect(stockOutputs.stockContributionSgd).toBe(14_125);
+    expect(stockOutputs.stockContributionSgd).toBe(14_000);
   });
 });
 
@@ -246,7 +246,7 @@ describe("deriveDashboardStockOutputs", () => {
     const outputs = deriveDashboardStockOutputs(summary);
 
     expect(outputs.stockHoldingsValueSgd).toBe(5_000);
-    expect(outputs.stockContributionSgd).toBe(4_010);
+    expect(outputs.stockContributionSgd).toBe(8_000);
     expect(outputs.availableTradingCashSgd).toBe(3_990);
     expect(outputs.stockProfitLossSgd).toBe(990);
     expect(outputs.totalStockValueSgd).toBe(8_990);

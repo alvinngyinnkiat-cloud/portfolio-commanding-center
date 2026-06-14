@@ -88,6 +88,7 @@ export interface StockTrackerSummary {
   stockProfitLossSgd: number;
   availableTradingCashSgd: number;
   usAvailableTradingCashUsd: number;
+  usAvailableTradingCashSgd: number;
   sgAvailableTradingCashSgd: number;
   totalStockValueSgd: number;
   netStockCashContributedSgd: number;

@@ -287,7 +287,7 @@ describe("dashboard integration QA — 9-step plan", () => {
       });
 
     expect(stockSummary.usAvailableTradingCashUsd).toBeCloseTo(4_990, 0);
-    expect(stockSummary.stockContributionSgd).toBeCloseTo(6_763.5, 0);
+    expect(stockSummary.stockContributionSgd).toBe(13_500);
     expect(metrics.totalStockValueSgd).toBeGreaterThan(0);
     expect(cryptoSummary.totalValueSgd).toBe(0);
     expect(optionsSummary.usAvailableCashUsd).toBe(
@@ -330,7 +330,7 @@ describe("dashboard integration QA — 9-step plan", () => {
 
     expect(stockSummary.sgAvailableTradingCashSgd).toBe(5_990);
     expect(stockSummary.usAvailableTradingCashUsd).toBe(0);
-    expect(stockSummary.sgStockContributionSgd).toBe(4_010);
+    expect(stockSummary.sgStockContributionSgd).toBe(10_000);
   });
 
   it("Step 4: crypto deposit and buy — stock cash unaffected", () => {

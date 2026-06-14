@@ -1,6 +1,4 @@
-import { sgdToUsd } from "@/core/calculations/fx";
-import { isValidFxRate } from "@/core/calculations/fx-validation";
-import { summarizeNetStockCashBreakdown } from "@/core/calculations/stocks/contributions";
+import { calculateUsNetStockCashContributedUsd } from "@/core/calculations/stocks/contributions";
 import { summarizeMarketTradingCashFlow } from "@/core/calculations/stocks/trading-cash";
 import type {
   UsAvailableCashResult,
@@ -11,12 +9,15 @@ import type {
  * Shared US Available Cash — single source of truth for Module 2 and Module 5.
  *
  * US Available Cash (USD) =
- *   US deposits − US withdrawals
+ *   US deposits − US withdrawals (USD legs at each deposit's FX rate)
  *   − US buy cash effect (buy amount + fees)
  *   + US sell cash effect (sell proceeds − fees)
  *   + dividends
  *   − standalone fees
  *   + full realized options P/L (closed trades — shared trades use full amount)
+ *
+ * Never convert the US SGD allocation leg with the current FX rate — USD cash is
+ * stored in USD using the FX rate recorded on each contribution transaction.
  *
  * Never add holdings realisedPL separately; sell proceeds already embed sale P/L.
  */
@@ -30,22 +31,8 @@ export function buildUsAvailableCashResult(
     realizedOptionsPlUsd = 0,
   } = input;
 
-  const zeroBreakdown = {
-    usNetStockCashUsd: 0,
-    stockBuySpendUsd: 0,
-    stockSellProceedsUsd: 0,
-    stockDividendsUsd: 0,
-    standaloneFeesUsd: 0,
-    realizedOptionsPlUsd: 0,
-  };
-
-  if (!isValidFxRate(fxRate) || fxRate == null) {
-    return { usAvailableCashUsd: 0, breakdown: zeroBreakdown };
-  }
-
-  const netCash = summarizeNetStockCashBreakdown(contributions);
-  const usNetStockCashUsd = sgdToUsd(
-    netCash.usNetStockCashContributedSgd,
+  const usNetStockCashUsd = calculateUsNetStockCashContributedUsd(
+    contributions,
     fxRate
   );
   const flow = summarizeMarketTradingCashFlow(stockTransactions, "US");

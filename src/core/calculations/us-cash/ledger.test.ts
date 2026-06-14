@@ -207,7 +207,7 @@ describe("calculateUsAvailableCashUsd", () => {
     expect(available).toBe(4_985);
   });
 
-  it("returns 0 when FX rate is invalid", () => {
+  it("returns 0 USD net cash when FX rate is invalid and deposit has no stored FX", () => {
     const available = calculateUsAvailableCashUsd({
       contributions: [
         {
@@ -224,5 +224,25 @@ describe("calculateUsAvailableCashUsd", () => {
     });
 
     expect(available).toBe(0);
+  });
+
+  it("uses deposit-day FX when current FX is invalid", () => {
+    const available = calculateUsAvailableCashUsd({
+      contributions: [
+        {
+          id: "c1",
+          date: "2025-01-01",
+          type: "deposit",
+          category: "stock",
+          amountSgd: 1_000,
+          usdAllocationPercent: 75,
+          fxRate: 1.32,
+        },
+      ],
+      stockTransactions: [],
+      fxRate: 0,
+    });
+
+    expect(available).toBeCloseTo(568.18, 2);
   });
 });

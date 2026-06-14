@@ -115,7 +115,7 @@ describe("summarizeStockHoldings", () => {
 });
 
 describe("buildStockPortfolioSummary", () => {
-  it("acceptance: total value and P/L use capital model (holdings + available cash; P/L excludes cash)", () => {
+  it("acceptance: total value and P/L use deposit contribution and total value", () => {
     const holdings: CalculatedHolding[] = [
       holding({ market: "US", marketValue: 10_259.5, sgdValue: 13_850.33 }),
     ];
@@ -151,23 +151,24 @@ describe("buildStockPortfolioSummary", () => {
       1.35
     );
 
-    expect(full.usStockContributionUsd).toBe(10_000);
+    expect(full.usStockContributionUsd).toBeCloseTo(18_000, 2);
+    expect(full.usStockContributionSgd).toBe(24_300);
     expect(full.usAvailableTradingCashUsd).toBe(8_100);
     expect(full.usTotalValueUsd).toBeCloseTo(18_359.5, 2);
-    expect(full.usMarketPLUsd).toBeCloseTo(259.5, 2);
-    expect(full.usMarketPLSgd).toBeCloseTo(350.33, 2);
+    expect(full.usMarketPLUsd).toBeCloseTo(359.5, 2);
+    expect(full.usMarketPLSgd).toBeCloseTo(485.33, 2);
 
     expect(full.usTotalValueUsd).toBeCloseTo(
       full.usMarketValueUsd + full.usAvailableTradingCashUsd,
       2
     );
-    expect(full.usMarketPLUsd).toBeCloseTo(
-      full.usMarketValueUsd - full.usStockContributionUsd,
+    expect(full.allMarketPLSgd).toBeCloseTo(
+      full.allMarketTotalValueSgd - full.totalStockContributionSgd,
       2
     );
   });
 
-  it("P/L equals holdings minus buy contribution when no net cash surplus", () => {
+  it("P/L equals total value minus deposit contribution when no holdings", () => {
     const holdings: CalculatedHolding[] = [
       holding({ market: "US", marketValue: 10_000 }),
       holding({ market: "SG", marketValue: 5_000 }),
@@ -197,9 +198,8 @@ describe("buildStockPortfolioSummary", () => {
       1.35
     );
 
-    expect(full.totalStockContributionSgd).toBe(0);
+    expect(full.totalStockContributionSgd).toBe(14_800);
     expect(full.allMarketTotalValueSgd).toBe(33_300);
-    expect(full.usMarketPLUsd).toBeCloseTo(10_000, 2);
     expect(full.usMarketPLSgd).toBeCloseTo(13_500, 2);
     expect(full.sgMarketPLSgd).toBe(5_000);
     expect(full.allMarketPLSgd).toBeCloseTo(18_500, 2);
@@ -213,7 +213,7 @@ describe("buildStockPortfolioSummary", () => {
       2
     );
     expect(full.allMarketPLSgd).toBeCloseTo(
-      full.totalStockHoldingsSgd - full.totalStockContributionSgd,
+      full.allMarketTotalValueSgd - full.totalStockContributionSgd,
       2
     );
   });
@@ -252,7 +252,7 @@ describe("buildStockTrackerSummary", () => {
     );
 
     expect(summary.stockHoldingsValueSgd).toBe(13_500);
-    expect(summary.stockContributionSgd).toBeCloseTo(10_827, 0);
+    expect(summary.stockContributionSgd).toBe(13_500);
     expect(summary.availableTradingCashSgd).toBeCloseTo(2_673, 0);
     expect(summary.stockProfitLossSgd).toBeCloseTo(2_673, 0);
     expect(summary.totalStockValueSgd).toBeCloseTo(16_173, 0);
