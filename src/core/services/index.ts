@@ -1,4 +1,5 @@
-import { createLocalRepositories } from "@/core/database/local";
+import { initializeRepositories } from "@/core/database/supabase";
+import type { RepositoryBundle } from "@/core/database/repository-bundle";
 import { FxService } from "./fx-service";
 import { DashboardSettingsService } from "./dashboard-settings-service";
 import { ContributionService } from "./contribution-service";
@@ -22,8 +23,7 @@ import { OptionsTradeService } from "./options-trade-service";
 import { OptionsSettingsService } from "./options-settings-service";
 import { OptionsTrackerService } from "./options-tracker-service";
 
-export function createPortfolioServices() {
-  const repos = createLocalRepositories();
+export function createPortfolioServices(repos: RepositoryBundle) {
 
   const stockTracker = new StockTrackerService(
     repos.stockTransactions,

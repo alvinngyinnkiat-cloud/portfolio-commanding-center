@@ -1,0 +1,115 @@
+import type { SupabaseClient } from "@supabase/supabase-js";
+import type { PersistenceCache } from "./cache";
+import { watchlistStorageKey } from "./local-export";
+
+export async function syncSettingsRow(
+  client: SupabaseClient,
+  cache: PersistenceCache
+): Promise<void> {
+  const res = await client.from("settings").upsert({
+    id: "default",
+    dashboard_settings: cache.dashboardSettings,
+    options_settings: cache.optionsSettings,
+    crypto_allocation_settings: cache.cryptoAllocation,
+    scanner_schedule: cache.scannerSchedule,
+    stock_price_schedule: cache.stockPriceSchedule,
+    stock_instruments: cache.stockInstruments,
+    stock_prices: cache.stockPrices,
+    stock_daily_candles: cache.stockDailyCandles,
+    stock_weekly_candles: cache.stockWeeklyCandles,
+    scanner_results: cache.scannerResults,
+    migrated_from_local: cache.migratedFromLocal,
+    updated_at: new Date().toISOString(),
+  });
+  if (res.error) throw res.error;
+}
+
+export async function syncContributions(
+  client: SupabaseClient,
+  rows: PersistenceCache["contributions"]
+): Promise<void> {
+  await replaceTable(client, "contributions", "id", rows);
+}
+
+export async function syncGoals(
+  client: SupabaseClient,
+  rows: PersistenceCache["goals"]
+): Promise<void> {
+  await replaceTable(client, "goals", "id", rows);
+}
+
+export async function syncSnapshots(
+  client: SupabaseClient,
+  rows: PersistenceCache["snapshots"]
+): Promise<void> {
+  await replaceTable(client, "portfolio_snapshots", "date", rows);
+}
+
+export async function syncStockTransactions(
+  client: SupabaseClient,
+  rows: PersistenceCache["stockTransactions"]
+): Promise<void> {
+  await replaceTable(client, "stock_transactions", "id", rows);
+}
+
+export async function syncCryptoHoldings(
+  client: SupabaseClient,
+  rows: PersistenceCache["cryptoHoldings"]
+): Promise<void> {
+  await replaceTable(client, "crypto_transactions", "id", rows);
+}
+
+export async function syncOptionsTrades(
+  client: SupabaseClient,
+  rows: PersistenceCache["optionsTrades"]
+): Promise<void> {
+  await replaceTable(client, "options_trades", "id", rows);
+}
+
+export async function syncWatchlist(
+  client: SupabaseClient,
+  rows: PersistenceCache["scannerWatchlist"]
+): Promise<void> {
+  const deleteRes = await client.from("watchlist_items").delete().neq("id", "");
+  if (deleteRes.error) throw deleteRes.error;
+
+  if (rows.length === 0) return;
+
+  const payload = rows.map((entry, index) => ({
+    id: watchlistStorageKey(entry, index),
+    ticker: entry.ticker,
+    data: entry,
+    sort_order: index,
+    updated_at: new Date().toISOString(),
+  }));
+
+  const insertRes = await client.from("watchlist_items").insert(payload);
+  if (insertRes.error) throw insertRes.error;
+}
+
+async function replaceTable<T extends { id?: string; date?: string }>(
+  client: SupabaseClient,
+  table:
+    | "contributions"
+    | "goals"
+    | "portfolio_snapshots"
+    | "stock_transactions"
+    | "crypto_transactions"
+    | "options_trades",
+  key: "id" | "date",
+  rows: T[]
+): Promise<void> {
+  const deleteRes = await client.from(table).delete().neq(key, "");
+  if (deleteRes.error) throw deleteRes.error;
+
+  if (rows.length === 0) return;
+
+  const payload = rows.map((row) => ({
+    [key]: key === "date" ? (row as { date: string }).date : (row as { id: string }).id,
+    data: row,
+    updated_at: new Date().toISOString(),
+  }));
+
+  const insertRes = await client.from(table).insert(payload);
+  if (insertRes.error) throw insertRes.error;
+}
