@@ -334,6 +334,7 @@ export class OptionsTradeService {
     });
 
     const realizedPlUsd = resolveClosedTradeRealizedPlUsd({
+      strategy: normalizedDraft.strategy,
       closeMethod: normalizedDraft.closeMethod,
       openPremiumUsd: resolved.openPremiumUsd,
       openFeesUsd: resolved.openFeesUsd,
@@ -345,9 +346,7 @@ export class OptionsTradeService {
     const now = new Date().toISOString();
     const isManual = normalizedDraft.closeMethod === "manual_pl";
     const updated: OptionsTrade = {
-      id: trade.id,
-      status: "closed",
-      createdAt: trade.createdAt,
+      ...trade,
       tradeType: resolved.tradeType,
       userSharePercent: resolved.userSharePercent,
       clientSharePercent: resolved.clientSharePercent,
@@ -378,6 +377,7 @@ export class OptionsTradeService {
         calculateTradeReturnPercent(realizedPlUsd, resolved.maxRiskUsd) ?? undefined,
       notes: normalizedDraft.notes,
       updatedAt: now,
+      status: "closed",
     };
 
     this.tradeRepo.update(updated);

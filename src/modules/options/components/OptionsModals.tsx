@@ -37,6 +37,8 @@ import { capacityLabel, CLOSE_METHOD_OPTIONS, STRATEGY_OPTIONS } from "./options
 import { deriveCapacityStatus } from "@/core/calculations/options/capacity";
 import { splitForTrade } from "@/core/calculations/options/split";
 import { usePortfolio } from "@/context/PortfolioContext";
+import { DEFAULT_OPTIONS_SETTINGS } from "@/core/domain/defaults-options";
+import { normalizeLocalDateString } from "@/shared/lib/date";
 
 function premiumOptionPriceFromTrade(trade: OptionsTrade): string {
   const price = calculatePerShareOptionPrice(trade.openPremiumUsd, trade.contracts);
@@ -89,6 +91,48 @@ type OpenTradeForm = Omit<typeof emptyOpenForm, "strategy" | "tradeType"> & {
   underlyingPriceUsd?: string;
 };
 
+function parseStrikeField(value: string): number | undefined {
+  const parsed = parseFloat(value);
+  return Number.isFinite(parsed) ? parsed : undefined;
+}
+
+function closedEditStrikeFields(
+  form: ReturnType<typeof buildClosedEditFormState>,
+  strategy: OptionsStrategy
+): Pick<
+  ClosedTradeEditDraft,
+  | "shortStrikeUsd"
+  | "longStrikeUsd"
+  | "bullPutShortStrikeUsd"
+  | "bullPutLongStrikeUsd"
+  | "bearCallShortStrikeUsd"
+  | "bearCallLongStrikeUsd"
+> {
+  const isVertical = isVerticalSpreadStrategy(strategy);
+  const isIronCondor = isIronCondorStrategy(strategy);
+  const isNaked = isNakedCreditStrategy(strategy);
+  const isDebit = isDebitStrategy(strategy);
+
+  return {
+    shortStrikeUsd:
+      isVertical || isNaked ? parseStrikeField(form.shortStrikeUsd) : undefined,
+    longStrikeUsd:
+      isVertical || isDebit ? parseStrikeField(form.longStrikeUsd) : undefined,
+    bullPutShortStrikeUsd: isIronCondor
+      ? parseStrikeField(form.bullPutShortStrikeUsd)
+      : undefined,
+    bullPutLongStrikeUsd: isIronCondor
+      ? parseStrikeField(form.bullPutLongStrikeUsd)
+      : undefined,
+    bearCallShortStrikeUsd: isIronCondor
+      ? parseStrikeField(form.bearCallShortStrikeUsd)
+      : undefined,
+    bearCallLongStrikeUsd: isIronCondor
+      ? parseStrikeField(form.bearCallLongStrikeUsd)
+      : undefined,
+  };
+}
+
 function buildClosedEditFormState(trade: OptionsTrade) {
   const closeDebitOptionPrice =
     trade.closePremiumUsd != null && trade.contracts > 0
@@ -121,15 +165,15 @@ function buildClosedEditFormState(trade: OptionsTrade) {
       trade.bearCallLongStrikeUsd != null
         ? String(trade.bearCallLongStrikeUsd)
         : "",
-    expirationDate: trade.expirationDate,
-    openDate: trade.openDate,
+    expirationDate: normalizeLocalDateString(trade.expirationDate) ?? trade.expirationDate,
+    openDate: normalizeLocalDateString(trade.openDate) ?? trade.openDate,
     openPremiumOptionPrice: premiumOptionPriceFromTrade(trade),
     openFeesUsd: String(trade.openFeesUsd),
     maxRiskUsd: String(trade.maxRiskUsd),
     userSharePercent: String(trade.userSharePercent),
     clientSharePercent: String(trade.clientSharePercent),
     notes: trade.notes ?? "",
-    closeDate: trade.closeDate ?? "",
+    closeDate: normalizeLocalDateString(trade.closeDate) ?? "",
     closeMethod: (trade.closeMethod ?? "normal") as OptionsCloseMethod,
     closeDebitOptionPrice:
       closeDebitOptionPrice != null ? closeDebitOptionPrice.toFixed(2) : "0",
@@ -1199,13 +1243,15 @@ export function EditClosedTradeModal({
   onClose: () => void;
 }) {
   const { optionsData, services, refresh } = usePortfolio();
-  const settings = optionsData?.settings;
+  const settings = optionsData?.settings ?? DEFAULT_OPTIONS_SETTINGS;
   const [form, setForm] = useState(() => buildClosedEditFormState(trade));
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [submitting, setSubmitting] = useState(false);
 
   const isVertical = isVerticalSpreadStrategy(form.strategy);
   const isIronCondor = isIronCondorStrategy(form.strategy);
+  const isNaked = isNakedCreditStrategy(form.strategy);
+  const isDebit = isDebitStrategy(form.strategy);
   const showManualMaxRisk = requiresManualMaxRisk(form.strategy);
   const contracts = parseInt(form.contracts, 10);
 
@@ -1278,8 +1324,14 @@ export function EditClosedTradeModal({
     setForm((prev) => ({
       ...prev,
       strategy,
-      shortStrikeUsd: isVerticalSpreadStrategy(strategy) ? prev.shortStrikeUsd : "",
-      longStrikeUsd: isVerticalSpreadStrategy(strategy) ? prev.longStrikeUsd : "",
+      shortStrikeUsd:
+        isVerticalSpreadStrategy(strategy) || isNakedCreditStrategy(strategy)
+          ? prev.shortStrikeUsd
+          : "",
+      longStrikeUsd:
+        isVerticalSpreadStrategy(strategy) || isDebitStrategy(strategy)
+          ? prev.longStrikeUsd
+          : "",
       bullPutShortStrikeUsd: isIronCondorStrategy(strategy)
         ? prev.bullPutShortStrikeUsd
         : "",
@@ -1298,7 +1350,6 @@ export function EditClosedTradeModal({
   };
 
   const handleTradeTypeChange = (tradeType: "personal" | "shared") => {
-    if (!settings) return;
     const split = defaultSplitForTradeType(tradeType, settings);
     setForm((prev) => ({
       ...prev,
@@ -1309,7 +1360,27 @@ export function EditClosedTradeModal({
   };
 
   const handleSubmit = () => {
-    if (!settings) return;
+    if (!services?.optionsTrades) {
+      setErrors({ submit: "Options service is not ready. Try again in a moment." });
+      return;
+    }
+
+    const openDate = normalizeLocalDateString(form.openDate);
+    const closeDate = normalizeLocalDateString(form.closeDate);
+    const expirationDate = normalizeLocalDateString(form.expirationDate);
+    if (!openDate) {
+      setErrors({ openDate: "Open date must be YYYY-MM-DD" });
+      return;
+    }
+    if (!closeDate) {
+      setErrors({ closeDate: "Close date must be YYYY-MM-DD" });
+      return;
+    }
+    if (!expirationDate) {
+      setErrors({ expirationDate: "Expiration date must be YYYY-MM-DD" });
+      return;
+    }
+
     if (!Number.isInteger(contracts) || contracts <= 0) {
       setErrors({ contracts: "Contracts must be greater than zero" });
       return;
@@ -1323,6 +1394,25 @@ export function EditClosedTradeModal({
       return;
     }
 
+    const strikeFields = closedEditStrikeFields(form, form.strategy);
+    const sharedFields = {
+      tradeType: form.tradeType,
+      strategy: form.strategy,
+      strategyLabel: form.strategyLabel || undefined,
+      underlying: form.underlying,
+      expirationDate,
+      contracts,
+      ...strikeFields,
+      openDate,
+      openPremiumUsd,
+      openFeesUsd: parseFloat(form.openFeesUsd),
+      maxRiskUsd: showManualMaxRisk ? parseFloat(form.maxRiskUsd) : undefined,
+      userSharePercent: parseFloat(form.userSharePercent),
+      clientSharePercent: parseFloat(form.clientSharePercent),
+      closeDate,
+      notes: form.notes || undefined,
+    };
+
     let draft: ClosedTradeEditDraft;
     if (isManualClose) {
       const manual = parseFloat(form.manualRealizedPlUsd);
@@ -1331,36 +1421,9 @@ export function EditClosedTradeModal({
         return;
       }
       draft = {
-        tradeType: form.tradeType,
-        strategy: form.strategy,
-        strategyLabel: form.strategyLabel || undefined,
-        underlying: form.underlying,
-        expirationDate: form.expirationDate,
-        contracts,
-        shortStrikeUsd: isVertical ? parseFloat(form.shortStrikeUsd) : undefined,
-        longStrikeUsd: isVertical ? parseFloat(form.longStrikeUsd) : undefined,
-        bullPutShortStrikeUsd: isIronCondor
-          ? parseFloat(form.bullPutShortStrikeUsd)
-          : undefined,
-        bullPutLongStrikeUsd: isIronCondor
-          ? parseFloat(form.bullPutLongStrikeUsd)
-          : undefined,
-        bearCallShortStrikeUsd: isIronCondor
-          ? parseFloat(form.bearCallShortStrikeUsd)
-          : undefined,
-        bearCallLongStrikeUsd: isIronCondor
-          ? parseFloat(form.bearCallLongStrikeUsd)
-          : undefined,
-        openDate: form.openDate,
-        openPremiumUsd,
-        openFeesUsd: parseFloat(form.openFeesUsd),
-        maxRiskUsd: showManualMaxRisk ? parseFloat(form.maxRiskUsd) : undefined,
-        userSharePercent: parseFloat(form.userSharePercent),
-        clientSharePercent: parseFloat(form.clientSharePercent),
-        closeDate: form.closeDate,
+        ...sharedFields,
         closeMethod: "manual_pl",
         manualRealizedPlUsd: manual,
-        notes: form.notes || undefined,
       };
     } else {
       const optionPrice = parseFloat(form.closeDebitOptionPrice);
@@ -1369,37 +1432,10 @@ export function EditClosedTradeModal({
         return;
       }
       draft = {
-        tradeType: form.tradeType,
-        strategy: form.strategy,
-        strategyLabel: form.strategyLabel || undefined,
-        underlying: form.underlying,
-        expirationDate: form.expirationDate,
-        contracts,
-        shortStrikeUsd: isVertical ? parseFloat(form.shortStrikeUsd) : undefined,
-        longStrikeUsd: isVertical ? parseFloat(form.longStrikeUsd) : undefined,
-        bullPutShortStrikeUsd: isIronCondor
-          ? parseFloat(form.bullPutShortStrikeUsd)
-          : undefined,
-        bullPutLongStrikeUsd: isIronCondor
-          ? parseFloat(form.bullPutLongStrikeUsd)
-          : undefined,
-        bearCallShortStrikeUsd: isIronCondor
-          ? parseFloat(form.bearCallShortStrikeUsd)
-          : undefined,
-        bearCallLongStrikeUsd: isIronCondor
-          ? parseFloat(form.bearCallLongStrikeUsd)
-          : undefined,
-        openDate: form.openDate,
-        openPremiumUsd,
-        openFeesUsd: parseFloat(form.openFeesUsd),
-        maxRiskUsd: showManualMaxRisk ? parseFloat(form.maxRiskUsd) : undefined,
-        userSharePercent: parseFloat(form.userSharePercent),
-        clientSharePercent: parseFloat(form.clientSharePercent),
-        closeDate: form.closeDate,
+        ...sharedFields,
         closeMethod: "normal",
         closePremiumUsd: calculateOptionDollarValue(optionPrice, contracts),
         closeFeesUsd: parseFloat(form.closeFeesUsd),
-        notes: form.notes || undefined,
       };
     }
 
@@ -1417,8 +1453,27 @@ export function EditClosedTradeModal({
   };
 
   return (
-    <Modal title={`Edit Closed Trade — ${trade.underlying}`} onClose={onClose} wide>
+    <Modal
+      title={`Edit Closed Trade — ${trade.underlying}`}
+      onClose={onClose}
+      wide
+      footer={
+        <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+          <Button variant="secondary" onClick={onClose} disabled={submitting}>
+            Cancel
+          </Button>
+          <Button onClick={handleSubmit} disabled={submitting}>
+            {submitting ? "Saving…" : "Save Changes"}
+          </Button>
+        </div>
+      }
+    >
       <div className="space-y-4">
+        {errors.submit && (
+          <p className="rounded-lg border border-red-500/40 bg-red-500/10 px-3 py-2 text-sm text-red-300">
+            {errors.submit}
+          </p>
+        )}
         <div className="flex gap-4">
           <label className="flex items-center gap-2 text-sm text-slate-300">
             <input
@@ -1452,6 +1507,20 @@ export function EditClosedTradeModal({
               onChange={(e) => setForm((p) => ({ ...p, strategyLabel: e.target.value }))}
               error={errors.strategyLabel}
             />
+          )}
+          {isNaked && (
+            <p className="text-xs text-slate-500 sm:col-span-2">
+              {form.strategy === "sellPut"
+                ? "SELL PUT: short put strike required for save."
+                : "SELL CALL: short call strike required for save."}
+            </p>
+          )}
+          {isDebit && (
+            <p className="text-xs text-slate-500 sm:col-span-2">
+              {form.strategy === "buyCall"
+                ? "BUY CALL: long call strike required for save."
+                : "BUY PUT: long put strike required for save."}
+            </p>
           )}
           <Input
             label="Underlying"
@@ -1537,6 +1606,35 @@ export function EditClosedTradeModal({
               />
             </>
           )}
+          {isNaked && (
+            <Input
+              label={form.strategy === "sellPut" ? "Put strike" : "Call strike"}
+              type="number"
+              step="any"
+              min="0"
+              value={form.shortStrikeUsd}
+              onChange={(e) => setForm((p) => ({ ...p, shortStrikeUsd: e.target.value }))}
+              error={errors.shortStrikeUsd}
+            />
+          )}
+          {isDebit && (
+            <Input
+              label={form.strategy === "buyCall" ? "Call strike" : "Put strike"}
+              type="number"
+              step="any"
+              min="0"
+              value={form.longStrikeUsd}
+              onChange={(e) => setForm((p) => ({ ...p, longStrikeUsd: e.target.value }))}
+              error={errors.longStrikeUsd}
+            />
+          )}
+          <Input
+            label="Expiration"
+            type="date"
+            value={form.expirationDate}
+            onChange={(e) => setForm((p) => ({ ...p, expirationDate: e.target.value }))}
+            error={errors.expirationDate}
+          />
           <Input
             label="Open date"
             type="date"
@@ -1712,15 +1810,6 @@ export function EditClosedTradeModal({
           value={form.notes}
           onChange={(e) => setForm((p) => ({ ...p, notes: e.target.value }))}
         />
-
-        <div className="flex justify-end gap-2">
-          <Button variant="secondary" onClick={onClose}>
-            Cancel
-          </Button>
-          <Button onClick={handleSubmit} disabled={submitting}>
-            Save Changes
-          </Button>
-        </div>
       </div>
     </Modal>
   );
@@ -1748,7 +1837,18 @@ export function EditClosedNotesModal({
   };
 
   return (
-    <Modal title={`Edit Notes — ${trade.underlying}`} onClose={onClose}>
+    <Modal
+      title={`Edit Notes — ${trade.underlying}`}
+      onClose={onClose}
+      footer={
+        <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+          <Button variant="secondary" onClick={onClose}>
+            Cancel
+          </Button>
+          <Button onClick={save}>Save Notes</Button>
+        </div>
+      }
+    >
       <div className="space-y-4">
         <Input
           label="Notes"
@@ -1756,12 +1856,6 @@ export function EditClosedNotesModal({
           onChange={(e) => setNotes(e.target.value)}
           error={error ?? undefined}
         />
-        <div className="flex justify-end gap-2">
-          <Button variant="secondary" onClick={onClose}>
-            Cancel
-          </Button>
-          <Button onClick={save}>Save Notes</Button>
-        </div>
       </div>
     </Modal>
   );
