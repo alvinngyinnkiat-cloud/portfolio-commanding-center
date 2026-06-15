@@ -32,9 +32,10 @@ import {
   migrateLegacyStockDepositsToCashFlow,
 } from "@/core/calculations/stocks/migrate-stock-cash-flow";
 import { migrateLegacyCryptoHoldingsToTrades } from "@/core/calculations/crypto/migrate-crypto-trades";
-import { rebuildHoldingsFromTrades } from "@/core/calculations/crypto/trades";
+import { rebuildHoldingsFromTrades, normalizeCryptoAssetName } from "@/core/calculations/crypto/trades";
 import { normalizeCryptoHoldings } from "@/core/calculations/crypto/normalize";
 import { normalizeCryptoTrades } from "@/core/calculations/crypto/trade-normalize";
+import { coerceNumber } from "@/shared/lib/coerce-number";
 import { STORAGE_KEYS } from "../local/storage-keys";
 import { readJson, writeJson } from "../local/local-storage";
 import {
@@ -101,6 +102,7 @@ export class PersistenceManager {
   private async bootstrap(): Promise<void> {
     if (!isSupabaseConfigured()) {
       this.cache = exportLocalStorageCache();
+      this.reconcileCryptoHoldingsWithTrades();
       this.status = "local";
       return;
     }
@@ -108,6 +110,7 @@ export class PersistenceManager {
     this.client = getSupabaseClient();
     if (!this.client) {
       this.cache = exportLocalStorageCache();
+      this.reconcileCryptoHoldingsWithTrades();
       this.status = "local";
       return;
     }
@@ -132,11 +135,13 @@ export class PersistenceManager {
       this.markCryptoLegacyMigratedIfTradesPresent();
       await this.applyStockCashFlowMigrationIfNeeded();
       await this.applyCryptoTradesMigrationIfNeeded();
+      this.reconcileCryptoHoldingsWithTrades();
       this.cache = normalizeCache(this.cache);
     } catch (error) {
       logPersistenceError("bootstrap failed — falling back to local cache", error);
       this.lastWarning = `Cloud persistence unavailable (${formatPersistenceError(error)}). Loaded local data instead.`;
       this.cache = exportLocalStorageCache();
+      this.reconcileCryptoHoldingsWithTrades();
       this.status = "local";
       this.client = getSupabaseClient();
       this.cryptoTradesSyncAvailable = false;
@@ -269,6 +274,7 @@ export class PersistenceManager {
       this.markCryptoLegacyMigratedIfTradesPresent();
       await this.applyStockCashFlowMigrationIfNeeded();
       await this.applyCryptoTradesMigrationIfNeeded();
+      this.reconcileCryptoHoldingsWithTrades();
       this.cache = normalizeCache(this.cache);
     } catch (error) {
       logPersistenceError("server bootstrap failed", error);
@@ -280,6 +286,69 @@ export class PersistenceManager {
   persistCryptoTradesLocalBackup(): void {
     if (typeof window === "undefined") return;
     writeJson(STORAGE_KEYS.cryptoTrades, this.cache.cryptoTrades);
+  }
+
+  /** Mirror crypto holdings so manual valuations survive when cloud rows are stale or missing. */
+  persistCryptoHoldingsLocalBackup(): void {
+    if (typeof window === "undefined") return;
+    writeJson(STORAGE_KEYS.cryptoHoldings, this.cache.cryptoHoldings);
+  }
+
+  /** Merge local holdings backup, then rebuild cost basis from the trade ledger. */
+  private reconcileCryptoHoldingsWithTrades(): void {
+    const before = JSON.stringify(this.cache.cryptoHoldings);
+    this.mergeLocalCryptoHoldingsFromBackup();
+    this.cache.cryptoHoldings = rebuildHoldingsFromTrades(
+      this.cache.cryptoTrades,
+      this.cache.cryptoHoldings
+    );
+    this.persistCryptoHoldingsLocalBackup();
+
+    if (before !== JSON.stringify(this.cache.cryptoHoldings) && this.client) {
+      this.queueCryptoHoldingsSync();
+    }
+  }
+
+  private mergeLocalCryptoHoldingsFromBackup(): void {
+    if (typeof window === "undefined") return;
+
+    const local = normalizeCryptoHoldings(
+      readJson<unknown[]>(STORAGE_KEYS.cryptoHoldings, [])
+    );
+    if (local.length === 0) return;
+
+    const byAsset = new Map(
+      this.cache.cryptoHoldings.map((holding) => [
+        normalizeCryptoAssetName(holding.assetName),
+        holding,
+      ])
+    );
+
+    for (const localHolding of local) {
+      const key = normalizeCryptoAssetName(localHolding.assetName);
+      const existing = byAsset.get(key);
+      if (!existing) {
+        this.cache.cryptoHoldings.push(localHolding);
+        byAsset.set(key, localHolding);
+        continue;
+      }
+
+      const localValue = coerceNumber(localHolding.currentValueSgd);
+      const existingValue = coerceNumber(existing.currentValueSgd);
+      if (localValue <= existingValue) continue;
+
+      const index = this.cache.cryptoHoldings.findIndex(
+        (holding) => normalizeCryptoAssetName(holding.assetName) === key
+      );
+      if (index < 0) continue;
+
+      this.cache.cryptoHoldings[index] = {
+        ...existing,
+        currentValueSgd: localValue,
+        notes: localHolding.notes ?? existing.notes,
+      };
+      byAsset.set(key, this.cache.cryptoHoldings[index]!);
+    }
   }
 
   /** Reload crypto holdings and trades from Supabase after a write (verifies persistence). */
@@ -309,11 +378,13 @@ export class PersistenceManager {
     }
 
     if (!this.cryptoTradesSyncAvailable) {
+      this.reconcileCryptoHoldingsWithTrades();
       return result;
     }
 
     if (tradesRes.error) {
       logPersistenceError("rehydrate crypto trades failed", tradesRes.error);
+      this.reconcileCryptoHoldingsWithTrades();
       return result;
     }
 
@@ -325,12 +396,14 @@ export class PersistenceManager {
       this.setOptionalTableWarning(
         "Cloud transaction history is empty after save — kept local buy/sell records. Check crypto_trades sync."
       );
-      return result;
+    } else {
+      this.cache.cryptoTrades = remoteTrades;
+      this.persistCryptoTradesLocalBackup();
+      result.trades = true;
     }
 
-    this.cache.cryptoTrades = remoteTrades;
-    this.persistCryptoTradesLocalBackup();
-    result.trades = true;
+    this.reconcileCryptoHoldingsWithTrades();
+    result.holdings = true;
     return result;
   }
 
@@ -426,6 +499,7 @@ export class PersistenceManager {
   }
 
   queueCryptoHoldingsSync(): void {
+    this.persistCryptoHoldingsLocalBackup();
     this.enqueueSync(() =>
       this.client
         ? syncCryptoHoldings(this.client, this.cache.cryptoHoldings)

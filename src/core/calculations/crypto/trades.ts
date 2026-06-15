@@ -74,8 +74,9 @@ export function rebuildHoldingsFromTrades(
     const existing = holdingByAsset.get(key);
     const currentValueSgd = coerceNumber(existing?.currentValueSgd ?? 0);
 
-    // Open/closed is manual: current value > 0 = open. Trades never remove holdings alone.
-    if (currentValueSgd <= 0 && costBasis <= 0) {
+    // Skip only when the user explicitly closed a persisted holding (both zero).
+    // Assets with trade history but no holdings row are materialized so valuations can be restored.
+    if (existing && currentValueSgd <= 0 && costBasis <= 0) {
       continue;
     }
 

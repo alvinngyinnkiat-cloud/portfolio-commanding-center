@@ -127,6 +127,67 @@ describe("rebuildHoldingsFromTrades", () => {
     expect(isCryptoHoldingOpen(rebuilt[0]!)).toBe(true);
   });
 
+  it("materializes holding from trades when persisted row is missing", () => {
+    const trades: CryptoTrade[] = [
+      {
+        id: "1",
+        date: "2025-01-01",
+        assetName: "HYPE",
+        type: "buy",
+        amountSgd: 300,
+      },
+      {
+        id: "2",
+        date: "2025-02-01",
+        assetName: "HYPE",
+        type: "sell",
+        amountSgd: 400,
+      },
+    ];
+
+    const rebuilt = rebuildHoldingsFromTrades(trades, []);
+
+    expect(rebuilt).toHaveLength(1);
+    expect(rebuilt[0]?.assetName).toBe("HYPE");
+    expect(rebuilt[0]?.investedSgd).toBe(0);
+    expect(rebuilt[0]?.currentValueSgd).toBe(0);
+  });
+
+  it("restores open holding when trades exist and manual current value is preserved", () => {
+    const existing: CryptoHolding[] = [
+      {
+        id: "h1",
+        assetName: "HYPE",
+        investedSgd: 0,
+        currentValueSgd: 700,
+        notes: "Recovered holding after migration issue",
+      },
+    ];
+    const trades: CryptoTrade[] = [
+      {
+        id: "1",
+        date: "2025-01-01",
+        assetName: "HYPE",
+        type: "buy",
+        amountSgd: 300,
+      },
+      {
+        id: "2",
+        date: "2025-02-01",
+        assetName: "HYPE",
+        type: "sell",
+        amountSgd: 400,
+      },
+    ];
+
+    const rebuilt = rebuildHoldingsFromTrades(trades, existing);
+
+    expect(rebuilt).toHaveLength(1);
+    expect(rebuilt[0]?.currentValueSgd).toBe(700);
+    expect(rebuilt[0]?.notes).toBe("Recovered holding after migration issue");
+    expect(isCryptoHoldingOpen(rebuilt[0]!)).toBe(true);
+  });
+
   it("removes holding only when manual current value and cost basis are both zero", () => {
     const existing: CryptoHolding[] = [
       {
