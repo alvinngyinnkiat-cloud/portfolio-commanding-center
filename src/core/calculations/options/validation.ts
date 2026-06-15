@@ -10,7 +10,6 @@ import { normalizeUnderlying } from "./helpers";
 import {
   calculateVerticalSpreadMetrics,
   isVerticalSpreadStrategy,
-  requiresManualMaxRisk,
   validateVerticalSpreadStrikes,
 } from "./vertical-spread";
 import {
@@ -18,6 +17,20 @@ import {
   isIronCondorStrategy,
   validateIronCondorStrikes,
 } from "./iron-condor";
+import {
+  calculateNakedCreditMetrics,
+  validateNakedCreditStrike,
+} from "./naked-credit";
+import {
+  calculateDebitOptionMetrics,
+  validateDebitOptionStrike,
+} from "./debit-option";
+import {
+  getOpenPremiumFieldLabel,
+  isDebitStrategy,
+  isNakedCreditStrategy,
+  requiresManualMaxRisk,
+} from "./strategy-kind";
 
 export interface OptionsValidationError {
   field: string;
@@ -140,7 +153,10 @@ export function validateOpenTradeDraft(
   }
 
   if (!Number.isFinite(draft.openPremiumUsd)) {
-    errors.push({ field: "openPremiumUsd", message: "Premium received is required" });
+    errors.push({
+      field: "openPremiumUsd",
+      message: `${getOpenPremiumFieldLabel(draft.strategy).replace(" (Option Price)", "")} is required`,
+    });
   }
 
   if (!Number.isFinite(draft.openFeesUsd) || draft.openFeesUsd < 0) {
@@ -180,6 +196,80 @@ export function validateOpenTradeDraft(
           errors.push({
             field: "openPremiumUsd",
             message: "Premium exceeds spread width — max risk must be positive",
+          });
+        }
+      }
+    }
+  } else if (isNakedCreditStrategy(draft.strategy)) {
+    if (draft.shortStrikeUsd == null || !Number.isFinite(draft.shortStrikeUsd)) {
+      errors.push({
+        field: "shortStrikeUsd",
+        message:
+          draft.strategy === "sellPut"
+            ? "Put strike is required"
+            : "Call strike is required",
+      });
+    } else {
+      const strikeError = validateNakedCreditStrike(
+        draft.strategy,
+        draft.shortStrikeUsd
+      );
+      if (strikeError) {
+        errors.push({ field: "shortStrikeUsd", message: strikeError });
+      } else if (Number.isFinite(draft.openPremiumUsd)) {
+        const metrics = calculateNakedCreditMetrics({
+          strategy: draft.strategy,
+          strikeUsd: draft.shortStrikeUsd,
+          contracts: draft.contracts,
+          openPremiumUsd: draft.openPremiumUsd,
+          openFeesUsd: draft.openFeesUsd,
+          manualMaxRiskUsd: draft.maxRiskUsd,
+        });
+        if (draft.strategy === "sellPut" && metrics.maxRiskUsd <= 0) {
+          errors.push({
+            field: "openPremiumUsd",
+            message: "Premium exceeds assignment width — max risk must be positive",
+          });
+        }
+      }
+    }
+    if (draft.strategy === "sellCall") {
+      if (draft.maxRiskUsd == null || !Number.isFinite(draft.maxRiskUsd) || draft.maxRiskUsd <= 0) {
+        errors.push({
+          field: "maxRiskUsd",
+          message:
+            "Max risk must be greater than zero (underlying shares tracked in Module 2)",
+        });
+      }
+    }
+  } else if (isDebitStrategy(draft.strategy)) {
+    if (draft.longStrikeUsd == null || !Number.isFinite(draft.longStrikeUsd)) {
+      errors.push({
+        field: "longStrikeUsd",
+        message:
+          draft.strategy === "buyCall"
+            ? "Call strike is required"
+            : "Put strike is required",
+      });
+    } else {
+      const strikeError = validateDebitOptionStrike(
+        draft.strategy,
+        draft.longStrikeUsd
+      );
+      if (strikeError) {
+        errors.push({ field: "longStrikeUsd", message: strikeError });
+      } else if (Number.isFinite(draft.openPremiumUsd)) {
+        const metrics = calculateDebitOptionMetrics({
+          strategy: draft.strategy,
+          strikeUsd: draft.longStrikeUsd,
+          contracts: draft.contracts,
+          openPremiumUsd: draft.openPremiumUsd,
+          openFeesUsd: draft.openFeesUsd,
+        });
+        if (metrics.premiumCostUsd <= 0) {
+          errors.push({
+            field: "openPremiumUsd",
+            message: "Premium cost must be greater than zero",
           });
         }
       }
@@ -237,9 +327,12 @@ export function validateOpenTradeDraft(
         }
       }
     }
-  } else if (requiresManualMaxRisk(draft.strategy)) {
+  } else if (requiresManualMaxRisk(draft.strategy) && draft.strategy === "custom") {
     if (draft.maxRiskUsd == null || !Number.isFinite(draft.maxRiskUsd) || draft.maxRiskUsd <= 0) {
-      errors.push({ field: "maxRiskUsd", message: "Max risk must be greater than zero" });
+      errors.push({
+        field: "maxRiskUsd",
+        message: "Max risk must be greater than zero",
+      });
     }
   }
 
@@ -316,6 +409,38 @@ export function resolveOpenTradeDraft(draft: OpenTradeDraft): ResolvedOpenTradeD
       bullPutLongStrikeUsd: draft.bullPutLongStrikeUsd,
       bearCallShortStrikeUsd: draft.bearCallShortStrikeUsd,
       bearCallLongStrikeUsd: draft.bearCallLongStrikeUsd,
+      maxRiskUsd: metrics.maxRiskUsd,
+    };
+  }
+
+  if (isNakedCreditStrategy(draft.strategy)) {
+    const metrics = calculateNakedCreditMetrics({
+      strategy: draft.strategy,
+      strikeUsd: draft.shortStrikeUsd!,
+      contracts: draft.contracts,
+      openPremiumUsd: draft.openPremiumUsd,
+      openFeesUsd: draft.openFeesUsd,
+      manualMaxRiskUsd: draft.maxRiskUsd,
+    });
+    return {
+      ...draft,
+      shortStrikeUsd: draft.shortStrikeUsd,
+      maxRiskUsd:
+        draft.strategy === "sellCall" ? draft.maxRiskUsd! : metrics.maxRiskUsd,
+    };
+  }
+
+  if (isDebitStrategy(draft.strategy)) {
+    const metrics = calculateDebitOptionMetrics({
+      strategy: draft.strategy,
+      strikeUsd: draft.longStrikeUsd!,
+      contracts: draft.contracts,
+      openPremiumUsd: draft.openPremiumUsd,
+      openFeesUsd: draft.openFeesUsd,
+    });
+    return {
+      ...draft,
+      longStrikeUsd: draft.longStrikeUsd,
       maxRiskUsd: metrics.maxRiskUsd,
     };
   }

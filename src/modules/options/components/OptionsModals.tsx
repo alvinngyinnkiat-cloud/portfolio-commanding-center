@@ -7,9 +7,15 @@ import {
   calculateUnrealizedPlUsd,
   calculateVerticalSpreadMetrics,
   calculateIronCondorMetrics,
+  calculateNakedCreditMetrics,
+  calculateDebitOptionMetrics,
   calculateOptionDollarValue,
   calculatePerShareOptionPrice,
   defaultSplitForTradeType,
+  getClosePremiumFieldLabel,
+  getOpenPremiumFieldLabel,
+  isDebitStrategy,
+  isNakedCreditStrategy,
   isVerticalSpreadStrategy,
   isIronCondorStrategy,
   requiresManualMaxRisk,
@@ -187,7 +193,10 @@ export function OpenTradeModal({
 
   const isVertical = isVerticalSpreadStrategy(form.strategy);
   const isIronCondor = isIronCondorStrategy(form.strategy);
+  const isNaked = isNakedCreditStrategy(form.strategy);
+  const isDebit = isDebitStrategy(form.strategy);
   const showManualMaxRisk = requiresManualMaxRisk(form.strategy);
+  const openPremiumLabel = getOpenPremiumFieldLabel(form.strategy);
 
   const spreadPreview = useMemo(() => {
     if (!isVertical) return null;
@@ -273,7 +282,89 @@ export function OpenTradeModal({
     form.openFeesUsd,
   ]);
 
-  const autoRiskPreview = spreadPreview?.maxRiskUsd ?? ironCondorPreview?.maxRiskUsd;
+  const nakedPreview = useMemo(() => {
+    if (!isNaked) return null;
+    const strategy = form.strategy;
+    if (!isNakedCreditStrategy(strategy)) return null;
+    const strike = parseFloat(form.shortStrikeUsd);
+    const contracts = parseInt(form.contracts, 10);
+    const openPremiumUsd = parsePremiumDollarValue(
+      form.openPremiumOptionPrice,
+      contracts
+    );
+    const openFees = parseFloat(form.openFeesUsd);
+    const manualMaxRisk = parseFloat(form.maxRiskUsd);
+    if (
+      !Number.isFinite(strike) ||
+      !Number.isInteger(contracts) ||
+      contracts <= 0 ||
+      openPremiumUsd == null ||
+      !Number.isFinite(openFees)
+    ) {
+      return null;
+    }
+    return calculateNakedCreditMetrics({
+      strategy,
+      strikeUsd: strike,
+      contracts,
+      openPremiumUsd,
+      openFeesUsd: openFees,
+      manualMaxRiskUsd:
+        strategy === "sellCall" && Number.isFinite(manualMaxRisk)
+          ? manualMaxRisk
+          : undefined,
+    });
+  }, [
+    isNaked,
+    form.strategy,
+    form.shortStrikeUsd,
+    form.contracts,
+    form.openPremiumOptionPrice,
+    form.openFeesUsd,
+    form.maxRiskUsd,
+  ]);
+
+  const debitPreview = useMemo(() => {
+    if (!isDebit) return null;
+    const strategy = form.strategy;
+    if (!isDebitStrategy(strategy)) return null;
+    const strike = parseFloat(form.longStrikeUsd);
+    const contracts = parseInt(form.contracts, 10);
+    const openPremiumUsd = parsePremiumDollarValue(
+      form.openPremiumOptionPrice,
+      contracts
+    );
+    const openFees = parseFloat(form.openFeesUsd);
+    if (
+      !Number.isFinite(strike) ||
+      !Number.isInteger(contracts) ||
+      contracts <= 0 ||
+      openPremiumUsd == null ||
+      !Number.isFinite(openFees)
+    ) {
+      return null;
+    }
+    return calculateDebitOptionMetrics({
+      strategy,
+      strikeUsd: strike,
+      contracts,
+      openPremiumUsd,
+      openFeesUsd: openFees,
+    });
+  }, [
+    isDebit,
+    form.strategy,
+    form.longStrikeUsd,
+    form.contracts,
+    form.openPremiumOptionPrice,
+    form.openFeesUsd,
+  ]);
+
+  const autoRiskPreview =
+    spreadPreview?.maxRiskUsd ??
+    ironCondorPreview?.maxRiskUsd ??
+    nakedPreview?.maxRiskUsd ??
+    debitPreview?.maxRiskUsd;
 
   const contractsCount = parseInt(form.contracts, 10);
   const openPremiumOptionPrice =
@@ -329,8 +420,14 @@ export function OpenTradeModal({
     setForm((prev) => ({
       ...prev,
       strategy,
-      shortStrikeUsd: isVerticalSpreadStrategy(strategy) ? prev.shortStrikeUsd : "",
-      longStrikeUsd: isVerticalSpreadStrategy(strategy) ? prev.longStrikeUsd : "",
+      shortStrikeUsd:
+        isVerticalSpreadStrategy(strategy) || isNakedCreditStrategy(strategy)
+          ? prev.shortStrikeUsd
+          : "",
+      longStrikeUsd:
+        isVerticalSpreadStrategy(strategy) || isDebitStrategy(strategy)
+          ? prev.longStrikeUsd
+          : "",
       bullPutShortStrikeUsd: isIronCondorStrategy(strategy) ? prev.bullPutShortStrikeUsd : "",
       bullPutLongStrikeUsd: isIronCondorStrategy(strategy) ? prev.bullPutLongStrikeUsd : "",
       bearCallShortStrikeUsd: isIronCondorStrategy(strategy) ? prev.bearCallShortStrikeUsd : "",
@@ -371,8 +468,10 @@ export function OpenTradeModal({
       strategyLabel: form.strategyLabel || undefined,
       underlying: form.underlying,
       contracts,
-      shortStrikeUsd: isVertical ? parseFloat(form.shortStrikeUsd) : undefined,
-      longStrikeUsd: isVertical ? parseFloat(form.longStrikeUsd) : undefined,
+      shortStrikeUsd:
+        isVertical || isNaked ? parseFloat(form.shortStrikeUsd) : undefined,
+      longStrikeUsd:
+        isVertical || isDebit ? parseFloat(form.longStrikeUsd) : undefined,
       bullPutShortStrikeUsd: isIronCondor
         ? parseFloat(form.bullPutShortStrikeUsd)
         : undefined,
@@ -453,25 +552,45 @@ export function OpenTradeModal({
           />
           {isVertical && (
             <p className="text-xs text-slate-500 sm:col-span-2">
-              Bull Put / Bear Call: enter strikes and premium — max risk is auto-calculated.
+              BULL PUT / BEAR CALL: enter strikes and premium — max risk is auto-calculated.
+            </p>
+          )}
+          {isNaked && (
+            <p className="text-xs text-slate-500 sm:col-span-2">
+              {form.strategy === "sellPut"
+                ? "SELL PUT: short put strike — net credit and breakeven auto-calculated."
+                : "SELL CALL (covered): short call strike — max risk is manual (shares in Module 2)."}
+            </p>
+          )}
+          {isDebit && (
+            <p className="text-xs text-slate-500 sm:col-span-2">
+              {form.strategy === "buyCall"
+                ? "BUY CALL: long call strike — premium cost and breakeven auto-calculated."
+                : "BUY PUT: long put strike — premium cost and breakeven auto-calculated."}
             </p>
           )}
           {isIronCondor && (
             <p className="text-xs text-slate-500 sm:col-span-2">
-              Iron Condor: one trade (bull put + bear call) — risk uses the wider wing only.
+              IRON CONDOR: one trade (bull put + bear call) — risk uses the wider wing only.
             </p>
           )}
-          {showManualMaxRisk && (
+          {form.strategy === "custom" && (
             <p className="text-xs text-slate-500 sm:col-span-2">
-              Custom strategy: enter max risk manually.
+              CUSTOM: enter strategy name and max risk manually.
+            </p>
+          )}
+          {form.strategy === "sellCall" && (
+            <p className="text-xs text-slate-500 sm:col-span-2">
+              Covered call only — underlying shares tracked in Module 2.
             </p>
           )}
           {form.strategy === "custom" && (
             <Input
-              label="Custom label"
+              label="Custom Strategy Name"
               value={form.strategyLabel}
               onChange={(e) => setForm((p) => ({ ...p, strategyLabel: e.target.value }))}
               error={errors.strategyLabel}
+              placeholder="e.g. Bullish Synthetic"
             />
           )}
           <Input
@@ -558,6 +677,28 @@ export function OpenTradeModal({
               />
             </>
           )}
+          {isNaked && (
+            <Input
+              label={form.strategy === "sellPut" ? "Put strike" : "Call strike"}
+              type="number"
+              step="any"
+              min="0"
+              value={form.shortStrikeUsd}
+              onChange={(e) => setForm((p) => ({ ...p, shortStrikeUsd: e.target.value }))}
+              error={errors.shortStrikeUsd}
+            />
+          )}
+          {isDebit && (
+            <Input
+              label={form.strategy === "buyCall" ? "Call strike" : "Put strike"}
+              type="number"
+              step="any"
+              min="0"
+              value={form.longStrikeUsd}
+              onChange={(e) => setForm((p) => ({ ...p, longStrikeUsd: e.target.value }))}
+              error={errors.longStrikeUsd}
+            />
+          )}
           <Input
             label="Open date"
             type="date"
@@ -573,7 +714,7 @@ export function OpenTradeModal({
             error={errors.expirationDate}
           />
           <Input
-            label="Premium Received (Option Price)"
+            label={openPremiumLabel}
             type="number"
             step="any"
             min="0"
@@ -602,20 +743,24 @@ export function OpenTradeModal({
                 </span>
               </p>
               <p>
-                Dollar Value:{" "}
+                {isDebit ? "Premium Cost" : "Premium Dollar Value"}:{" "}
                 <span className="font-medium text-slate-200">
-                  {formatUsd(openPremiumDollarValue)}
+                  {isDebit
+                    ? formatUsd(
+                        openPremiumDollarValue + (parseFloat(form.openFeesUsd) || 0)
+                      )
+                    : formatUsd(openPremiumDollarValue)}
                 </span>
               </p>
             </div>
           )}
           {showManualMaxRisk && (
             <Input
-              label="Max risk (USD) — manual"
-              type="number"
-              step="any"
-              min="0"
-              value={form.maxRiskUsd}
+              label={
+                form.strategy === "sellCall"
+                  ? "Max risk (USD) — manual (underlying shares)"
+                  : "Max risk (USD) — manual"
+              }
               onChange={(e) => setForm((p) => ({ ...p, maxRiskUsd: e.target.value }))}
               error={errors.maxRiskUsd}
             />
@@ -667,6 +812,40 @@ export function OpenTradeModal({
               Breakevens: ${ironCondorPreview.lowerBreakevenUsd.toFixed(2)} – $
               {ironCondorPreview.upperBreakevenUsd.toFixed(2)}
             </p>
+          </div>
+        )}
+
+        {nakedPreview && (
+          <div className="rounded-xl border border-surface-border/60 bg-surface/40 p-3 text-xs text-slate-400">
+            <p className="mb-1 text-sm font-medium text-slate-300">Auto-calculated</p>
+            <p>Net credit: {formatUsd(nakedPreview.netCreditUsd)}</p>
+            <p>
+              75% TP exit price:{" "}
+              {calculatePerShareOptionPrice(
+                nakedPreview.tpExitPrice75Usd,
+                contractsCount
+              )?.toFixed(2) ?? "—"}{" "}
+              ({formatUsd(nakedPreview.tpExitPrice75Usd)})
+            </p>
+            <p>Max profit: {formatUsd(nakedPreview.maxProfitUsd)}</p>
+            {form.strategy === "sellPut" && (
+              <p>Max risk: {formatUsd(nakedPreview.maxRiskUsd)}</p>
+            )}
+            <p>Breakeven: ${nakedPreview.breakevenUsd.toFixed(2)}</p>
+          </div>
+        )}
+
+        {debitPreview && (
+          <div className="rounded-xl border border-surface-border/60 bg-surface/40 p-3 text-xs text-slate-400">
+            <p className="mb-1 text-sm font-medium text-slate-300">Auto-calculated</p>
+            <p>Premium cost: {formatUsd(debitPreview.premiumCostUsd)}</p>
+            <p>
+              75% TP price:{" "}
+              {(debitPreview.premiumPaidPerShare * 1.75).toFixed(2)}{" "}
+              ({formatUsd(debitPreview.tpExitPrice75Usd)})
+            </p>
+            <p>Max risk: {formatUsd(debitPreview.maxRiskUsd)}</p>
+            <p>Breakeven: ${debitPreview.breakevenUsd.toFixed(2)}</p>
           </div>
         )}
 
@@ -774,6 +953,7 @@ export function UpdateMarkModal({
   const preview =
     dollarValue != null
       ? calculateUnrealizedPlUsd({
+          strategy: row.trade.strategy,
           openPremiumUsd: row.trade.openPremiumUsd,
           openFeesUsd: row.trade.openFeesUsd,
           currentValueUsd: dollarValue,
@@ -920,6 +1100,7 @@ export function CloseTradeModal({
   const [errors, setErrors] = useState<Record<string, string>>({});
 
   const isManualClose = form.closeMethod === "manual_pl";
+  const closePremiumLabel = getClosePremiumFieldLabel(trade.strategy);
   const closeDebitOptionPrice =
     form.closeDebitOptionPrice.trim() === ""
       ? null
@@ -941,6 +1122,7 @@ export function CloseTradeModal({
   const realized =
     isManualClose && manualRealizedPlUsd != null && Number.isFinite(manualRealizedPlUsd)
       ? resolveClosedTradeRealizedPlUsd({
+          strategy: trade.strategy,
           closeMethod: "manual_pl",
           openPremiumUsd: trade.openPremiumUsd,
           openFeesUsd: trade.openFeesUsd,
@@ -948,6 +1130,7 @@ export function CloseTradeModal({
         })
       : closeDebitDollarValue != null && Number.isFinite(closeFeesUsd)
         ? resolveClosedTradeRealizedPlUsd({
+            strategy: trade.strategy,
             closeMethod: "normal",
             openPremiumUsd: trade.openPremiumUsd,
             openFeesUsd: trade.openFeesUsd,
@@ -1057,7 +1240,7 @@ export function CloseTradeModal({
         ) : (
           <div className="grid gap-3 sm:grid-cols-2">
             <Input
-              label="Close Debit (Option Price)"
+              label={closePremiumLabel}
               type="number"
               step="any"
               min="0"
@@ -1198,6 +1381,7 @@ export function EditClosedTradeModal({
     openPremiumDollarValue != null &&
     Number.isFinite(openFeesUsd)
       ? resolveClosedTradeRealizedPlUsd({
+          strategy: form.strategy,
           closeMethod: "manual_pl",
           openPremiumUsd: openPremiumDollarValue,
           openFeesUsd,
@@ -1208,6 +1392,7 @@ export function EditClosedTradeModal({
           Number.isFinite(openFeesUsd) &&
           Number.isFinite(closeFeesUsd)
         ? resolveClosedTradeRealizedPlUsd({
+            strategy: form.strategy,
             closeMethod: "normal",
             openPremiumUsd: openPremiumDollarValue,
             openFeesUsd,

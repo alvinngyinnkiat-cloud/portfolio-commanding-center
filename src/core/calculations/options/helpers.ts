@@ -14,9 +14,13 @@ import {
 } from "./vertical-spread";
 
 const STRATEGY_LABELS: Record<Exclude<OptionsStrategy, "custom">, string> = {
-  bullPut: "Bull Put",
-  bearCall: "Bear Call",
-  ironCondor: "Iron Condor",
+  sellPut: "SELL PUT",
+  sellCall: "SELL CALL",
+  bullPut: "BULL PUT",
+  bearCall: "BEAR CALL",
+  ironCondor: "IRON CONDOR",
+  buyCall: "BUY CALL",
+  buyPut: "BUY PUT",
 };
 
 export function formatOptionsStrategy(
@@ -109,8 +113,19 @@ export function formatTradeStrikes(trade: OptionsTrade): string {
     return `BP ${trade.bullPutShortStrikeUsd}/${trade.bullPutLongStrikeUsd} · BC ${trade.bearCallShortStrikeUsd}/${trade.bearCallLongStrikeUsd}`;
   }
 
-  if (trade.shortStrikeUsd != null && trade.longStrikeUsd != null) {
-    return `${trade.shortStrikeUsd} / ${trade.longStrikeUsd}`;
+  if (isVerticalSpreadStrategy(trade.strategy)) {
+    if (trade.shortStrikeUsd != null && trade.longStrikeUsd != null) {
+      return `${trade.shortStrikeUsd} / ${trade.longStrikeUsd}`;
+    }
+    return "—";
+  }
+
+  if (trade.strategy === "sellPut" || trade.strategy === "sellCall") {
+    return trade.shortStrikeUsd != null ? String(trade.shortStrikeUsd) : "—";
+  }
+
+  if (trade.strategy === "buyCall" || trade.strategy === "buyPut") {
+    return trade.longStrikeUsd != null ? String(trade.longStrikeUsd) : "—";
   }
 
   return "—";

@@ -18,14 +18,26 @@ describe("options calculations", () => {
     ).toBe(345);
   });
 
-  it("unrealized P/L = premium - open fees - current value", () => {
+  it("unrealized P/L = premium - open fees - current value (credit)", () => {
     expect(
       calculateUnrealizedPlUsd({
+        strategy: "bullPut",
         openPremiumUsd: 420,
         openFeesUsd: 2.5,
         currentValueUsd: 380,
       })
     ).toBe(37.5);
+  });
+
+  it("unrealized P/L for debit = current value - premium - fees", () => {
+    expect(
+      calculateUnrealizedPlUsd({
+        strategy: "buyPut",
+        openPremiumUsd: 200,
+        openFeesUsd: 2,
+        currentValueUsd: 350,
+      })
+    ).toBe(148);
   });
 
   it("capacity status thresholds", () => {

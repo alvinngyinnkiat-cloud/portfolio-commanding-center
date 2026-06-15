@@ -140,9 +140,9 @@ describe("buildPerformanceScopeDetail", () => {
 });
 
 describe("buildStrategyBreakdown", () => {
-  it("returns all four strategies", () => {
+  it("returns all eight strategies", () => {
     const rows = buildStrategyBreakdown([closedTrade({ strategy: "bullPut" })], "total");
-    expect(rows).toHaveLength(4);
+    expect(rows).toHaveLength(8);
     expect(rows.find((r) => r.strategy === "bullPut")?.closedCount).toBe(1);
     expect(rows.find((r) => r.strategy === "bearCall")?.closedCount).toBe(0);
   });

@@ -13,9 +13,13 @@ import { splitForTrade } from "./split";
 export type PerformanceScope = "total" | "personal" | "client";
 
 const STRATEGY_KEYS: OptionsStrategy[] = [
+  "sellPut",
+  "sellCall",
   "bullPut",
   "bearCall",
   "ironCondor",
+  "buyCall",
+  "buyPut",
   "custom",
 ];
 
@@ -171,7 +175,10 @@ function accumulateStrategyMetrics(
 
   return {
     strategy,
-    strategyDisplay: formatOptionsStrategy(strategy),
+    strategyDisplay:
+      strategy === "custom"
+        ? formatOptionsStrategy(strategy, strategyTrades[0]?.strategyLabel)
+        : formatOptionsStrategy(strategy),
     closedCount,
     winCount,
     lossCount,

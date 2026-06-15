@@ -48,6 +48,7 @@ import {
 } from "./return-percent";
 import { splitForTrade, splitTradeAmount } from "./split";
 import { calculateUnrealizedPlUsd } from "./unrealized-pl";
+import { buildTradeEconomicsFromTrade } from "./trade-economics";
 import {
   compareOpenTradesByOpenDate,
   deriveDteStatus,
@@ -81,6 +82,7 @@ export function buildOpenTradeRows(
         trade.currentValueUsd == null
           ? null
           : calculateUnrealizedPlUsd({
+              strategy: trade.strategy,
               openPremiumUsd: trade.openPremiumUsd,
               openFeesUsd: trade.openFeesUsd,
               currentValueUsd: trade.currentValueUsd,
@@ -95,6 +97,7 @@ export function buildOpenTradeRows(
         trade,
         spreadMetrics: buildVerticalSpreadMetricsFromTrade(trade),
         ironCondorMetrics: buildIronCondorMetricsFromTrade(trade),
+        tradeEconomics: buildTradeEconomicsFromTrade(trade),
         underlyingPrice: scannerPriceContext
           ? resolveScannerWatchlistPrice({
               underlying: trade.underlying,
@@ -230,6 +233,7 @@ export function buildOptionsTrackerSummary(input: {
     markedOpenCount += 1;
     hasMarked = true;
     const unrealized = calculateUnrealizedPlUsd({
+      strategy: trade.strategy,
       openPremiumUsd: trade.openPremiumUsd,
       openFeesUsd: trade.openFeesUsd,
       currentValueUsd: trade.currentValueUsd,
@@ -467,6 +471,7 @@ export function buildOptionsPerformanceSummary(
     markedOpenCount += 1;
     hasMarked = true;
     totalUnrealized! += calculateUnrealizedPlUsd({
+      strategy: trade.strategy,
       openPremiumUsd: trade.openPremiumUsd,
       openFeesUsd: trade.openFeesUsd,
       currentValueUsd: trade.currentValueUsd,
@@ -475,9 +480,13 @@ export function buildOptionsPerformanceSummary(
   if (!hasMarked) totalUnrealized = null;
 
   const strategyKeys: OptionsStrategy[] = [
+    "sellPut",
+    "sellCall",
     "bullPut",
     "bearCall",
     "ironCondor",
+    "buyCall",
+    "buyPut",
     "custom",
   ];
   const byStrategy = strategyKeys

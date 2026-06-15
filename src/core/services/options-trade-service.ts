@@ -157,6 +157,7 @@ export class OptionsTradeService {
     if (errors.length > 0) return { ok: false, errors };
 
     const realizedPlUsd = resolveClosedTradeRealizedPlUsd({
+      strategy: trade.strategy,
       closeMethod: draft.closeMethod,
       openPremiumUsd: trade.openPremiumUsd,
       openFeesUsd: trade.openFeesUsd,

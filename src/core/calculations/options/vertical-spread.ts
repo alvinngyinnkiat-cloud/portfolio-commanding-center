@@ -33,10 +33,6 @@ export function isVerticalSpreadStrategy(
   return strategy === "bullPut" || strategy === "bearCall";
 }
 
-export function requiresManualMaxRisk(strategy: OptionsStrategy): boolean {
-  return strategy === "custom";
-}
-
 /** Per-share width for a credit vertical spread. */
 export function calculateVerticalSpreadWidthPerShare(
   strategy: VerticalSpreadStrategy,

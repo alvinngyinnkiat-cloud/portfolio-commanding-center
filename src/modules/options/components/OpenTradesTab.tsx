@@ -163,18 +163,21 @@ function OpenTradesTable({
             </tr>
           ) : (
             rows.map((row) => {
-              const metrics = row.spreadMetrics ?? row.ironCondorMetrics;
+              const economics = row.tradeEconomics;
+              const metrics = economics ?? row.spreadMetrics ?? row.ironCondorMetrics;
               const hasBreakeven = hasBreakevenMetrics(
                 row.trade.strategy,
                 row.spreadMetrics,
-                row.ironCondorMetrics
+                row.ironCondorMetrics,
+                economics
               );
               const underlying = row.underlyingPrice;
               const breakevenDiff = resolveBreakevenDifference(
                 row.trade.strategy,
                 underlying.priceUsd,
                 row.spreadMetrics,
-                row.ironCondorMetrics
+                row.ironCondorMetrics,
+                economics
               );
               const targetExit = formatTargetExit(row.daysToExpiration);
               const tpExit =
@@ -227,7 +230,15 @@ function OpenTradesTable({
                   <td className="px-4 py-3">{formatTradeStrikes(row.trade)}</td>
                   <td className="px-4 py-3">{formatUsd(row.trade.openPremiumUsd)}</td>
                   <td className="px-4 py-3">
-                    {metrics ? formatUsd(metrics.netCreditUsd) : "—"}
+                    {economics?.isDebit
+                      ? economics.premiumCostUsd != null
+                        ? formatUsd(economics.premiumCostUsd)
+                        : "—"
+                      : economics?.netCreditUsd != null
+                        ? formatUsd(economics.netCreditUsd)
+                        : metrics && "netCreditUsd" in metrics
+                          ? formatUsd(metrics.netCreditUsd)
+                          : "—"}
                   </td>
                   <td className="px-4 py-3">
                     <StackedPriceCell value={tpExit} />

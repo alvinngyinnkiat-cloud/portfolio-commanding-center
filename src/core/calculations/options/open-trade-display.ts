@@ -137,7 +137,8 @@ export function resolveBreakevenDifference(
   strategy: OptionsStrategy,
   currentStockPriceUsd: number | null,
   spreadMetrics: OptionsVerticalSpreadMetrics | null,
-  ironCondorMetrics: OptionsIronCondorMetrics | null
+  ironCondorMetrics: OptionsIronCondorMetrics | null,
+  tradeEconomics?: { breakevenUsd: number | null; lowerBreakevenUsd?: number; upperBreakevenUsd?: number } | null
 ): BreakevenDifference | null {
   if (currentStockPriceUsd == null) return null;
 
@@ -160,19 +161,46 @@ export function resolveBreakevenDifference(
       ironCondorMetrics.upperBreakevenUsd
     );
   }
+  if (
+    (strategy === "sellPut" || strategy === "buyCall") &&
+    tradeEconomics?.breakevenUsd != null
+  ) {
+    return calculateBullPutBreakevenDifference(
+      currentStockPriceUsd,
+      tradeEconomics.breakevenUsd
+    );
+  }
+  if (
+    (strategy === "sellCall" || strategy === "buyPut") &&
+    tradeEconomics?.breakevenUsd != null
+  ) {
+    return calculateBearCallBreakevenDifference(
+      currentStockPriceUsd,
+      tradeEconomics.breakevenUsd
+    );
+  }
   return null;
 }
 
 export function hasBreakevenMetrics(
   strategy: OptionsStrategy,
   spreadMetrics: OptionsVerticalSpreadMetrics | null,
-  ironCondorMetrics: OptionsIronCondorMetrics | null
+  ironCondorMetrics: OptionsIronCondorMetrics | null,
+  tradeEconomics?: { breakevenUsd: number | null; lowerBreakevenUsd?: number; upperBreakevenUsd?: number } | null
 ): boolean {
   if (strategy === "bullPut" || strategy === "bearCall") {
     return spreadMetrics != null;
   }
   if (strategy === "ironCondor") {
     return ironCondorMetrics != null;
+  }
+  if (
+    strategy === "sellPut" ||
+    strategy === "sellCall" ||
+    strategy === "buyCall" ||
+    strategy === "buyPut"
+  ) {
+    return tradeEconomics?.breakevenUsd != null;
   }
   return false;
 }

@@ -4,7 +4,7 @@ import {
   validateIronCondorStrikes,
 } from "./iron-condor";
 import { resolveOpenTradeDraft, validateOpenTradeDraft } from "./validation";
-import { requiresManualMaxRisk } from "./vertical-spread";
+import { requiresManualMaxRisk } from "./strategy-kind";
 import { DEFAULT_OPTIONS_SETTINGS } from "@/core/domain/defaults-options";
 
 describe("iron condor calculations", () => {
@@ -93,6 +93,7 @@ describe("iron condor validation and resolution", () => {
 
   it("iron condor does not require manual max risk", () => {
     expect(requiresManualMaxRisk("ironCondor")).toBe(false);
+    expect(requiresManualMaxRisk("sellCall")).toBe(true);
     expect(requiresManualMaxRisk("custom")).toBe(true);
   });
 });

@@ -4,7 +4,15 @@ export type OptionsTradeType = "personal" | "shared";
 
 export type OptionsCloseMethod = "normal" | "manual_pl";
 
-export type OptionsStrategy = "bullPut" | "bearCall" | "ironCondor" | "custom";
+export type OptionsStrategy =
+  | "sellPut"
+  | "sellCall"
+  | "bullPut"
+  | "bearCall"
+  | "ironCondor"
+  | "buyCall"
+  | "buyPut"
+  | "custom";
 
 export type OptionsCapacityStatus = "OK" | "AT_LIMIT" | "NO_TRADE";
 
@@ -109,11 +117,13 @@ export interface OptionsSplitLegs {
 }
 
 import type { ResolvedScannerPrice } from "@/core/calculations/scanner/price-engine";
+import type { OptionsTradeEconomics } from "@/core/calculations/options/trade-economics";
 
 export interface OptionsOpenTradeRow {
   trade: OptionsTrade;
   spreadMetrics: OptionsVerticalSpreadMetrics | null;
   ironCondorMetrics: OptionsIronCondorMetrics | null;
+  tradeEconomics: OptionsTradeEconomics | null;
   underlyingPrice: ResolvedScannerPrice;
   unrealizedPlUsd: number | null;
   userUnrealizedPlUsd: number | null;

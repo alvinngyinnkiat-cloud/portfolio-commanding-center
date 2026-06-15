@@ -79,10 +79,14 @@ export function targetExitClass(kind: TargetExitKind): string {
 export { profitFactorColorClass } from "@/core/calculations/options/profit-factor";
 
 export const STRATEGY_OPTIONS = [
-  { value: "bullPut", label: "Bull Put" },
-  { value: "bearCall", label: "Bear Call" },
-  { value: "ironCondor", label: "Iron Condor" },
-  { value: "custom", label: "Custom" },
+  { value: "sellPut", label: "SELL PUT" },
+  { value: "sellCall", label: "SELL CALL" },
+  { value: "bullPut", label: "BULL PUT" },
+  { value: "bearCall", label: "BEAR CALL" },
+  { value: "ironCondor", label: "IRON CONDOR" },
+  { value: "buyCall", label: "BUY CALL" },
+  { value: "buyPut", label: "BUY PUT" },
+  { value: "custom", label: "CUSTOM" },
 ] as const;
 
 export const CLOSE_METHOD_OPTIONS = [
