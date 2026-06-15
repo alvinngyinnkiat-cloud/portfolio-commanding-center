@@ -376,9 +376,9 @@ describe("dashboard integration QA — 9-step plan", () => {
     });
 
     expect(cryptoSummary.availableTradingCashSgd).toBe(1_980);
-    expect(cryptoSummary.cryptoContributionSgd).toBe(3_020);
+    expect(cryptoSummary.cryptoContributionSgd).toBe(5_000);
     expect(stockSummary.availableTradingCashSgd).toBe(0);
-    expect(metrics.totalContribution).toBe(3_020);
+    expect(metrics.totalContribution).toBe(5_000);
   });
 
   it("Step 5: open options trade — cash unchanged, premium ×100×contracts", () => {

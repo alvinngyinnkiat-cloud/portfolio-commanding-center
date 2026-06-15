@@ -202,7 +202,7 @@ export function CryptoCashFlowSection() {
             label="Total Crypto Contribution"
             value={formatSgd(summary.cryptoContributionSgd)}
             icon={<Wallet size={18} />}
-            subValue="Buy amounts + fees · capital deployed"
+            subValue="Deposits − withdrawals · personal capital injected"
           />
           <SummaryCard
             label="Crypto Cash Balance"

@@ -1,6 +1,6 @@
 import type { CryptoHolding, CryptoTrackerSummary } from "@/core/domain/types";
 import { coerceNumber } from "@/shared/lib/coerce-number";
-import { calculateCryptoContribution } from "./contribution";
+import { calculateCryptoCapitalDeployed } from "./contribution";
 import { buildCryptoHoldingRows } from "./holdings";
 
 export function calculateCryptoHoldingsValue(holdings: CryptoHolding[]): number {
@@ -9,9 +9,9 @@ export function calculateCryptoHoldingsValue(holdings: CryptoHolding[]): number 
 
 export function calculateAvailableTradingCash(
   totalCryptoCashContributed: number,
-  cryptoContributionSgd: number
+  cryptoCapitalDeployedSgd: number
 ): number {
-  return totalCryptoCashContributed - cryptoContributionSgd;
+  return totalCryptoCashContributed - cryptoCapitalDeployedSgd;
 }
 
 export function calculateTotalValueSgd(
@@ -22,10 +22,10 @@ export function calculateTotalValueSgd(
 }
 
 export function calculateCryptoProfitLossSgd(
-  cryptoHoldingsValueSgd: number,
+  cryptoTotalValueSgd: number,
   cryptoContributionSgd: number
 ): number {
-  return cryptoHoldingsValueSgd - cryptoContributionSgd;
+  return cryptoTotalValueSgd - cryptoContributionSgd;
 }
 
 export function calculateCryptoProfitLossPercent(
@@ -42,13 +42,18 @@ export function buildCryptoTrackerSummary(
 ): CryptoTrackerSummary {
   const safeCashContributed = coerceNumber(totalCryptoCashContributed);
   const cryptoHoldingsValueSgd = calculateCryptoHoldingsValue(holdings);
-  const cryptoContributionSgd = calculateCryptoContribution(holdings);
+  const cryptoContributionSgd = safeCashContributed;
+  const cryptoCapitalDeployedSgd = calculateCryptoCapitalDeployed(holdings);
   const availableTradingCashSgd = calculateAvailableTradingCash(
     safeCashContributed,
-    cryptoContributionSgd
+    cryptoCapitalDeployedSgd
+  );
+  const totalValueSgd = calculateTotalValueSgd(
+    cryptoHoldingsValueSgd,
+    availableTradingCashSgd
   );
   const cryptoProfitLossSgd = calculateCryptoProfitLossSgd(
-    cryptoHoldingsValueSgd,
+    totalValueSgd,
     cryptoContributionSgd
   );
   const cryptoProfitLossPercent = calculateCryptoProfitLossPercent(
@@ -57,10 +62,7 @@ export function buildCryptoTrackerSummary(
   );
 
   return {
-    totalValueSgd: calculateTotalValueSgd(
-      cryptoHoldingsValueSgd,
-      availableTradingCashSgd
-    ),
+    totalValueSgd,
     cryptoHoldingsValueSgd,
     cryptoContributionSgd,
     availableTradingCashSgd,

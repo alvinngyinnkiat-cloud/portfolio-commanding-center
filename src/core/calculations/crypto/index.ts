@@ -17,7 +17,7 @@ export {
 export {
   normalizeFeesSgd,
   calculateHoldingContribution,
-  calculateCryptoContribution,
+  calculateCryptoCapitalDeployed,
 } from "./contribution";
 export {
   DEFAULT_CRYPTO_ALLOCATION,
@@ -29,4 +29,7 @@ export {
   validateCryptoHoldingDraft,
   validateAllocationPercent,
 } from "./validation";
-export { calculateTotalCryptoCashContributed } from "./contributions";
+export {
+  calculateTotalCryptoCashContributed,
+  calculateCryptoContribution,
+} from "./contributions";

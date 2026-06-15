@@ -12,3 +12,10 @@ export function calculateTotalCryptoCashContributed(
   }
   return total;
 }
+
+/** Crypto Contribution = total crypto deposits − total crypto withdrawals. */
+export function calculateCryptoContribution(
+  contributions: ContributionTransaction[]
+): number {
+  return calculateTotalCryptoCashContributed(contributions);
+}

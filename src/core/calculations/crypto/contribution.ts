@@ -15,8 +15,8 @@ export function calculateHoldingContribution(holding: CryptoHolding): number {
   );
 }
 
-/** Crypto Contribution = all buy transactions + associated fees (Module 3 owned). */
-export function calculateCryptoContribution(holdings: CryptoHolding[]): number {
+/** Capital deployed into holdings (buys + fees). Reduces available trading cash only. */
+export function calculateCryptoCapitalDeployed(holdings: CryptoHolding[]): number {
   return holdings.reduce(
     (sum, holding) => sum + calculateHoldingContribution(holding),
     0

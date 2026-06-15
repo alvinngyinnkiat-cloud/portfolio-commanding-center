@@ -21,14 +21,14 @@ describe("deriveDashboardCryptoOutputs", () => {
     });
   });
 
-  it("exposes module-owned contribution separate from deposits", () => {
+  it("maps contribution from deposits minus withdrawals", () => {
     const holdings: CryptoHolding[] = [
       { id: "1", assetName: "BTC", investedSgd: 500, currentValueSgd: 620 },
     ];
     const summary = buildCryptoTrackerSummary(holdings, 5000);
     const outputs = deriveDashboardCryptoOutputs(summary);
 
-    expect(outputs.cryptoContributionSgd).toBe(500);
+    expect(outputs.cryptoContributionSgd).toBe(5000);
     expect(outputs.availableTradingCashSgd).toBe(4500);
     expect(outputs.cryptoTotalValueSgd).toBe(5120);
   });

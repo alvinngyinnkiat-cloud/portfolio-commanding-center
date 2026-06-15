@@ -13,21 +13,21 @@ describe("buildCryptoTrackerSummary", () => {
     const summary = buildCryptoTrackerSummary(holdings, 2000);
 
     expect(summary.cryptoHoldingsValueSgd).toBe(1650);
-    expect(summary.cryptoContributionSgd).toBe(1182);
+    expect(summary.cryptoContributionSgd).toBe(2000);
     expect(summary.availableTradingCashSgd).toBe(818);
     expect(summary.totalValueSgd).toBe(2468);
     expect(summary.cryptoProfitLossSgd).toBe(468);
-    expect(summary.cryptoProfitLossPercent).toBeCloseTo(39.59, 1);
+    expect(summary.cryptoProfitLossPercent).toBeCloseTo(23.4, 1);
     expect(summary.holdingCount).toBe(3);
   });
 
-  it("includes buy fees in crypto contribution", () => {
+  it("reduces available cash by deployed buys and fees", () => {
     const withFees: CryptoHolding[] = [
       { id: "1", assetName: "BTC", investedSgd: 500, feesSgd: 10, currentValueSgd: 620 },
     ];
     const summary = buildCryptoTrackerSummary(withFees, 1000);
 
-    expect(summary.cryptoContributionSgd).toBe(510);
+    expect(summary.cryptoContributionSgd).toBe(1000);
     expect(summary.availableTradingCashSgd).toBe(490);
     expect(summary.cryptoProfitLossSgd).toBe(110);
   });
@@ -36,9 +36,20 @@ describe("buildCryptoTrackerSummary", () => {
     const summary = buildCryptoTrackerSummary([], 1000);
 
     expect(summary.cryptoHoldingsValueSgd).toBe(0);
+    expect(summary.cryptoContributionSgd).toBe(1000);
     expect(summary.availableTradingCashSgd).toBe(1000);
     expect(summary.totalValueSgd).toBe(1000);
+    expect(summary.cryptoProfitLossSgd).toBe(0);
     expect(summary.cryptoProfitLossPercent).toBe(0);
     expect(summary.holdingCount).toBe(0);
+  });
+
+  it("counts deposit-only capital as contribution with zero P/L", () => {
+    const summary = buildCryptoTrackerSummary([], 11_575);
+
+    expect(summary.cryptoContributionSgd).toBe(11_575);
+    expect(summary.availableTradingCashSgd).toBe(11_575);
+    expect(summary.totalValueSgd).toBe(11_575);
+    expect(summary.cryptoProfitLossSgd).toBe(0);
   });
 });

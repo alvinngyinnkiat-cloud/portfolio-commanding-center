@@ -45,7 +45,7 @@ export function CryptoOverviewSection() {
           label="Crypto Contribution"
           value={formatSgd(summary.cryptoContributionSgd)}
           icon={<Coins size={18} />}
-          subValue="Buy amounts + fees · capital injected only"
+          subValue="Deposits − withdrawals · personal capital injected"
         />
         <SummaryCard
           label="Available Trading Cash"
@@ -56,7 +56,7 @@ export function CryptoOverviewSection() {
               ? "neutral"
               : "negative"
           }
-          subValue={`Contributed ${formatSgd(summary.totalCryptoCashContributed)} − Contribution ${formatSgd(summary.cryptoContributionSgd)}`}
+          subValue={`Contribution ${formatSgd(summary.cryptoContributionSgd)} − buys & fees ${formatSgd(summary.cryptoContributionSgd - summary.availableTradingCashSgd)}`}
         />
       </div>
 
