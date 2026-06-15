@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, type ReactNode } from "react";
+import { useMemo } from "react";
 import { usePortfolio } from "@/context/PortfolioContext";
 import type { CryptoHoldingRow } from "@/core/domain/types";
 import { formatPercent, formatSgd } from "@/shared/lib/format";
@@ -41,90 +41,112 @@ function rankByProfitLoss(
   }));
 }
 
-function OverviewPanel({
+type RankingRow = {
+  id: string;
+  rank: number;
+  assetName: string;
+  primaryValue: number;
+  secondaryValue: number;
+  colorize?: boolean;
+};
+
+function HoldingsRankingCard({
   title,
   subtitle,
-  children,
+  primaryLabel,
+  secondaryLabel,
+  rows,
+  emptyMessage,
 }: {
   title: string;
-  subtitle?: string;
-  children: ReactNode;
+  subtitle: string;
+  primaryLabel: string;
+  secondaryLabel: string;
+  rows: RankingRow[];
+  emptyMessage: string;
 }) {
   return (
-    <div className="rounded-xl border border-surface-border/60 bg-surface/40 p-4">
-      <h4 className="text-sm font-semibold text-white">{title}</h4>
-      {subtitle ? (
-        <p className="mt-1 text-xs text-slate-500">{subtitle}</p>
-      ) : null}
-      {children}
+    <div className="flex min-h-[22rem] min-w-0 flex-col rounded-2xl border border-surface-border/80 bg-surface-card/90 p-5 shadow-md shadow-black/15 sm:min-h-[24rem] sm:p-6">
+      <div className="border-b border-surface-border/40 pb-4">
+        <h4 className="text-base font-semibold tracking-tight text-white">
+          {title}
+        </h4>
+        <p className="mt-1.5 text-xs leading-relaxed text-slate-500">
+          {subtitle}
+        </p>
+      </div>
+
+      {rows.length === 0 ? (
+        <p className="mt-6 flex flex-1 items-center justify-center text-sm text-slate-500">
+          {emptyMessage}
+        </p>
+      ) : (
+        <div className="mt-4 flex flex-1 flex-col">
+          <div className="mb-2 grid grid-cols-[1.75rem_minmax(0,1fr)_4.5rem_3.25rem] items-center gap-x-2 text-[10px] font-medium uppercase tracking-wide text-slate-600 sm:grid-cols-[2rem_minmax(0,1fr)_5rem_3.5rem] sm:gap-x-3">
+            <span>#</span>
+            <span>Asset</span>
+            <span className="text-right">{primaryLabel}</span>
+            <span className="text-right">{secondaryLabel}</span>
+          </div>
+
+          <ul className="divide-y divide-surface-border/30">
+            {rows.map((row) => (
+              <li
+                key={row.id}
+                className="grid grid-cols-[1.75rem_minmax(0,1fr)_4.5rem_3.25rem] items-center gap-x-2 py-3 sm:grid-cols-[2rem_minmax(0,1fr)_5rem_3.5rem] sm:gap-x-3"
+              >
+                <span className="text-xs font-medium text-slate-500">
+                  {row.rank}
+                </span>
+                <span className="truncate text-sm font-medium text-slate-200">
+                  {row.assetName}
+                </span>
+                <span
+                  className={`text-right text-sm font-semibold tabular-nums ${
+                    row.colorize
+                      ? plColorClass(row.primaryValue)
+                      : "text-white"
+                  }`}
+                >
+                  {formatSgd(row.primaryValue)}
+                </span>
+                <span
+                  className={`text-right text-xs tabular-nums ${
+                    row.colorize
+                      ? plColorClass(row.secondaryValue)
+                      : "text-slate-400"
+                  }`}
+                >
+                  {formatPercent(row.secondaryValue)}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
     </div>
   );
 }
 
-function ValueHoldingsList({ rows }: { rows: CryptoHoldingRow[] }) {
-  if (rows.length === 0) {
-    return <p className="mt-4 text-sm text-slate-500">No holdings yet.</p>;
-  }
-
-  return (
-    <ul className="mt-4 space-y-2">
-      {rows.map((row) => (
-        <li
-          key={row.id}
-          className="flex items-center justify-between gap-3 text-sm"
-        >
-          <span className="truncate text-slate-300">
-            #{row.rank} {row.assetName}
-          </span>
-          <span className="shrink-0 font-medium text-white">
-            {formatSgd(row.currentValueSgd)}
-          </span>
-          <span className="shrink-0 text-slate-500">
-            {formatPercent(row.portfolioPercent)}
-          </span>
-        </li>
-      ))}
-    </ul>
-  );
+function toValueRows(rows: CryptoHoldingRow[]): RankingRow[] {
+  return rows.map((row) => ({
+    id: row.id,
+    rank: row.rank,
+    assetName: row.assetName,
+    primaryValue: row.currentValueSgd,
+    secondaryValue: row.portfolioPercent,
+  }));
 }
 
-function ProfitLossHoldingsTable({ rows }: { rows: CryptoHoldingRow[] }) {
-  if (rows.length === 0) {
-    return null;
-  }
-
-  return (
-    <div className="mt-4 overflow-x-auto">
-      <table className="w-full min-w-[280px] text-sm">
-        <thead>
-          <tr className="text-left text-xs text-slate-500">
-            <th className="pb-2 pr-3 font-medium">Rank</th>
-            <th className="pb-2 pr-3 font-medium">Asset</th>
-            <th className="pb-2 pr-3 text-right font-medium">P/L SGD</th>
-            <th className="pb-2 text-right font-medium">P/L %</th>
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map((row) => (
-            <tr key={row.id} className="border-t border-surface-border/40">
-              <td className="py-2 pr-3 text-slate-400">#{row.rank}</td>
-              <td className="py-2 pr-3 text-slate-300">{row.assetName}</td>
-              <td
-                className={`py-2 pr-3 text-right font-medium ${plColorClass(row.profitLossSgd)}`}
-              >
-                {formatSgd(row.profitLossSgd)}
-              </td>
-              <td
-                className={`py-2 text-right ${plColorClass(row.profitLossPercent)}`}
-              >
-                {formatPercent(row.profitLossPercent)}
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
-  );
+function toProfitLossRows(rows: CryptoHoldingRow[]): RankingRow[] {
+  return rows.map((row) => ({
+    id: row.id,
+    rank: row.rank,
+    assetName: row.assetName,
+    primaryValue: row.profitLossSgd,
+    secondaryValue: row.profitLossPercent,
+    colorize: true,
+  }));
 }
 
 export function CryptoOverviewSection() {
@@ -190,38 +212,32 @@ export function CryptoOverviewSection() {
         />
       </div>
 
-      <OverviewPanel
-        title="Top Holdings By Value"
-        subtitle={`${summary.holdingCount} holding${summary.holdingCount === 1 ? "" : "s"} · ${formatSgd(summary.cryptoHoldingsValueSgd)} total value`}
-      >
-        <ValueHoldingsList rows={topHoldingsByValue} />
-      </OverviewPanel>
-
-      <OverviewPanel
-        title="Top 5 Winners"
-        subtitle="Open holdings ranked by P/L (current value − cost basis)"
-      >
-        {topWinners.length > 0 ? (
-          <ProfitLossHoldingsTable rows={topWinners} />
-        ) : (
-          <p className="mt-4 text-sm text-slate-500">
-            No open holdings with P/L yet.
-          </p>
-        )}
-      </OverviewPanel>
-
-      <OverviewPanel
-        title="Top 5 Losers"
-        subtitle="Open holdings ranked by lowest P/L (current value − cost basis)"
-      >
-        {topLosers.length > 0 ? (
-          <ProfitLossHoldingsTable rows={topLosers} />
-        ) : (
-          <p className="mt-4 text-sm text-slate-500">
-            No open holdings with P/L yet.
-          </p>
-        )}
-      </OverviewPanel>
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
+        <HoldingsRankingCard
+          title="Top Holdings By Value"
+          subtitle={`${summary.holdingCount} holding${summary.holdingCount === 1 ? "" : "s"} · ${formatSgd(summary.cryptoHoldingsValueSgd)} total value`}
+          primaryLabel="Value"
+          secondaryLabel="Port. %"
+          rows={toValueRows(topHoldingsByValue)}
+          emptyMessage="No holdings yet."
+        />
+        <HoldingsRankingCard
+          title="Top 5 Winners"
+          subtitle="Open holdings ranked by P/L (current value − cost basis)"
+          primaryLabel="P/L"
+          secondaryLabel="P/L %"
+          rows={toProfitLossRows(topWinners)}
+          emptyMessage="No open holdings with P/L yet."
+        />
+        <HoldingsRankingCard
+          title="Top 5 Losers"
+          subtitle="Open holdings ranked by lowest P/L (current value − cost basis)"
+          primaryLabel="P/L"
+          secondaryLabel="P/L %"
+          rows={toProfitLossRows(topLosers)}
+          emptyMessage="No open holdings with P/L yet."
+        />
+      </div>
     </div>
   );
 }
