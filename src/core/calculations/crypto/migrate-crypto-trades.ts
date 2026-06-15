@@ -1,13 +1,30 @@
 import type { CryptoHolding, CryptoTrade } from "@/core/domain/types";
-import { toLocalDateString } from "@/shared/lib/date";
 import { calculateHoldingContribution } from "./contribution";
+
+/** Stable sentinel when legacy holdings have no original transaction date. */
+export const LEGACY_CRYPTO_TRADE_DATE = "1970-01-01";
+
+export function hasLegacyCryptoHoldingsToMigrate(
+  holdings: CryptoHolding[],
+  trades: CryptoTrade[],
+  legacyMigrationComplete: boolean
+): boolean {
+  if (legacyMigrationComplete || trades.length > 0) {
+    return false;
+  }
+
+  return holdings.some(
+    (holding) => calculateHoldingContribution(holding) > 0
+  );
+}
 
 /** One-time migration: synthesize buy trades from legacy holdings-only records. */
 export function migrateLegacyCryptoHoldingsToTrades(
   holdings: CryptoHolding[],
-  trades: CryptoTrade[]
+  trades: CryptoTrade[],
+  legacyMigrationComplete = false
 ): CryptoTrade[] {
-  if (trades.length > 0) {
+  if (!hasLegacyCryptoHoldingsToMigrate(holdings, trades, legacyMigrationComplete)) {
     return trades;
   }
 
@@ -18,7 +35,7 @@ export function migrateLegacyCryptoHoldingsToTrades(
 
     migrated.push({
       id: `legacy-${holding.id}`,
-      date: toLocalDateString(),
+      date: LEGACY_CRYPTO_TRADE_DATE,
       assetName: holding.assetName,
       type: "buy",
       amountSgd: holding.investedSgd,

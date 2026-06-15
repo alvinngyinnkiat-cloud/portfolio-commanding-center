@@ -190,13 +190,25 @@ export function migrateSchemaIfNeeded(): void {
   if (version < 11) {
     const holdings = readJson<CryptoHolding[]>(STORAGE_KEYS.cryptoHoldings, []);
     const trades = readJson<CryptoTrade[]>(STORAGE_KEYS.cryptoTrades, []);
-    const migratedTrades = migrateLegacyCryptoHoldingsToTrades(holdings, trades);
+    const settings = readJson<DashboardSettings>(
+      STORAGE_KEYS.dashboardSettings,
+      DEFAULT_DASHBOARD_SETTINGS
+    );
+    const migratedTrades = migrateLegacyCryptoHoldingsToTrades(
+      holdings,
+      trades,
+      settings.cryptoLegacyTradesMigrated === true
+    );
     if (migratedTrades.length > trades.length) {
       writeJson(STORAGE_KEYS.cryptoTrades, migratedTrades);
       writeJson(
         STORAGE_KEYS.cryptoHoldings,
         rebuildHoldingsFromTrades(migratedTrades, holdings)
       );
+      writeJson(STORAGE_KEYS.dashboardSettings, {
+        ...normalizeDashboardSettings(settings),
+        cryptoLegacyTradesMigrated: true,
+      });
     }
   }
 

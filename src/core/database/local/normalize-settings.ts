@@ -17,6 +17,7 @@ interface LegacyDashboardSettings {
   sgdTradingCashSgd?: number;
   cryptoCashSgd?: number;
   manualValues?: LegacyManualValues;
+  cryptoLegacyTradesMigrated?: boolean;
 }
 
 function normalizeStoredFxRate(raw: LegacyDashboardSettings): number | null {
@@ -63,5 +64,6 @@ export function normalizeDashboardSettings(
   return {
     usdSgdFxRate: fxRate,
     manualValues: normalizeManualValues(raw.manualValues, fxRate),
+    cryptoLegacyTradesMigrated: raw.cryptoLegacyTradesMigrated === true,
   };
 }

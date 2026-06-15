@@ -4,13 +4,19 @@ import { useMemo } from "react";
 import { usePortfolio } from "@/context/PortfolioContext";
 import type { CryptoTrade } from "@/core/domain/types";
 import { formatDate, formatSgd } from "@/shared/lib/format";
-import { sortByDateDesc } from "@/shared/lib/sort";
+import { compareDateDescWithCreatedAt } from "@/shared/lib/sort";
 
 export function CryptoTransactionsSection() {
   const { cryptoData } = usePortfolio();
 
   const transactions = useMemo(
-    () => sortByDateDesc(cryptoData?.trades ?? []),
+    () =>
+      [...(cryptoData?.trades ?? [])].sort((a, b) =>
+        compareDateDescWithCreatedAt(
+          { date: a.date, createdAt: a.createdAt ?? a.id },
+          { date: b.date, createdAt: b.createdAt ?? b.id }
+        )
+      ),
     [cryptoData?.trades]
   );
 

@@ -1,5 +1,6 @@
 import type { CryptoTrade, CryptoTradeType } from "@/core/domain/types";
 import { coerceNumber } from "@/shared/lib/coerce-number";
+import { normalizeLocalDateString } from "@/shared/lib/date";
 
 function normalizeTradeType(raw: unknown): CryptoTradeType | null {
   return raw === "buy" || raw === "sell" ? raw : null;
@@ -20,9 +21,14 @@ export function normalizeCryptoTrade(raw: unknown): CryptoTrade | null {
     return null;
   }
 
+  const date = normalizeLocalDateString(row.date);
+  if (!date) {
+    return null;
+  }
+
   return {
     id: row.id,
-    date: typeof row.date === "string" ? row.date : "",
+    date,
     assetName: typeof row.assetName === "string" ? row.assetName : "",
     type,
     amountSgd: coerceNumber(row.amountSgd),

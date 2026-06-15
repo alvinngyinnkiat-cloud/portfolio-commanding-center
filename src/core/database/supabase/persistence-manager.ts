@@ -192,9 +192,13 @@ export class PersistenceManager {
 
   /** One-time legacy holding → buy trade migration for transaction ledger cash math. */
   private async applyCryptoTradesMigrationIfNeeded(): Promise<void> {
+    const legacyMigrationComplete =
+      this.cache.dashboardSettings.cryptoLegacyTradesMigrated === true;
+
     const migratedTrades = migrateLegacyCryptoHoldingsToTrades(
       this.cache.cryptoHoldings,
-      this.cache.cryptoTrades
+      this.cache.cryptoTrades,
+      legacyMigrationComplete
     );
     if (migratedTrades.length === this.cache.cryptoTrades.length) {
       return;
@@ -205,6 +209,11 @@ export class PersistenceManager {
       migratedTrades,
       this.cache.cryptoHoldings
     );
+    this.cache.dashboardSettings = {
+      ...this.cache.dashboardSettings,
+      cryptoLegacyTradesMigrated: true,
+    };
+    this.queueSettingsSync();
 
     if (!this.client || !this.cryptoTradesSyncAvailable) {
       return;
