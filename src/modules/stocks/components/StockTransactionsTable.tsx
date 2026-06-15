@@ -113,7 +113,7 @@ export function StockTransactionsTable() {
 
     const result = services.stockTransactions.upsert({
       ...form,
-      id: editingId ?? undefined,
+      id: editingId ?? form.id,
     });
 
     if (!result.ok) {

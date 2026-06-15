@@ -7,7 +7,7 @@ import type {
 } from "@/core/domain/types";
 import { buildPositionLedgers } from "./holdings";
 import { SellExceedsHoldingsError } from "./errors";
-import { marketToCurrency, normalizeTicker } from "./normalize";
+import { marketToCurrency, normalizeTicker, positionKey } from "./normalize";
 
 const VALID_MARKETS: StockMarket[] = ["US", "SG"];
 
@@ -344,16 +344,10 @@ export function buildStockTransactionFromDraft(
   };
 }
 
-/** Simulate ledger — surfaces sell-more-than-owned and other ledger errors. */
-export function validateTransactionLedger(
-  transactions: StockTransaction[],
-  excludeId?: string
-): StockValidationResult {
-  const filtered = excludeId
-    ? transactions.filter((tx) => tx.id !== excludeId)
-    : transactions;
-
-  for (const tx of filtered) {
+function validateTransactionCurrencies(
+  transactions: StockTransaction[]
+): StockValidationResult | null {
+  for (const tx of transactions) {
     if (!assertCurrencyMatchesMarket(tx.market, tx.currency)) {
       return {
         valid: false,
@@ -363,19 +357,94 @@ export function validateTransactionLedger(
       };
     }
   }
+  return null;
+}
+
+function sellExceedsHoldingsResult(
+  error: SellExceedsHoldingsError
+): StockValidationResult {
+  return {
+    valid: false,
+    errors: {
+      ledger: error.message,
+      quantity: `Cannot sell more shares than owned (${error.availableQuantity} available)`,
+    },
+  };
+}
+
+/**
+ * Edit upsert candidate set: drop the original row, then apply the edited row.
+ * Chronological replay order is handled separately by validation mode.
+ */
+export function buildCandidateTransactionSet(
+  existingTransactions: StockTransaction[],
+  editedTransaction: StockTransaction,
+  editId: string
+): StockTransaction[] {
+  const withoutOriginal = existingTransactions.filter((tx) => tx.id !== editId);
+  return [...withoutOriginal, editedTransaction];
+}
+
+/**
+ * Final net share count per ticker after all buys/sells.
+ * Used for buy/dividend/fee upserts so date-only buy edits do not replay sell checks.
+ */
+export function validateFinalNetQuantities(
+  transactions: StockTransaction[]
+): StockValidationResult {
+  const currencyError = validateTransactionCurrencies(transactions);
+  if (currencyError) return currencyError;
+
+  const netQuantity = new Map<string, number>();
+
+  for (const tx of transactions) {
+    if (tx.transactionType !== "buy" && tx.transactionType !== "sell") {
+      continue;
+    }
+    const key = positionKey(tx.market, tx.ticker);
+    const current = netQuantity.get(key) ?? 0;
+    if (tx.transactionType === "buy") {
+      netQuantity.set(key, current + tx.quantity);
+    } else {
+      netQuantity.set(key, current - tx.quantity);
+    }
+  }
+
+  for (const [key, quantity] of netQuantity) {
+    if (quantity < 0) {
+      const [market, ticker] = key.split(":");
+      const oversold = Math.abs(quantity);
+      return {
+        valid: false,
+        errors: {
+          ledger: `Holdings for ${market}:${ticker} would be negative (${oversold} shares oversold)`,
+          quantity: `Cannot sell more shares than owned (${Math.max(0, quantity + oversold)} available)`,
+        },
+      };
+    }
+  }
+
+  return { valid: true, errors: {} };
+}
+
+/** Chronological ledger replay — required for sell upserts. */
+export function validateTransactionLedger(
+  transactions: StockTransaction[],
+  excludeId?: string
+): StockValidationResult {
+  const filtered = excludeId
+    ? transactions.filter((tx) => tx.id !== excludeId)
+    : transactions;
+
+  const currencyError = validateTransactionCurrencies(filtered);
+  if (currencyError) return currencyError;
 
   try {
     buildPositionLedgers(filtered);
     return { valid: true, errors: {} };
   } catch (error) {
     if (error instanceof SellExceedsHoldingsError) {
-      return {
-        valid: false,
-        errors: {
-          ledger: error.message,
-          quantity: `Cannot sell more shares than owned (${error.availableQuantity} available)`,
-        },
-      };
+      return sellExceedsHoldingsResult(error);
     }
     throw error;
   }
@@ -392,14 +461,27 @@ export function validateStockTransactionUpsert(
     return draftResult;
   }
 
-  const transaction = buildStockTransactionFromDraft(draft, createdAt, id);
+  const editId = id || draft.id;
+  if (!editId) {
+    return { valid: false, errors: { ledger: "Unable to build transaction" } };
+  }
+
+  const transaction = buildStockTransactionFromDraft(draft, createdAt, editId);
   if (!transaction) {
     return { valid: false, errors: { ledger: "Unable to build transaction" } };
   }
 
-  const withoutCurrent = existingTransactions.filter((tx) => tx.id !== id);
-  const candidateSet = [...withoutCurrent, transaction];
-  const ledgerResult = validateTransactionLedger(candidateSet);
+  const candidateSet = buildCandidateTransactionSet(
+    existingTransactions,
+    transaction,
+    editId
+  );
+
+  const ledgerResult =
+    transaction.transactionType === "sell"
+      ? validateTransactionLedger(candidateSet)
+      : validateFinalNetQuantities(candidateSet);
+
   if (!ledgerResult.valid) {
     return ledgerResult;
   }

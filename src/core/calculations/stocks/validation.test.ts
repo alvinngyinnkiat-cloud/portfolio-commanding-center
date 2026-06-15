@@ -218,4 +218,87 @@ describe("stock transaction validation", () => {
     expect(result.valid).toBe(false);
     expect(result.errors.quantity).toMatch(/Cannot sell more/i);
   });
+
+  it("allows editing a buy date after an existing sell when net holdings stay valid", () => {
+    const createdAt = "2025-01-01T00:00:00.000Z";
+    const existingBuy = buildStockTransactionFromDraft(
+      baseDraft({
+        date: "2025-01-01",
+        ticker: "NVDA",
+        assetName: "NVIDIA",
+        quantity: "82",
+        price: "100",
+        fees: "0",
+      }),
+      createdAt,
+      "buy-1"
+    )!;
+    const existingSell = buildStockTransactionFromDraft(
+      baseDraft({
+        date: "2025-06-01",
+        ticker: "NVDA",
+        assetName: "NVIDIA",
+        transactionType: "sell",
+        quantity: "82",
+        price: "120",
+        fees: "0",
+      }),
+      "2025-06-01T00:00:00.000Z",
+      "sell-1"
+    )!;
+
+    const result = validateStockTransactionUpsert(
+      baseDraft({
+        id: "buy-1",
+        date: "2025-07-01",
+        ticker: "NVDA",
+        assetName: "NVIDIA",
+        quantity: "82",
+        price: "100",
+        fees: "0",
+      }),
+      [existingBuy, existingSell],
+      createdAt,
+      "buy-1"
+    );
+
+    expect(result.valid).toBe(true);
+    expect(result.transaction?.date).toBe("2025-07-01");
+    expect(result.transaction?.createdAt).toBe(createdAt);
+  });
+
+  it("rejects editing a buy when net holdings would become negative", () => {
+    const createdAt = "2025-01-01T00:00:00.000Z";
+    const existingBuy = buildStockTransactionFromDraft(
+      baseDraft({ date: "2025-01-01", quantity: "100" }),
+      createdAt,
+      "buy-1"
+    )!;
+    const existingSell = buildStockTransactionFromDraft(
+      baseDraft({
+        date: "2025-06-01",
+        transactionType: "sell",
+        quantity: "80",
+        price: "180",
+        fees: "0",
+      }),
+      "2025-06-01T00:00:00.000Z",
+      "sell-1"
+    )!;
+
+    const result = validateStockTransactionUpsert(
+      baseDraft({
+        id: "buy-1",
+        quantity: "50",
+        price: "150",
+        fees: "0",
+      }),
+      [existingBuy, existingSell],
+      createdAt,
+      "buy-1"
+    );
+
+    expect(result.valid).toBe(false);
+    expect(result.errors.ledger).toMatch(/negative/i);
+  });
 });
