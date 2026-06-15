@@ -177,11 +177,21 @@ export function calculateHoldings(
   prices: StockPrice[],
   fxRate: number | null
 ): CalculatedHolding[] {
+  return calculateAllPositionHoldings(transactions, prices, fxRate).filter(
+    (holding) => holding.quantity > 0
+  );
+}
+
+/** All positions including fully closed (quantity = 0). */
+export function calculateAllPositionHoldings(
+  transactions: StockTransaction[],
+  prices: StockPrice[],
+  fxRate: number | null
+): CalculatedHolding[] {
   const ledgers = buildPositionLedgers(transactions);
   const priceLookup = buildPriceLookup(prices);
 
   return [...ledgers.values()]
-    .filter((ledger) => ledger.quantity > 0)
     .map((ledger) => {
       const key = positionKey(ledger.market, ledger.ticker);
       const currentPrice = priceLookup.get(key) ?? null;
@@ -192,6 +202,91 @@ export function calculateHoldings(
       if (marketCmp !== 0) return marketCmp;
       return a.ticker.localeCompare(b.ticker);
     });
+}
+
+export interface PositionOverviewSummary {
+  openPositionCount: number;
+  closedPositionCount: number;
+  openMarketValueSgd: number;
+  closedRealisedPLSgd: number;
+  totalDividendsSgd: number;
+  openMarketValueUsd: number;
+  closedRealisedPLUsd: number;
+  totalDividendsUsd: number;
+  openMarketValueSgdMarket: number;
+  closedRealisedPLSgdMarket: number;
+  totalDividendsSgdMarket: number;
+}
+
+function amountToSgd(
+  amount: number,
+  market: CalculatedHolding["market"],
+  fxRate: number | null
+): number {
+  if (market === "SG") return amount;
+  return isValidFxRate(fxRate) && fxRate != null ? usdToSgd(amount, fxRate) : 0;
+}
+
+/** Aggregate open/closed counts and P/L metrics for a position list. */
+export function summarizePositionOverview(
+  positions: CalculatedHolding[],
+  fxRate: number | null
+): PositionOverviewSummary {
+  const open = positions.filter((position) => position.quantity > 0);
+  const closed = positions.filter((position) => position.quantity <= 0);
+
+  const openUs = open.filter((position) => position.market === "US");
+  const openSg = open.filter((position) => position.market === "SG");
+  const closedUs = closed.filter((position) => position.market === "US");
+  const closedSg = closed.filter((position) => position.market === "SG");
+
+  const openMarketValueUsd = openUs.reduce(
+    (sum, position) => sum + position.marketValue,
+    0
+  );
+  const openMarketValueSgdMarket = openSg.reduce(
+    (sum, position) => sum + position.marketValue,
+    0
+  );
+  const closedRealisedPLUsd = closedUs.reduce(
+    (sum, position) => sum + position.realisedPL,
+    0
+  );
+  const closedRealisedPLSgdMarket = closedSg.reduce(
+    (sum, position) => sum + position.realisedPL,
+    0
+  );
+
+  const totalDividendsUsd = positions
+    .filter((position) => position.market === "US")
+    .reduce((sum, position) => sum + position.dividendIncome, 0);
+  const totalDividendsSgdMarket = positions
+    .filter((position) => position.market === "SG")
+    .reduce((sum, position) => sum + position.dividendIncome, 0);
+
+  const openMarketValueSgd =
+    openUs.reduce((sum, position) => sum + (position.sgdValue ?? 0), 0) +
+    openMarketValueSgdMarket;
+
+  const closedRealisedPLSgd =
+    amountToSgd(closedRealisedPLUsd, "US", fxRate) + closedRealisedPLSgdMarket;
+
+  const totalDividendsSgd =
+    amountToSgd(totalDividendsUsd, "US", fxRate) + totalDividendsSgdMarket;
+
+  return {
+    openPositionCount: open.length,
+    closedPositionCount: closed.length,
+    openMarketValueSgd,
+    closedRealisedPLSgd,
+    totalDividendsSgd,
+    openMarketValueUsd,
+    closedRealisedPLUsd,
+    totalDividendsUsd,
+    openMarketValueSgdMarket,
+    closedRealisedPLSgdMarket,
+    totalDividendsSgdMarket,
+  };
 }
 
 /** Ledger for one ticker — includes closed positions (quantity may be 0). */

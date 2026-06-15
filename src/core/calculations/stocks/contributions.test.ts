@@ -6,6 +6,7 @@ import {
   calculateSgNetStockCashContributedSgd,
   calculateUsNetStockCashContributedSgd,
   summarizeNetStockCashBreakdown,
+  summarizeStockContributionFromDeposits,
 } from "./contributions";
 
 function stockTx(
@@ -80,5 +81,32 @@ describe("Module 2 net stock cash", () => {
     expect(summary.usNetStockCashContributedSgd).toBe(0);
     expect(summary.sgNetStockCashContributedSgd).toBe(5_000);
     expect(summary.netStockCashContributedSgd).toBe(5_000);
+  });
+
+  it("splits market contribution from deposits and FX conversions", () => {
+    const contributions: ContributionTransaction[] = [
+      stockTx({ id: "c1", type: "deposit", amountSgd: 1_000 }),
+    ];
+    const fxConversions: StockFxConversion[] = [
+      {
+        id: "fx-1",
+        date: "2025-01-02",
+        direction: "sgd_to_usd",
+        sgdAmount: 1_000,
+        usdAmount: 757.94,
+        createdAt: "2025-01-02T00:00:00.000Z",
+      },
+    ];
+
+    const contribution = summarizeStockContributionFromDeposits(
+      contributions,
+      fxConversions,
+      1.28
+    );
+
+    expect(contribution.usStockContributionUsd).toBeCloseTo(757.94, 2);
+    expect(contribution.usStockContributionSgd).toBeCloseTo(757.94 * 1.28, 2);
+    expect(contribution.sgStockContributionSgd).toBe(0);
+    expect(contribution.totalStockContributionSgd).toBe(1_000);
   });
 });

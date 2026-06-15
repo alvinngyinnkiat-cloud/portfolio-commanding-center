@@ -8,6 +8,10 @@ import {
   buildStockPortfolioSummary,
   plTrend,
 } from "@/core/calculations/stocks/summary";
+import {
+  calculateAllPositionHoldings,
+  summarizePositionOverview,
+} from "@/core/calculations/stocks/holdings";
 import { formatSgd, formatSingaporeDateTime, formatUsd } from "@/shared/lib/format";
 import { coerceNumber } from "@/shared/lib/coerce-number";
 import { SummaryCard } from "@/shared/components/ui/SummaryCard";
@@ -18,7 +22,7 @@ import {
   resolvePriceSource,
 } from "@/core/calculations/stocks/price-normalize";
 import type { PriceDisplaySource } from "@/core/domain/types";
-import { TrendingUp, RefreshCw, PiggyBank } from "lucide-react";
+import { TrendingUp, RefreshCw, PiggyBank, Briefcase, Archive, DollarSign } from "lucide-react";
 
 type MarketFilter = "ALL" | StockMarket;
 
@@ -189,6 +193,50 @@ function PriceDisplay({
   );
 }
 
+function ClosedPositionsTable({ positions }: { positions: CalculatedHolding[] }) {
+  if (positions.length === 0) {
+    return (
+      <p className="px-4 py-6 text-center text-sm text-slate-500">
+        No closed positions.
+      </p>
+    );
+  }
+
+  return (
+    <div className="overflow-x-auto rounded-xl border border-surface-border/60">
+      <table className="w-full text-sm">
+        <thead className="bg-surface/60">
+          <tr className="border-b border-surface-border text-left text-xs font-medium uppercase tracking-wide text-slate-500">
+            <th className="px-4 py-3">Market</th>
+            <th className="px-4 py-3">Ticker</th>
+            <th className="px-4 py-3">Name</th>
+            <th className="px-4 py-3">Realised P/L</th>
+            <th className="px-4 py-3">Dividends</th>
+          </tr>
+        </thead>
+        <tbody>
+          {positions.map((holding) => (
+            <tr
+              key={`closed-${holding.market}-${holding.ticker}`}
+              className="border-b border-surface-border/40 last:border-0 hover:bg-surface/30"
+            >
+              <td className="px-4 py-3 text-slate-300">{holding.market}</td>
+              <td className="px-4 py-3 font-medium text-white">{holding.ticker}</td>
+              <td className="px-4 py-3 text-slate-400">{holding.assetName}</td>
+              <td className={`px-4 py-3 ${plColorClass(holding.realisedPL)}`}>
+                {formatNativeValue(holding, holding.realisedPL)}
+              </td>
+              <td className={`px-4 py-3 ${plColorClass(holding.dividendIncome)}`}>
+                {formatNativeValue(holding, holding.dividendIncome)}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
 export function StockHoldingsTable() {
   const { data, stockData, optionsData, services, refresh } = usePortfolio();
   const [marketFilter, setMarketFilter] = useState<MarketFilter>("ALL");
@@ -199,6 +247,32 @@ export function StockHoldingsTable() {
   const holdings = stockData?.holdings ?? [];
   const transactions = stockData?.transactions ?? [];
   const contributions = data?.contributions ?? [];
+  const prices = stockData?.prices ?? [];
+
+  const allPositions = useMemo(
+    () => calculateAllPositionHoldings(transactions, prices, fxRate),
+    [transactions, prices, fxRate]
+  );
+
+  const marketPositions = useMemo(() => {
+    if (marketFilter === "ALL") return allPositions;
+    return allPositions.filter((position) => position.market === marketFilter);
+  }, [allPositions, marketFilter]);
+
+  const openPositions = useMemo(
+    () => marketPositions.filter((position) => position.quantity > 0),
+    [marketPositions]
+  );
+
+  const closedPositions = useMemo(
+    () => marketPositions.filter((position) => position.quantity <= 0),
+    [marketPositions]
+  );
+
+  const positionOverview = useMemo(
+    () => summarizePositionOverview(marketPositions, fxRate),
+    [marketPositions, fxRate]
+  );
 
   const priceByPosition = useMemo(() => {
     const map = new Map<string, StockPrice>();
@@ -208,10 +282,7 @@ export function StockHoldingsTable() {
     return map;
   }, [stockData?.prices]);
 
-  const filtered = useMemo(() => {
-    if (marketFilter === "ALL") return holdings;
-    return holdings.filter((h) => h.market === marketFilter);
-  }, [holdings, marketFilter]);
+  const filtered = openPositions;
 
   const summary = useMemo(
     () =>
@@ -248,11 +319,110 @@ export function StockHoldingsTable() {
     refresh();
   };
 
+  const openMarketValueDisplay =
+    marketFilter === "US"
+      ? {
+          value: formatUsd(positionOverview.openMarketValueUsd),
+          subValue:
+            fxRateValid && positionOverview.openMarketValueUsd > 0
+              ? formatSgd(
+                  positionOverview.openMarketValueSgd -
+                    positionOverview.openMarketValueSgdMarket
+                )
+              : undefined,
+        }
+      : marketFilter === "SG"
+        ? { value: formatSgd(positionOverview.openMarketValueSgdMarket) }
+        : { value: formatSgd(positionOverview.openMarketValueSgd) };
+
+  const closedPlDisplay =
+    marketFilter === "US"
+      ? {
+          value: formatUsd(positionOverview.closedRealisedPLUsd),
+          trend: plTrend(positionOverview.closedRealisedPLUsd),
+        }
+      : marketFilter === "SG"
+        ? {
+            value: formatSgd(positionOverview.closedRealisedPLSgdMarket),
+            trend: plTrend(positionOverview.closedRealisedPLSgdMarket),
+          }
+        : {
+            value: formatSgd(positionOverview.closedRealisedPLSgd),
+            trend: plTrend(positionOverview.closedRealisedPLSgd),
+          };
+
+  const dividendsDisplay =
+    marketFilter === "US"
+      ? { value: formatUsd(positionOverview.totalDividendsUsd) }
+      : marketFilter === "SG"
+        ? { value: formatSgd(positionOverview.totalDividendsSgdMarket) }
+        : { value: formatSgd(positionOverview.totalDividendsSgd) };
+
+  const marketLabel =
+    marketFilter === "ALL" ? "All Markets" : marketFilter;
+
   return (
     <div className="min-w-0 space-y-6">
       {!fxRateValid && holdings.some((h) => h.market === "US") && (
         <FxRateErrorBanner />
       )}
+
+      <div className="flex flex-wrap items-center gap-2">
+        {(["ALL", "US", "SG"] as const).map((filter) => (
+          <button
+            key={filter}
+            type="button"
+            onClick={() => setMarketFilter(filter)}
+            className={`rounded-lg px-3 py-1.5 text-xs font-medium transition-colors ${
+              marketFilter === filter
+                ? "bg-accent text-white"
+                : "bg-surface-card text-slate-400 hover:text-white"
+            }`}
+          >
+            {filter === "ALL" ? "All Markets" : filter}
+          </button>
+        ))}
+      </div>
+
+      <div>
+        <h3 className="text-sm font-semibold text-white">
+          Position Overview · {marketLabel}
+        </h3>
+        <p className="mt-1 text-xs text-slate-500">
+          Open and closed positions for this market view.
+        </p>
+        <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
+          <SummaryCard
+            label="Total Open Positions"
+            value={String(positionOverview.openPositionCount)}
+            icon={<Briefcase size={18} />}
+            subValue="Positive quantity"
+          />
+          <SummaryCard
+            label="Total Closed Positions"
+            value={String(positionOverview.closedPositionCount)}
+            icon={<Archive size={18} />}
+            subValue="Fully sold positions"
+          />
+          <SummaryCard
+            label="Open Market Value"
+            value={openMarketValueDisplay.value}
+            subValue={openMarketValueDisplay.subValue}
+            icon={<TrendingUp size={18} />}
+          />
+          <SummaryCard
+            label="Closed Realised P/L"
+            value={closedPlDisplay.value}
+            trend={closedPlDisplay.trend}
+            icon={<TrendingUp size={18} />}
+          />
+          <SummaryCard
+            label="Total Dividends"
+            value={dividendsDisplay.value}
+            icon={<DollarSign size={18} />}
+          />
+        </div>
+      </div>
 
       {marketFilter === "US" && (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -308,18 +478,16 @@ export function StockHoldingsTable() {
         </div>
       )}
 
-      <p className="text-xs text-slate-500">
-        {coerceNumber(summary.openPositionCount)} open position
-        {coerceNumber(summary.openPositionCount) === 1 ? "" : "s"} · Auto prices (US 6:00 AM
-        SGT · SG 6:00 PM SGT) · Manual override available when auto is missing.
-      </p>
-
-      <div className="flex flex-wrap items-center gap-2">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <p className="text-xs text-slate-500">
+          Auto prices (US 6:00 AM SGT · SG 6:00 PM SGT) · Manual override
+          available when auto is missing.
+        </p>
         <Button
           size="sm"
           variant="secondary"
           onClick={handleRefreshPrices}
-          disabled={refreshing || holdings.length === 0}
+          disabled={refreshing || openPositions.length === 0}
         >
           <RefreshCw
             size={14}
@@ -327,125 +495,129 @@ export function StockHoldingsTable() {
           />
           {refreshing ? "Refreshing…" : "Refresh Prices"}
         </Button>
-        {(["ALL", "US", "SG"] as const).map((filter) => (
-          <button
-            key={filter}
-            type="button"
-            onClick={() => setMarketFilter(filter)}
-            className={`rounded-lg px-3 py-1.5 text-xs font-medium transition-colors ${
-              marketFilter === filter
-                ? "bg-accent text-white"
-                : "bg-surface-card text-slate-400 hover:text-white"
-            }`}
-          >
-            {filter === "ALL" ? "All Markets" : filter}
-          </button>
-        ))}
       </div>
 
-      <div className="overflow-x-auto rounded-xl border border-surface-border/60">
-        <table className="w-full text-sm">
-          <thead className="bg-surface/60">
-            <tr className="border-b border-surface-border text-left text-xs font-medium uppercase tracking-wide text-slate-500">
-              <th className="px-4 py-3">Market</th>
-              <th className="px-4 py-3">Ticker</th>
-              <th className="px-4 py-3">Name</th>
-              <th className="px-4 py-3">Qty</th>
-              <th className="px-4 py-3">Avg Cost</th>
-              <th className="px-4 py-3">Cost Basis</th>
-              <th className="px-4 py-3">Current Price</th>
-              <th className="px-4 py-3">Market Value</th>
-              <th className="px-4 py-3">Unrealised P/L</th>
-              <th className="px-4 py-3">Realised P/L</th>
-              <th className="px-4 py-3">Dividends</th>
-              <th className="px-4 py-3">SGD Value</th>
-            </tr>
-          </thead>
-          <tbody>
-            {filtered.length === 0 ? (
-              <tr>
-                <td
-                  colSpan={12}
-                  className="px-4 py-8 text-center text-slate-500"
-                >
-                  <p>No holdings yet.</p>
-                  <p className="mt-2 text-xs text-slate-600">
-                    Add your first stock transaction.
-                  </p>
-                </td>
+      <section className="space-y-3">
+        <div>
+          <h3 className="text-sm font-semibold text-white">Open Positions</h3>
+          <p className="mt-1 text-xs text-slate-500">
+            Active holdings with positive quantity.
+          </p>
+        </div>
+        <div className="overflow-x-auto rounded-xl border border-surface-border/60">
+          <table className="w-full text-sm">
+            <thead className="bg-surface/60">
+              <tr className="border-b border-surface-border text-left text-xs font-medium uppercase tracking-wide text-slate-500">
+                <th className="px-4 py-3">Market</th>
+                <th className="px-4 py-3">Ticker</th>
+                <th className="px-4 py-3">Name</th>
+                <th className="px-4 py-3">Qty</th>
+                <th className="px-4 py-3">Avg Cost</th>
+                <th className="px-4 py-3">Cost Basis</th>
+                <th className="px-4 py-3">Current Price</th>
+                <th className="px-4 py-3">Market Value</th>
+                <th className="px-4 py-3">Unrealised P/L</th>
+                <th className="px-4 py-3">Realised P/L</th>
+                <th className="px-4 py-3">Dividends</th>
+                <th className="px-4 py-3">SGD Value</th>
               </tr>
-            ) : (
-              filtered.map((holding) => {
-                const priceRecord = priceByPosition.get(
-                  `${holding.market}-${holding.ticker}`
-                );
-
-                return (
-                  <tr
-                    key={`${holding.market}-${holding.ticker}`}
-                    className="border-b border-surface-border/40 last:border-0 hover:bg-surface/30"
+            </thead>
+            <tbody>
+              {filtered.length === 0 ? (
+                <tr>
+                  <td
+                    colSpan={12}
+                    className="px-4 py-8 text-center text-slate-500"
                   >
-                    <td className="px-4 py-3 text-slate-300">{holding.market}</td>
-                    <td className="px-4 py-3 font-medium text-white">
-                      {holding.ticker}
-                    </td>
-                    <td className="px-4 py-3 text-slate-400">
-                      {holding.assetName}
-                    </td>
-                    <td className="px-4 py-3 text-slate-300">
-                      {coerceNumber(holding.quantity)}
-                    </td>
-                    <td className="px-4 py-3 text-slate-300">
-                      {formatNativeValue(holding, holding.averageCost)}
-                    </td>
-                    <td className="px-4 py-3 text-slate-300">
-                      {formatNativeValue(holding, holding.totalCost)}
-                    </td>
-                    <td className="px-4 py-3">
-                      <PriceDisplay
-                        holding={holding}
-                        priceRecord={priceRecord}
-                        onManualSave={(price) =>
-                          handleManualPriceSave(holding, price)
-                        }
-                      />
-                    </td>
-                    <td className="px-4 py-3">
-                      <MarketValueCell
-                        holding={holding}
-                        fxRateValid={fxRateValid}
-                      />
-                    </td>
-                    <td
-                      className={`px-4 py-3 ${plColorClass(
-                        holding.unrealisedPL,
-                        holding.currentPrice == null
-                      )}`}
+                    <p>No open positions.</p>
+                    <p className="mt-2 text-xs text-slate-600">
+                      Add a stock transaction or switch market filter.
+                    </p>
+                  </td>
+                </tr>
+              ) : (
+                filtered.map((holding) => {
+                  const priceRecord = priceByPosition.get(
+                    `${holding.market}-${holding.ticker}`
+                  );
+
+                  return (
+                    <tr
+                      key={`open-${holding.market}-${holding.ticker}`}
+                      className="border-b border-surface-border/40 last:border-0 hover:bg-surface/30"
                     >
-                      {holding.currentPrice != null
-                        ? formatNativeValue(holding, holding.unrealisedPL)
-                        : "—"}
-                    </td>
-                    <td
-                      className={`px-4 py-3 ${plColorClass(holding.realisedPL)}`}
-                    >
-                      {formatNativeValue(holding, holding.realisedPL)}
-                    </td>
-                    <td
-                      className={`px-4 py-3 ${plColorClass(holding.dividendIncome)}`}
-                    >
-                      {formatNativeValue(holding, holding.dividendIncome)}
-                    </td>
-                    <td className="px-4 py-3">
-                      <SgdValueCell holding={holding} fxRateValid={fxRateValid} />
-                    </td>
-                  </tr>
-                );
-              })
-            )}
-          </tbody>
-        </table>
-      </div>
+                      <td className="px-4 py-3 text-slate-300">{holding.market}</td>
+                      <td className="px-4 py-3 font-medium text-white">
+                        {holding.ticker}
+                      </td>
+                      <td className="px-4 py-3 text-slate-400">
+                        {holding.assetName}
+                      </td>
+                      <td className="px-4 py-3 text-slate-300">
+                        {coerceNumber(holding.quantity)}
+                      </td>
+                      <td className="px-4 py-3 text-slate-300">
+                        {formatNativeValue(holding, holding.averageCost)}
+                      </td>
+                      <td className="px-4 py-3 text-slate-300">
+                        {formatNativeValue(holding, holding.totalCost)}
+                      </td>
+                      <td className="px-4 py-3">
+                        <PriceDisplay
+                          holding={holding}
+                          priceRecord={priceRecord}
+                          onManualSave={(price) =>
+                            handleManualPriceSave(holding, price)
+                          }
+                        />
+                      </td>
+                      <td className="px-4 py-3">
+                        <MarketValueCell
+                          holding={holding}
+                          fxRateValid={fxRateValid}
+                        />
+                      </td>
+                      <td
+                        className={`px-4 py-3 ${plColorClass(
+                          holding.unrealisedPL,
+                          holding.currentPrice == null
+                        )}`}
+                      >
+                        {holding.currentPrice != null
+                          ? formatNativeValue(holding, holding.unrealisedPL)
+                          : "—"}
+                      </td>
+                      <td
+                        className={`px-4 py-3 ${plColorClass(holding.realisedPL)}`}
+                      >
+                        {formatNativeValue(holding, holding.realisedPL)}
+                      </td>
+                      <td
+                        className={`px-4 py-3 ${plColorClass(holding.dividendIncome)}`}
+                      >
+                        {formatNativeValue(holding, holding.dividendIncome)}
+                      </td>
+                      <td className="px-4 py-3">
+                        <SgdValueCell holding={holding} fxRateValid={fxRateValid} />
+                      </td>
+                    </tr>
+                  );
+                })
+              )}
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section className="space-y-3">
+        <div>
+          <h3 className="text-sm font-semibold text-white">Closed Positions</h3>
+          <p className="mt-1 text-xs text-slate-500">
+            Fully sold positions — realised P/L and dividends are preserved.
+          </p>
+        </div>
+        <ClosedPositionsTable positions={closedPositions} />
+      </section>
     </div>
   );
 }

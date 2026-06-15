@@ -163,13 +163,14 @@ describe("buildStockPortfolioSummary", () => {
       fxConversions
     );
 
-    expect(full.usStockContributionUsd).toBe(0);
-    expect(full.usStockContributionSgd).toBe(0);
+    expect(full.usStockContributionUsd).toBe(18_000);
+    expect(full.usStockContributionSgd).toBeCloseTo(24_300, 2);
+    expect(full.sgStockContributionSgd).toBe(0);
     expect(full.totalStockContributionSgd).toBe(24_300);
     expect(full.usAvailableTradingCashUsd).toBe(8_100);
     expect(full.usTotalValueUsd).toBeCloseTo(18_359.5, 2);
-    expect(full.usMarketPLUsd).toBeCloseTo(18_359.5, 2);
-    expect(full.usMarketPLSgd).toBeCloseTo(24_785.33, 1);
+    expect(full.usMarketPLUsd).toBeCloseTo(359.5, 2);
+    expect(full.usMarketPLSgd).toBeCloseTo(485.33, 1);
 
     expect(full.usTotalValueUsd).toBeCloseTo(
       full.usMarketValueUsd + full.usAvailableTradingCashUsd,
@@ -210,6 +211,8 @@ describe("buildStockPortfolioSummary", () => {
     );
 
     expect(full.totalStockContributionSgd).toBe(14_800);
+    expect(full.sgStockContributionSgd).toBe(14_800);
+    expect(full.usStockContributionUsd).toBe(0);
     expect(full.allMarketTotalValueSgd).toBe(33_300);
     expect(full.usMarketPLSgd).toBeCloseTo(13_500, 2);
     expect(full.sgMarketPLSgd).toBe(5_000);
@@ -227,6 +230,52 @@ describe("buildStockPortfolioSummary", () => {
       full.allMarketTotalValueSgd - full.totalStockContributionSgd,
       2
     );
+  });
+
+  it("deposit 1000 SGD, convert all to USD, buy stock — contribution unchanged", () => {
+    const contributions = [
+      {
+        id: "c1",
+        date: "2025-01-01",
+        type: "deposit" as const,
+        category: "stock" as const,
+        amountSgd: 1_000,
+      },
+    ];
+    const fxConversions: StockFxConversion[] = [
+      {
+        id: "fx-1",
+        date: "2025-01-02",
+        direction: "sgd_to_usd",
+        sgdAmount: 1_000,
+        usdAmount: 757.94,
+        createdAt: "2025-01-02T00:00:00.000Z",
+      },
+    ];
+    const transactions: StockTransaction[] = [
+      tx({
+        id: "buy-1",
+        date: "2025-01-03",
+        transactionType: "buy",
+        grossAmount: 700,
+        netAmount: -700,
+      }),
+    ];
+
+    const portfolio = buildStockPortfolioSummary(
+      [],
+      contributions,
+      transactions,
+      1.28,
+      0,
+      fxConversions
+    );
+
+    expect(portfolio.usStockContributionUsd).toBeCloseTo(757.94, 2);
+    expect(portfolio.sgStockContributionSgd).toBe(0);
+    expect(portfolio.totalStockContributionSgd).toBe(1_000);
+    expect(portfolio.usAvailableTradingCashUsd).toBeCloseTo(57.94, 2);
+    expect(portfolio.sgAvailableTradingCashSgd).toBe(0);
   });
 });
 

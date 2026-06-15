@@ -1,5 +1,7 @@
 import type { ContributionTransaction } from "@/core/domain/types";
 import type { StockFxConversion } from "@/core/domain/types/stock-fx-conversion";
+import { usdToSgd } from "@/core/calculations/fx";
+import { isValidFxRate } from "@/core/calculations/fx-validation";
 import {
   calculateSgStockFxCashSgd,
   calculateStockDepositNetSgd,
@@ -67,15 +69,27 @@ export interface StockContributionFromDeposits {
   usStockContributionUsd: number;
 }
 
-/** Historical SGD deposit amounts — FX conversions do not change contribution. */
+/** Market-level capital allocation — FX conversions split deposits across US/SG pools. */
 export function summarizeStockContributionFromDeposits(
-  contributions: ContributionTransaction[]
+  contributions: ContributionTransaction[],
+  fxConversions: StockFxConversion[] = [],
+  fxRate: number | null = null
 ): StockContributionFromDeposits {
   const totalStockContributionSgd = calculateStockDepositNetSgd(contributions);
+  const usStockContributionUsd = calculateUsStockFxCashUsd(fxConversions);
+  const sgStockContributionSgd = calculateSgNetStockCashContributedSgd(
+    contributions,
+    fxConversions
+  );
+  const usStockContributionSgd =
+    isValidFxRate(fxRate) && fxRate != null
+      ? usdToSgd(usStockContributionUsd, fxRate)
+      : 0;
+
   return {
-    usStockContributionSgd: 0,
-    sgStockContributionSgd: totalStockContributionSgd,
+    usStockContributionUsd,
+    sgStockContributionSgd,
+    usStockContributionSgd,
     totalStockContributionSgd,
-    usStockContributionUsd: 0,
   };
 }

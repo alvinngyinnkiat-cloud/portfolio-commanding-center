@@ -3,9 +3,11 @@ import type { StockPrice, StockTransaction } from "@/core/domain/types";
 import {
   applyTransactionToLedger,
   buildPositionLedgers,
+  calculateAllPositionHoldings,
   calculateHoldings,
   calculatePositionLedger,
   createEmptyLedger,
+  summarizePositionOverview,
 } from "./holdings";
 import { SellExceedsHoldingsError } from "./errors";
 
@@ -389,5 +391,91 @@ describe("stock holdings engine", () => {
     const ledger = calculatePositionLedger(transactions, "US", "AAPL");
     expect(ledger!.quantity).toBe(0);
     expect(ledger!.realisedPL).toBe(100);
+  });
+
+  it("includes closed positions in calculateAllPositionHoldings", () => {
+    const transactions = [
+      tx({
+        id: "buy-1",
+        transactionType: "buy",
+        quantity: 5,
+        price: 100,
+        grossAmount: 500,
+        fees: 0,
+        netAmount: -500,
+        createdAt: "2025-01-01T00:00:00.000Z",
+      }),
+      tx({
+        id: "sell-1",
+        date: "2025-02-01",
+        transactionType: "sell",
+        quantity: 5,
+        price: 120,
+        grossAmount: 600,
+        fees: 0,
+        netAmount: 600,
+        createdAt: "2025-02-01T00:00:00.000Z",
+      }),
+    ];
+
+    const positions = calculateAllPositionHoldings(
+      transactions,
+      [price("US", "AAPL", 120)],
+      1.35
+    );
+
+    expect(positions).toHaveLength(1);
+    expect(positions[0]?.quantity).toBe(0);
+    expect(positions[0]?.realisedPL).toBe(100);
+  });
+});
+
+describe("summarizePositionOverview", () => {
+  it("aggregates open and closed position metrics", () => {
+    const positions = [
+      {
+        market: "US" as const,
+        ticker: "AAPL",
+        assetName: "Apple",
+        currency: "USD" as const,
+        quantity: 2,
+        averageCost: 100,
+        totalCost: 200,
+        currentPrice: 110,
+        marketValue: 220,
+        unrealisedPL: 20,
+        realisedPL: 50,
+        dividendIncome: 10,
+        sgdValue: 297,
+      },
+      {
+        market: "SG" as const,
+        ticker: "D05",
+        assetName: "DBS",
+        currency: "SGD" as const,
+        quantity: 0,
+        averageCost: 0,
+        totalCost: 0,
+        currentPrice: null,
+        marketValue: 0,
+        unrealisedPL: 0,
+        realisedPL: 120,
+        dividendIncome: 30,
+        sgdValue: 0,
+      },
+    ];
+
+    const summary = summarizePositionOverview(positions, 1.35);
+
+    expect(summary.openPositionCount).toBe(1);
+    expect(summary.closedPositionCount).toBe(1);
+    expect(summary.openMarketValueUsd).toBe(220);
+    expect(summary.openMarketValueSgd).toBe(297);
+    expect(summary.closedRealisedPLUsd).toBe(0);
+    expect(summary.closedRealisedPLSgdMarket).toBe(120);
+    expect(summary.closedRealisedPLSgd).toBe(120);
+    expect(summary.totalDividendsUsd).toBe(10);
+    expect(summary.totalDividendsSgdMarket).toBe(30);
+    expect(summary.totalDividendsSgd).toBeCloseTo(43.5, 2);
   });
 });

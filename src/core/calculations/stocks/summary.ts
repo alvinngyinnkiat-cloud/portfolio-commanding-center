@@ -91,7 +91,11 @@ export function buildStockTrackerSummary(
 ): StockTrackerSummary {
   const holdingsSummary = summarizeStockHoldings(holdings, fxRate);
   const netCash = summarizeNetStockCashBreakdown(contributions, fxConversions);
-  const contribution = summarizeStockContributionFromDeposits(contributions);
+  const contribution = summarizeStockContributionFromDeposits(
+    contributions,
+    fxConversions,
+    fxRate
+  );
 
   const usAvailableTradingCashUsd = calculateUsAvailableCashUsd({
     contributions,
@@ -149,7 +153,11 @@ export function buildStockPortfolioSummary(
   const fxRateValid = isValidFxRate(fxRate);
   const holdingsSummary = summarizeStockHoldings(holdings, fxRate);
   const netCash = summarizeNetStockCashBreakdown(contributions, fxConversions);
-  const contribution = summarizeStockContributionFromDeposits(contributions);
+  const contribution = summarizeStockContributionFromDeposits(
+    contributions,
+    fxConversions,
+    fxRate
+  );
 
   const usAvailableTradingCashUsd = calculateUsAvailableCashUsd({
     contributions,
