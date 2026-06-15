@@ -41,8 +41,11 @@ export class CryptoTradeService {
         ? existing.map((row) => (row.id === trade.id ? trade : row))
         : [...existing, trade];
 
+    if (!this.trades.upsert(trade)) {
+      return null;
+    }
+
     this.syncHoldings(nextTrades);
-    this.trades.upsert(trade);
     return trade;
   }
 

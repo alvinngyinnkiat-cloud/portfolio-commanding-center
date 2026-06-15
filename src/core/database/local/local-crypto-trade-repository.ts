@@ -8,7 +8,7 @@ export class LocalCryptoTradeRepository implements CryptoTradeRepository {
     return readJson<CryptoTrade[]>(STORAGE_KEYS.cryptoTrades, []);
   }
 
-  upsert(trade: CryptoTrade): void {
+  upsert(trade: CryptoTrade): boolean {
     const list = this.list();
     const idx = list.findIndex((row) => row.id === trade.id);
     if (idx >= 0) {
@@ -17,6 +17,7 @@ export class LocalCryptoTradeRepository implements CryptoTradeRepository {
       list.push(trade);
     }
     this.replaceAll(list);
+    return true;
   }
 
   delete(id: string): void {

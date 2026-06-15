@@ -133,12 +133,14 @@ export function CryptoHoldingsSection() {
   const [notesDraft, setNotesDraft] = useState("");
   const [editingHoldingId, setEditingHoldingId] = useState<string | null>(null);
   const [tradeErrors, setTradeErrors] = useState<Record<string, string>>({});
+  const [tradeSaveError, setTradeSaveError] = useState<string | null>(null);
+  const [tradeSaving, setTradeSaving] = useState(false);
 
   const rows = cryptoData?.rows ?? [];
   const editingRow = rows.find((row) => row.id === editingHoldingId) ?? null;
 
   const handleTradeSubmit = async () => {
-    if (!services?.cryptoTrades) return;
+    if (!services?.cryptoTrades || tradeSaving) return;
 
     const result = validateCryptoTradeDraft(
       tradeForm,
@@ -153,6 +155,7 @@ export function CryptoHoldingsSection() {
     );
 
     if (!result.valid) {
+      setTradeSaveError(null);
       setTradeErrors(
         Object.fromEntries(
           Object.entries(result.errors).map(([key, value]) => [key, value ?? ""])
@@ -161,16 +164,45 @@ export function CryptoHoldingsSection() {
       return;
     }
 
-    const trade = services.cryptoTrades.upsertFromDraft(tradeForm);
-    if (!trade) return;
+    setTradeSaving(true);
+    setTradeSaveError(null);
 
-    setTradeErrors({});
-    setTradeForm(emptyTradeForm());
+    try {
+      const manager = getPersistenceManager();
+      const requiresSupabase =
+        manager?.getStatus() === "supabase" ||
+        manager?.getStatus() === "supabase_migrated";
 
-    const manager = getPersistenceManager();
-    await manager?.drainSyncQueue();
-    await manager?.rehydrateCryptoTradesFromSupabase();
-    refresh();
+      if (requiresSupabase && manager && !manager.isCryptoTradesSyncAvailable()) {
+        throw new Error(
+          "crypto_trades table is unavailable in Supabase. Run the crypto_trades block in supabase/schema.sql before adding buy/sell transactions."
+        );
+      }
+
+      const trade = services.cryptoTrades.upsertFromDraft(tradeForm);
+      if (!trade) {
+        setTradeSaveError(
+          "Could not save the transaction record. Check all fields and try again."
+        );
+        return;
+      }
+
+      await manager?.drainSyncQueue();
+      await manager?.rehydrateCryptoFromSupabase();
+
+      setTradeErrors({});
+      setTradeForm(emptyTradeForm());
+      refresh();
+    } catch (error) {
+      setTradeSaveError(
+        error instanceof Error
+          ? error.message
+          : "Failed to save transaction to Supabase."
+      );
+      refresh();
+    } finally {
+      setTradeSaving(false);
+    }
   };
 
   const saveCurrentValue = async (id: string, currentValueSgd: string) => {
@@ -221,7 +253,7 @@ export function CryptoHoldingsSection() {
       setNotesDraft("");
     }
     await getPersistenceManager()?.drainSyncQueue();
-    await getPersistenceManager()?.rehydrateCryptoTradesFromSupabase();
+    await getPersistenceManager()?.rehydrateCryptoFromSupabase();
     refresh();
   };
 
@@ -292,7 +324,15 @@ export function CryptoHoldingsSection() {
             onChange={(e) => setTradeForm({ ...tradeForm, notes: e.target.value })}
           />
         </div>
-        <Button onClick={() => void handleTradeSubmit()}>Add Transaction</Button>
+        <Button
+          onClick={() => void handleTradeSubmit()}
+          disabled={tradeSaving}
+        >
+          {tradeSaving ? "Saving…" : "Add Transaction"}
+        </Button>
+        {tradeSaveError && (
+          <p className="text-sm text-accent-red">{tradeSaveError}</p>
+        )}
       </section>
 
       {editingRow && (

@@ -33,6 +33,7 @@ import {
 } from "@/core/calculations/stocks/migrate-stock-cash-flow";
 import { migrateLegacyCryptoHoldingsToTrades } from "@/core/calculations/crypto/migrate-crypto-trades";
 import { rebuildHoldingsFromTrades } from "@/core/calculations/crypto/trades";
+import { normalizeCryptoHoldings } from "@/core/calculations/crypto/normalize";
 import { normalizeCryptoTrades } from "@/core/calculations/crypto/trade-normalize";
 import { STORAGE_KEYS } from "../local/storage-keys";
 import { readJson, writeJson } from "../local/local-storage";
@@ -51,7 +52,7 @@ export class PersistenceManager {
   private lastError: string | null = null;
   private lastWarning: string | null = null;
   private syncing = false;
-  private pendingSync = false;
+  private syncQueue: Array<() => Promise<void>> = [];
   private cryptoTradesSyncAvailable = true;
 
   static async initialize(): Promise<PersistenceManager> {
@@ -81,6 +82,10 @@ export class PersistenceManager {
 
   getLastWarning(): string | null {
     return this.lastWarning;
+  }
+
+  isCryptoTradesSyncAvailable(): boolean {
+    return this.cryptoTradesSyncAvailable;
   }
 
   clearError(): void {
@@ -277,23 +282,62 @@ export class PersistenceManager {
     writeJson(STORAGE_KEYS.cryptoTrades, this.cache.cryptoTrades);
   }
 
-  /** Reload crypto trades from Supabase after a write (verifies persistence). */
-  async rehydrateCryptoTradesFromSupabase(): Promise<boolean> {
-    if (!this.client || !this.cryptoTradesSyncAvailable) {
-      return false;
+  /** Reload crypto holdings and trades from Supabase after a write (verifies persistence). */
+  async rehydrateCryptoFromSupabase(): Promise<{
+    holdings: boolean;
+    trades: boolean;
+  }> {
+    const result = { holdings: false, trades: false };
+    if (!this.client) {
+      return result;
     }
 
-    const res = await this.client.from("crypto_trades").select("data");
-    if (res.error) {
-      logPersistenceError("rehydrate crypto trades failed", res.error);
-      return false;
+    const [holdingsRes, tradesRes] = await Promise.all([
+      this.client.from("crypto_transactions").select("data"),
+      this.cryptoTradesSyncAvailable
+        ? this.client.from("crypto_trades").select("data")
+        : Promise.resolve({ data: null, error: null }),
+    ]);
+
+    if (!holdingsRes.error) {
+      this.cache.cryptoHoldings = normalizeCryptoHoldings(
+        holdingsRes.data?.map((row) => row.data) ?? []
+      );
+      result.holdings = true;
+    } else {
+      logPersistenceError("rehydrate crypto holdings failed", holdingsRes.error);
     }
 
-    this.cache.cryptoTrades = normalizeCryptoTrades(
-      res.data?.map((row) => row.data) ?? []
+    if (!this.cryptoTradesSyncAvailable) {
+      return result;
+    }
+
+    if (tradesRes.error) {
+      logPersistenceError("rehydrate crypto trades failed", tradesRes.error);
+      return result;
+    }
+
+    const remoteTrades = normalizeCryptoTrades(
+      tradesRes.data?.map((row) => row.data) ?? []
     );
+
+    if (remoteTrades.length === 0 && this.cache.cryptoTrades.length > 0) {
+      this.setOptionalTableWarning(
+        "Cloud transaction history is empty after save — kept local buy/sell records. Check crypto_trades sync."
+      );
+      return result;
+    }
+
+    this.cache.cryptoTrades = remoteTrades;
     this.persistCryptoTradesLocalBackup();
-    return true;
+    result.trades = true;
+    return result;
+  }
+
+  /** @deprecated Use rehydrateCryptoFromSupabase */
+  async rehydrateCryptoTradesFromSupabase(): Promise<boolean> {
+    const result = await this.rehydrateCryptoFromSupabase();
+    return result.trades;
   }
 
   private mergeLocalCryptoTradesIfSupabaseEmpty(): void {
@@ -307,7 +351,7 @@ export class PersistenceManager {
     this.cache.cryptoTrades = normalized;
 
     if (this.client && this.cryptoTradesSyncAvailable) {
-      void this.runSync(() =>
+      this.enqueueSync(() =>
         syncCryptoTrades(this.client!, this.cache.cryptoTrades)
       );
     }
@@ -331,7 +375,10 @@ export class PersistenceManager {
   /** Wait for queued Supabase writes to finish (used by cron routes). */
   async drainSyncQueue(timeoutMs = 30_000): Promise<void> {
     const started = Date.now();
-    while (this.syncing || this.pendingSync) {
+    while (this.syncing || this.syncQueue.length > 0) {
+      if (!this.syncing && this.syncQueue.length > 0) {
+        void this.processSyncQueue();
+      }
       if (Date.now() - started > timeoutMs) {
         throw new Error("Timed out waiting for Supabase sync");
       }
@@ -343,13 +390,13 @@ export class PersistenceManager {
   }
 
   queueSettingsSync(): void {
-    void this.runSync(() =>
+    this.enqueueSync(() =>
       this.client ? syncSettingsRow(this.client, this.cache) : Promise.resolve()
     );
   }
 
   queueContributionsSync(): void {
-    void this.runSync(() =>
+    this.enqueueSync(() =>
       this.client
         ? syncContributions(this.client, this.cache.contributions)
         : Promise.resolve()
@@ -357,13 +404,13 @@ export class PersistenceManager {
   }
 
   queueGoalsSync(): void {
-    void this.runSync(() =>
+    this.enqueueSync(() =>
       this.client ? syncGoals(this.client, this.cache.goals) : Promise.resolve()
     );
   }
 
   queueSnapshotsSync(): void {
-    void this.runSync(() =>
+    this.enqueueSync(() =>
       this.client
         ? syncSnapshots(this.client, this.cache.snapshots)
         : Promise.resolve()
@@ -371,7 +418,7 @@ export class PersistenceManager {
   }
 
   queueStockTransactionsSync(): void {
-    void this.runSync(() =>
+    this.enqueueSync(() =>
       this.client
         ? syncStockTransactions(this.client, this.cache.stockTransactions)
         : Promise.resolve()
@@ -379,7 +426,7 @@ export class PersistenceManager {
   }
 
   queueCryptoHoldingsSync(): void {
-    void this.runSync(() =>
+    this.enqueueSync(() =>
       this.client
         ? syncCryptoHoldings(this.client, this.cache.cryptoHoldings)
         : Promise.resolve()
@@ -394,7 +441,7 @@ export class PersistenceManager {
       );
       return;
     }
-    void this.runSync(() =>
+    this.enqueueSync(() =>
       this.client
         ? syncCryptoTrades(this.client, this.cache.cryptoTrades)
         : Promise.resolve()
@@ -402,7 +449,7 @@ export class PersistenceManager {
   }
 
   queueOptionsTradesSync(): void {
-    void this.runSync(() =>
+    this.enqueueSync(() =>
       this.client
         ? syncOptionsTrades(this.client, this.cache.optionsTrades)
         : Promise.resolve()
@@ -410,7 +457,7 @@ export class PersistenceManager {
   }
 
   queueStockFxConversionsSync(): void {
-    void this.runSync(() =>
+    this.enqueueSync(() =>
       this.client
         ? syncStockFxConversions(this.client, this.cache.stockFxConversions)
         : Promise.resolve()
@@ -418,36 +465,42 @@ export class PersistenceManager {
   }
 
   queueWatchlistSync(): void {
-    void this.runSync(() =>
+    this.enqueueSync(() =>
       this.client
         ? syncWatchlist(this.client, this.cache.scannerWatchlist)
         : Promise.resolve()
     );
   }
 
-  private async runSync(task: () => Promise<void>): Promise<void> {
-    if (!this.client) return;
-    if (this.syncing) {
-      this.pendingSync = true;
-      return;
-    }
+  private enqueueSync(task: () => Promise<void>): void {
+    this.syncQueue.push(task);
+    void this.processSyncQueue();
+  }
+
+  private async processSyncQueue(): Promise<void> {
+    if (this.syncing || !this.client) return;
 
     this.syncing = true;
     try {
-      await task();
-      this.lastError = null;
-    } catch (error) {
-      const message = formatPersistenceError(error);
-      logPersistenceError("sync task failed", error);
-      this.lastError = message;
-      if (isMissingSupabaseTableError(error, "crypto_trades")) {
-        this.cryptoTradesSyncAvailable = false;
+      while (this.syncQueue.length > 0) {
+        const task = this.syncQueue.shift();
+        if (!task) continue;
+        try {
+          await task();
+          this.lastError = null;
+        } catch (error) {
+          const message = formatPersistenceError(error);
+          logPersistenceError("sync task failed", error);
+          this.lastError = message;
+          if (isMissingSupabaseTableError(error, "crypto_trades")) {
+            this.cryptoTradesSyncAvailable = false;
+          }
+        }
       }
     } finally {
       this.syncing = false;
-      if (this.pendingSync) {
-        this.pendingSync = false;
-        await this.runSync(task);
+      if (this.syncQueue.length > 0) {
+        void this.processSyncQueue();
       }
     }
   }

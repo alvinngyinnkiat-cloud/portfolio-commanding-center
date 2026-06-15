@@ -395,20 +395,21 @@ class CachedCryptoHoldingRepository implements CryptoHoldingRepository {
 class CachedCryptoTradeRepository implements CryptoTradeRepository {
   constructor(private readonly manager: PersistenceManager) {}
   list() {
-    return this.manager.getCache().cryptoTrades.map((row) => {
-      const normalized = normalizeCryptoTrade(row);
-      return normalized ?? row;
-    });
+    return this.manager
+      .getCache()
+      .cryptoTrades.map((row) => normalizeCryptoTrade(row))
+      .filter((row): row is NonNullable<typeof row> => row != null);
   }
   upsert(trade: Parameters<CryptoTradeRepository["upsert"]>[0]) {
     const normalized = normalizeCryptoTrade(trade);
-    if (!normalized) return;
+    if (!normalized) return false;
 
     const list = this.manager.getCache().cryptoTrades;
     const idx = list.findIndex((row) => row.id === normalized.id);
     if (idx >= 0) list[idx] = normalized;
     else list.push(normalized);
     this.manager.queueCryptoTradesSync();
+    return true;
   }
   delete(id: string) {
     this.manager.getCache().cryptoTrades = this.manager
