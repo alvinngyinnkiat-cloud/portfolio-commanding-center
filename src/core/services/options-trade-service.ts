@@ -5,6 +5,7 @@ import type {
 } from "@/core/database/repositories/options-repository";
 import {
   calculateRealizedPlUsd,
+  resolveClosedTradeRealizedPlUsd,
   calculateTradeReturnPercent,
   type CloseTradeDraft,
   defaultSplitForTradeType,
@@ -155,11 +156,13 @@ export class OptionsTradeService {
     const errors = validateCloseTradeDraft(trade, draft);
     if (errors.length > 0) return { ok: false, errors };
 
-    const realizedPlUsd = calculateRealizedPlUsd({
+    const realizedPlUsd = resolveClosedTradeRealizedPlUsd({
+      closeMethod: draft.closeMethod,
       openPremiumUsd: trade.openPremiumUsd,
       openFeesUsd: trade.openFeesUsd,
       closePremiumUsd: draft.closePremiumUsd,
       closeFeesUsd: draft.closeFeesUsd,
+      manualRealizedPlUsd: draft.manualRealizedPlUsd,
     });
 
     const notes = [trade.notes, draft.notesAppend?.trim()]
@@ -168,13 +171,16 @@ export class OptionsTradeService {
 
     const now = new Date().toISOString();
     const closedMaxRiskUsd = trade.maxRiskUsd;
+    const isManual = draft.closeMethod === "manual_pl";
     const closed: OptionsTrade = {
       ...trade,
       status: "closed",
       maxRiskUsd: closedMaxRiskUsd,
       closeDate: draft.closeDate,
-      closePremiumUsd: draft.closePremiumUsd,
-      closeFeesUsd: draft.closeFeesUsd,
+      closeMethod: draft.closeMethod,
+      closePremiumUsd: isManual ? 0 : draft.closePremiumUsd,
+      closeFeesUsd: isManual ? 0 : draft.closeFeesUsd,
+      manualRealizedPlUsd: isManual ? draft.manualRealizedPlUsd : undefined,
       realizedPlUsd,
       returnPercent:
         calculateTradeReturnPercent(realizedPlUsd, closedMaxRiskUsd) ?? undefined,
@@ -276,14 +282,17 @@ export class OptionsTradeService {
       notes: normalizedDraft.notes,
     });
 
-    const realizedPlUsd = calculateRealizedPlUsd({
+    const realizedPlUsd = resolveClosedTradeRealizedPlUsd({
+      closeMethod: normalizedDraft.closeMethod,
       openPremiumUsd: resolved.openPremiumUsd,
       openFeesUsd: resolved.openFeesUsd,
       closePremiumUsd: normalizedDraft.closePremiumUsd,
       closeFeesUsd: normalizedDraft.closeFeesUsd,
+      manualRealizedPlUsd: normalizedDraft.manualRealizedPlUsd,
     });
 
     const now = new Date().toISOString();
+    const isManual = normalizedDraft.closeMethod === "manual_pl";
     const updated: OptionsTrade = {
       id: trade.id,
       status: "closed",
@@ -307,8 +316,12 @@ export class OptionsTradeService {
       openFeesUsd: resolved.openFeesUsd,
       maxRiskUsd: resolved.maxRiskUsd,
       closeDate: normalizedDraft.closeDate,
-      closePremiumUsd: normalizedDraft.closePremiumUsd,
-      closeFeesUsd: normalizedDraft.closeFeesUsd,
+      closeMethod: normalizedDraft.closeMethod,
+      closePremiumUsd: isManual ? 0 : normalizedDraft.closePremiumUsd,
+      closeFeesUsd: isManual ? 0 : normalizedDraft.closeFeesUsd,
+      manualRealizedPlUsd: isManual
+        ? normalizedDraft.manualRealizedPlUsd
+        : undefined,
       realizedPlUsd,
       returnPercent:
         calculateTradeReturnPercent(realizedPlUsd, resolved.maxRiskUsd) ?? undefined,

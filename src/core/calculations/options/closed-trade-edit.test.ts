@@ -4,7 +4,7 @@ import {
   validateClosedTradeEditDraft,
   type ClosedTradeEditDraft,
 } from "./validation";
-import { calculateRealizedPlUsd } from "./realized-pl";
+import { calculateRealizedPlUsd, resolveClosedTradeRealizedPlUsd } from "./realized-pl";
 import { DEFAULT_OPTIONS_SETTINGS } from "@/core/domain/defaults-options";
 import type { OptionsTrade } from "@/core/domain/types/options";
 
@@ -47,6 +47,7 @@ function baseDraft(overrides: Partial<ClosedTradeEditDraft> = {}): ClosedTradeEd
     openPremiumUsd: 420,
     openFeesUsd: 2.5,
     closeDate: "2025-06-10",
+    closeMethod: "normal" as const,
     closePremiumUsd: 48,
     closeFeesUsd: 2.5,
     ...overrides,
@@ -96,5 +97,15 @@ describe("closed trade realized P/L recalculation", () => {
       closeFeesUsd: draft.closeFeesUsd,
     });
     expect(realized).toBe(367);
+  });
+
+  it("uses manual realized P/L when close method is manual_pl", () => {
+    const realized = resolveClosedTradeRealizedPlUsd({
+      closeMethod: "manual_pl",
+      openPremiumUsd: 420,
+      openFeesUsd: 2.5,
+      manualRealizedPlUsd: -1190.59,
+    });
+    expect(realized).toBe(-1190.59);
   });
 });

@@ -2,6 +2,8 @@ export type OptionsTradeStatus = "open" | "closed";
 
 export type OptionsTradeType = "personal" | "shared";
 
+export type OptionsCloseMethod = "normal" | "manual_pl";
+
 export type OptionsStrategy = "bullPut" | "bearCall" | "ironCondor" | "custom";
 
 export type OptionsCapacityStatus = "OK" | "AT_LIMIT" | "NO_TRADE";
@@ -89,6 +91,10 @@ export interface OptionsTrade {
   underlyingPriceUpdatedAt?: string;
   closePremiumUsd?: number;
   closeFeesUsd?: number;
+  /** How the trade was closed — normal debit math or broker manual P/L. */
+  closeMethod?: OptionsCloseMethod;
+  /** Broker-final realized P/L when closeMethod is manual_pl. */
+  manualRealizedPlUsd?: number;
   realizedPlUsd?: number;
   /** Stored at close — realized P/L ÷ max risk × 100. */
   returnPercent?: number;

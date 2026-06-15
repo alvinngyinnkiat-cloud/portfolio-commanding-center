@@ -1,4 +1,5 @@
 import type {
+  OptionsCloseMethod,
   OptionsSettings,
   OptionsStrategy,
   OptionsTrade,
@@ -61,8 +62,10 @@ export interface ResolvedOpenTradeDraft extends OpenTradeDraft {
 
 export interface CloseTradeDraft {
   closeDate: string;
-  closePremiumUsd: number;
-  closeFeesUsd: number;
+  closeMethod: OptionsCloseMethod;
+  closePremiumUsd?: number;
+  closeFeesUsd?: number;
+  manualRealizedPlUsd?: number;
   notesAppend?: string;
 }
 
@@ -86,8 +89,10 @@ export interface ClosedTradeEditDraft {
   openFeesUsd: number;
   maxRiskUsd?: number;
   closeDate: string;
-  closePremiumUsd: number;
-  closeFeesUsd: number;
+  closeMethod: OptionsCloseMethod;
+  closePremiumUsd?: number;
+  closeFeesUsd?: number;
+  manualRealizedPlUsd?: number;
   notes?: string;
 }
 
@@ -341,14 +346,24 @@ export function validateCloseTradeDraft(
     });
   }
 
-  if (!Number.isFinite(draft.closePremiumUsd) || draft.closePremiumUsd < 0) {
+  if (draft.closeMethod === "manual_pl") {
+    if (!Number.isFinite(draft.manualRealizedPlUsd)) {
+      errors.push({
+        field: "manualRealizedPlUsd",
+        message: "Final realized P/L is required",
+      });
+    }
+    return errors;
+  }
+
+  if (!Number.isFinite(draft.closePremiumUsd) || draft.closePremiumUsd! < 0) {
     errors.push({
       field: "closePremiumUsd",
       message: "Close debit must be zero or greater",
     });
   }
 
-  if (!Number.isFinite(draft.closeFeesUsd) || draft.closeFeesUsd < 0) {
+  if (!Number.isFinite(draft.closeFeesUsd) || draft.closeFeesUsd! < 0) {
     errors.push({
       field: "closeFeesUsd",
       message: "Close fees must be zero or greater",
@@ -356,6 +371,38 @@ export function validateCloseTradeDraft(
   }
 
   return errors;
+}
+
+function validateClosedCloseFields(
+  draft: Pick<
+    ClosedTradeEditDraft,
+    "closeMethod" | "closePremiumUsd" | "closeFeesUsd" | "manualRealizedPlUsd"
+  >,
+  errors: OptionsValidationError[]
+): void {
+  if (draft.closeMethod === "manual_pl") {
+    if (!Number.isFinite(draft.manualRealizedPlUsd)) {
+      errors.push({
+        field: "manualRealizedPlUsd",
+        message: "Final realized P/L is required",
+      });
+    }
+    return;
+  }
+
+  if (!Number.isFinite(draft.closePremiumUsd) || draft.closePremiumUsd! < 0) {
+    errors.push({
+      field: "closePremiumUsd",
+      message: "Close debit must be zero or greater",
+    });
+  }
+
+  if (!Number.isFinite(draft.closeFeesUsd) || draft.closeFeesUsd! < 0) {
+    errors.push({
+      field: "closeFeesUsd",
+      message: "Close fees must be zero or greater",
+    });
+  }
 }
 
 export function validateClosedTradeEditDraft(
@@ -401,19 +448,7 @@ export function validateClosedTradeEditDraft(
     });
   }
 
-  if (!Number.isFinite(draft.closePremiumUsd) || draft.closePremiumUsd < 0) {
-    errors.push({
-      field: "closePremiumUsd",
-      message: "Close debit must be zero or greater",
-    });
-  }
-
-  if (!Number.isFinite(draft.closeFeesUsd) || draft.closeFeesUsd < 0) {
-    errors.push({
-      field: "closeFeesUsd",
-      message: "Close fees must be zero or greater",
-    });
-  }
+  validateClosedCloseFields(draft, errors);
 
   return errors;
 }

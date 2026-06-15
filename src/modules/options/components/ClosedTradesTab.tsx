@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 import type { OptionsClosedTradeRow } from "@/core/domain/types/options";
 import { formatDate, formatPercent, formatUsd } from "@/shared/lib/format";
 import { Button } from "@/shared/components/ui/Button";
-import { formatSignedPercent, plColorClass } from "./options-utils";
+import { formatSignedPercent, plColorClass, closeMethodBadgeClass, closeMethodLabel } from "./options-utils";
 import { usePortfolio } from "@/context/PortfolioContext";
 import { EditClosedNotesModal, EditClosedTradeModal } from "./OptionsModals";
 
@@ -86,6 +86,7 @@ function ClosedTradesTable({
             <th className="px-4 py-3">Strategy</th>
             <th className="px-4 py-3">Opened</th>
             <th className="px-4 py-3">Closed</th>
+            <th className="px-4 py-3">Close Method</th>
             <th className="px-4 py-3">Premium</th>
             <th className="px-4 py-3">Close cost</th>
             <th className="px-4 py-3">Realized</th>
@@ -104,7 +105,7 @@ function ClosedTradesTable({
           {rows.length === 0 ? (
             <tr>
               <td
-                colSpan={showLegColumns ? 12 : 10}
+                colSpan={showLegColumns ? 13 : 11}
                 className="px-4 py-8 text-center text-slate-500"
               >
                 {emptyMessage}
@@ -119,8 +120,19 @@ function ClosedTradesTable({
                 <td className="px-4 py-3">
                   {row.trade.closeDate ? formatDate(row.trade.closeDate) : "—"} ({row.daysHeld}d)
                 </td>
+                <td className="px-4 py-3">
+                  <span
+                    className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${closeMethodBadgeClass(row.trade.closeMethod)}`}
+                  >
+                    {closeMethodLabel(row.trade.closeMethod)}
+                  </span>
+                </td>
                 <td className="px-4 py-3">{formatUsd(row.trade.openPremiumUsd)}</td>
-                <td className="px-4 py-3">{formatUsd(row.closeCostUsd)}</td>
+                <td className="px-4 py-3">
+                  {row.trade.closeMethod === "manual_pl"
+                    ? "—"
+                    : formatUsd(row.closeCostUsd)}
+                </td>
                 <td
                   className={`px-4 py-3 ${plColorClass(row.trade.realizedPlUsd ?? 0)}`}
                 >

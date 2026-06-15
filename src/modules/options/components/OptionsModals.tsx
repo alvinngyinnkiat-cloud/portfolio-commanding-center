@@ -1,9 +1,8 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import type { OptionsOpenTradeRow, OptionsStrategy, OptionsTrade } from "@/core/domain/types/options";
+import type { OptionsCloseMethod, OptionsOpenTradeRow, OptionsStrategy, OptionsTrade } from "@/core/domain/types/options";
 import {
-  calculateRealizedPlUsd,
   calculateRemainingCapacityUsd,
   calculateUnrealizedPlUsd,
   calculateVerticalSpreadMetrics,
@@ -14,6 +13,7 @@ import {
   isVerticalSpreadStrategy,
   isIronCondorStrategy,
   requiresManualMaxRisk,
+  resolveClosedTradeRealizedPlUsd,
   sumOpenRiskUsd,
   type CloseTradeDraft,
   type ClosedTradeEditDraft,
@@ -25,7 +25,7 @@ import { Button } from "@/shared/components/ui/Button";
 import { Select } from "@/shared/components/ui/Select";
 import { Modal } from "@/shared/components/ui/Modal";
 import { formatUsd } from "@/shared/lib/format";
-import { capacityLabel, STRATEGY_OPTIONS } from "./options-utils";
+import { capacityLabel, CLOSE_METHOD_OPTIONS, STRATEGY_OPTIONS } from "./options-utils";
 import { deriveCapacityStatus } from "@/core/calculations/options/capacity";
 import { splitForTrade } from "@/core/calculations/options/split";
 import { usePortfolio } from "@/context/PortfolioContext";
@@ -122,9 +122,12 @@ function buildClosedEditFormState(trade: OptionsTrade) {
     clientSharePercent: String(trade.clientSharePercent),
     notes: trade.notes ?? "",
     closeDate: trade.closeDate ?? "",
+    closeMethod: (trade.closeMethod ?? "normal") as OptionsCloseMethod,
     closeDebitOptionPrice:
       closeDebitOptionPrice != null ? closeDebitOptionPrice.toFixed(2) : "0",
     closeFeesUsd: String(trade.closeFeesUsd ?? 0),
+    manualRealizedPlUsd:
+      trade.manualRealizedPlUsd != null ? String(trade.manualRealizedPlUsd) : "",
   };
 }
 
@@ -908,17 +911,21 @@ export function CloseTradeModal({
   const { services, refresh } = usePortfolio();
   const [form, setForm] = useState({
     closeDate: new Date().toISOString().slice(0, 10),
+    closeMethod: "normal" as OptionsCloseMethod,
     closeDebitOptionPrice: "0",
     closeFeesUsd: "0",
+    manualRealizedPlUsd: "",
     notesAppend: "",
   });
   const [errors, setErrors] = useState<Record<string, string>>({});
 
+  const isManualClose = form.closeMethod === "manual_pl";
   const closeDebitOptionPrice =
     form.closeDebitOptionPrice.trim() === ""
       ? null
       : parseFloat(form.closeDebitOptionPrice);
   const closeDebitDollarValue =
+    !isManualClose &&
     closeDebitOptionPrice != null &&
     Number.isFinite(closeDebitOptionPrice) &&
     closeDebitOptionPrice >= 0 &&
@@ -926,19 +933,55 @@ export function CloseTradeModal({
       ? calculateOptionDollarValue(closeDebitOptionPrice, trade.contracts)
       : null;
   const closeFeesUsd = parseFloat(form.closeFeesUsd);
+  const manualRealizedPlUsd =
+    form.manualRealizedPlUsd.trim() === ""
+      ? null
+      : parseFloat(form.manualRealizedPlUsd);
 
   const realized =
-    closeDebitDollarValue != null && Number.isFinite(closeFeesUsd)
-      ? calculateRealizedPlUsd({
+    isManualClose && manualRealizedPlUsd != null && Number.isFinite(manualRealizedPlUsd)
+      ? resolveClosedTradeRealizedPlUsd({
+          closeMethod: "manual_pl",
           openPremiumUsd: trade.openPremiumUsd,
           openFeesUsd: trade.openFeesUsd,
-          closePremiumUsd: closeDebitDollarValue,
-          closeFeesUsd: Number.isFinite(closeFeesUsd) ? closeFeesUsd : 0,
+          manualRealizedPlUsd,
         })
-      : null;
+      : closeDebitDollarValue != null && Number.isFinite(closeFeesUsd)
+        ? resolveClosedTradeRealizedPlUsd({
+            closeMethod: "normal",
+            openPremiumUsd: trade.openPremiumUsd,
+            openFeesUsd: trade.openFeesUsd,
+            closePremiumUsd: closeDebitDollarValue,
+            closeFeesUsd: Number.isFinite(closeFeesUsd) ? closeFeesUsd : 0,
+          })
+        : null;
   const legs = realized != null ? splitForTrade(trade, realized) : null;
 
   const submit = () => {
+    if (isManualClose) {
+      const manual = parseFloat(form.manualRealizedPlUsd);
+      if (!Number.isFinite(manual)) {
+        setErrors({ manualRealizedPlUsd: "Enter the broker final realized P/L" });
+        return;
+      }
+      const draft: CloseTradeDraft = {
+        closeDate: form.closeDate,
+        closeMethod: "manual_pl",
+        manualRealizedPlUsd: manual,
+        notesAppend: form.notesAppend || undefined,
+      };
+      const result = services.optionsTrades.closeTrade(trade.id, draft);
+      if (!result.ok) {
+        const map: Record<string, string> = {};
+        for (const err of result.errors) map[err.field] = err.message;
+        setErrors(map);
+        return;
+      }
+      refresh();
+      onClose();
+      return;
+    }
+
     if (trade.contracts <= 0) {
       setErrors({ closePremiumUsd: "Contracts must be greater than zero" });
       return;
@@ -955,6 +998,7 @@ export function CloseTradeModal({
     const fees = parseFloat(form.closeFeesUsd);
     const draft: CloseTradeDraft = {
       closeDate: form.closeDate,
+      closeMethod: "normal",
       closePremiumUsd,
       closeFeesUsd: Number.isFinite(fees) ? fees : 0,
       notesAppend: form.notesAppend || undefined,
@@ -982,29 +1026,63 @@ export function CloseTradeModal({
             onChange={(e) => setForm((p) => ({ ...p, closeDate: e.target.value }))}
             error={errors.closeDate}
           />
-          <Input
-            label="Close Debit (Option Price)"
-            type="number"
-            step="any"
-            min="0"
-            placeholder="0.24"
-            value={form.closeDebitOptionPrice}
+          <Select
+            label="Close Method"
+            value={form.closeMethod}
             onChange={(e) =>
-              setForm((p) => ({ ...p, closeDebitOptionPrice: e.target.value }))
+              setForm((p) => ({
+                ...p,
+                closeMethod: e.target.value as OptionsCloseMethod,
+              }))
             }
-            error={errors.closePremiumUsd}
-          />
-          <Input
-            label="Close fees (USD)"
-            type="number"
-            step="any"
-            min="0"
-            value={form.closeFeesUsd}
-            onChange={(e) => setForm((p) => ({ ...p, closeFeesUsd: e.target.value }))}
-            error={errors.closeFeesUsd}
+            options={CLOSE_METHOD_OPTIONS.map((option) => ({
+              value: option.value,
+              label: option.label,
+            }))}
           />
         </div>
-        {closeDebitOptionPrice != null && closeDebitDollarValue != null && (
+
+        {isManualClose ? (
+          <Input
+            label="Final Realized P/L (USD)"
+            type="number"
+            step="any"
+            placeholder="-1190.59"
+            value={form.manualRealizedPlUsd}
+            onChange={(e) =>
+              setForm((p) => ({ ...p, manualRealizedPlUsd: e.target.value }))
+            }
+            error={errors.manualRealizedPlUsd}
+          />
+        ) : (
+          <div className="grid gap-3 sm:grid-cols-2">
+            <Input
+              label="Close Debit (Option Price)"
+              type="number"
+              step="any"
+              min="0"
+              placeholder="0.24"
+              value={form.closeDebitOptionPrice}
+              onChange={(e) =>
+                setForm((p) => ({ ...p, closeDebitOptionPrice: e.target.value }))
+              }
+              error={errors.closePremiumUsd}
+            />
+            <Input
+              label="Close fees (USD)"
+              type="number"
+              step="any"
+              min="0"
+              value={form.closeFeesUsd}
+              onChange={(e) => setForm((p) => ({ ...p, closeFeesUsd: e.target.value }))}
+              error={errors.closeFeesUsd}
+            />
+          </div>
+        )}
+
+        {!isManualClose &&
+          closeDebitOptionPrice != null &&
+          closeDebitDollarValue != null && (
           <div className="rounded-xl border border-surface-border/60 bg-surface/40 p-3 text-sm text-slate-400">
             <p>
               Option Price:{" "}
@@ -1023,18 +1101,26 @@ export function CloseTradeModal({
         {realized != null && legs && (
           <div className="rounded-xl border border-surface-border/60 bg-surface/40 p-3 text-sm text-slate-300">
             <p>Realized P/L: {formatUsd(realized)}</p>
-            <p>Your leg: {formatUsd(legs.userLegUsd)}</p>
-            <p>Client leg: {formatUsd(legs.clientLegUsd)}</p>
+            <p>Your P/L: {formatUsd(legs.userLegUsd)}</p>
+            <p>Client P/L: {formatUsd(legs.clientLegUsd)}</p>
             <p className="mt-2 text-xs text-slate-500">
-              US Available Cash will change by {formatUsd(realized)} on confirm (full
-              amount for shared trades; client leg is reporting only).
+              US Available Cash impact: {formatUsd(realized)} (full amount for shared
+              trades; client leg is reporting only).
             </p>
           </div>
         )}
-        <p className="text-xs text-slate-500">
-          Enter broker option price (e.g. 0.24). Close debit dollar value = price ×
-          100 × {trade.contracts} contract{trade.contracts === 1 ? "" : "s"}.
-        </p>
+        {!isManualClose && (
+          <p className="text-xs text-slate-500">
+            Enter broker option price (e.g. 0.24). Close debit dollar value = price ×
+            100 × {trade.contracts} contract{trade.contracts === 1 ? "" : "s"}.
+          </p>
+        )}
+        {isManualClose && (
+          <p className="text-xs text-slate-500">
+            Use for assignment, exercise, liquidation, or broker-adjusted final P/L.
+            Stock assignment legs stay in Options only — do not add to Stock Tracker.
+          </p>
+        )}
         <Input
           label="Notes (append)"
           value={form.notesAppend}
@@ -1069,11 +1155,13 @@ export function EditClosedTradeModal({
   const showManualMaxRisk = requiresManualMaxRisk(form.strategy);
   const contracts = parseInt(form.contracts, 10);
 
+  const isManualClose = form.closeMethod === "manual_pl";
   const closeDebitOptionPrice =
     form.closeDebitOptionPrice.trim() === ""
       ? null
       : parseFloat(form.closeDebitOptionPrice);
   const closeDebitDollarValue =
+    !isManualClose &&
     closeDebitOptionPrice != null &&
     Number.isFinite(closeDebitOptionPrice) &&
     closeDebitOptionPrice >= 0 &&
@@ -1082,6 +1170,10 @@ export function EditClosedTradeModal({
       ? calculateOptionDollarValue(closeDebitOptionPrice, contracts)
       : null;
   const closeFeesUsd = parseFloat(form.closeFeesUsd);
+  const manualRealizedPlUsd =
+    form.manualRealizedPlUsd.trim() === ""
+      ? null
+      : parseFloat(form.manualRealizedPlUsd);
   const openPremiumOptionPrice =
     form.openPremiumOptionPrice.trim() === ""
       ? null
@@ -1092,30 +1184,39 @@ export function EditClosedTradeModal({
   );
   const openFeesUsd = parseFloat(form.openFeesUsd);
 
+  const previewTrade = {
+    ...trade,
+    tradeType: form.tradeType,
+    userSharePercent: parseFloat(form.userSharePercent) || 0,
+    clientSharePercent: parseFloat(form.clientSharePercent) || 0,
+  };
+
   const realizedPreview =
-    closeDebitDollarValue != null &&
+    isManualClose &&
+    manualRealizedPlUsd != null &&
+    Number.isFinite(manualRealizedPlUsd) &&
     openPremiumDollarValue != null &&
-    Number.isFinite(openFeesUsd) &&
-    Number.isFinite(closeFeesUsd)
-      ? calculateRealizedPlUsd({
+    Number.isFinite(openFeesUsd)
+      ? resolveClosedTradeRealizedPlUsd({
+          closeMethod: "manual_pl",
           openPremiumUsd: openPremiumDollarValue,
           openFeesUsd,
-          closePremiumUsd: closeDebitDollarValue,
-          closeFeesUsd,
+          manualRealizedPlUsd,
         })
-      : null;
+      : closeDebitDollarValue != null &&
+          openPremiumDollarValue != null &&
+          Number.isFinite(openFeesUsd) &&
+          Number.isFinite(closeFeesUsd)
+        ? resolveClosedTradeRealizedPlUsd({
+            closeMethod: "normal",
+            openPremiumUsd: openPremiumDollarValue,
+            openFeesUsd,
+            closePremiumUsd: closeDebitDollarValue,
+            closeFeesUsd,
+          })
+        : null;
   const legsPreview =
-    realizedPreview != null
-      ? splitForTrade(
-          {
-            ...trade,
-            tradeType: form.tradeType,
-            userSharePercent: parseFloat(form.userSharePercent) || 0,
-            clientSharePercent: parseFloat(form.clientSharePercent) || 0,
-          },
-          realizedPreview
-        )
-      : null;
+    realizedPreview != null ? splitForTrade(previewTrade, realizedPreview) : null;
 
   const handleStrategyChange = (strategy: OptionsStrategy) => {
     setForm((prev) => ({
@@ -1157,11 +1258,6 @@ export function EditClosedTradeModal({
       setErrors({ contracts: "Contracts must be greater than zero" });
       return;
     }
-    const optionPrice = parseFloat(form.closeDebitOptionPrice);
-    if (!Number.isFinite(optionPrice) || optionPrice < 0) {
-      setErrors({ closePremiumUsd: "Enter a valid close debit option price" });
-      return;
-    }
     const openPremiumUsd = parsePremiumDollarValue(
       form.openPremiumOptionPrice,
       contracts
@@ -1171,40 +1267,87 @@ export function EditClosedTradeModal({
       return;
     }
 
-    setSubmitting(true);
-    const draft: ClosedTradeEditDraft = {
-      tradeType: form.tradeType,
-      strategy: form.strategy,
-      strategyLabel: form.strategyLabel || undefined,
-      underlying: form.underlying,
-      expirationDate: form.expirationDate,
-      contracts,
-      shortStrikeUsd: isVertical ? parseFloat(form.shortStrikeUsd) : undefined,
-      longStrikeUsd: isVertical ? parseFloat(form.longStrikeUsd) : undefined,
-      bullPutShortStrikeUsd: isIronCondor
-        ? parseFloat(form.bullPutShortStrikeUsd)
-        : undefined,
-      bullPutLongStrikeUsd: isIronCondor
-        ? parseFloat(form.bullPutLongStrikeUsd)
-        : undefined,
-      bearCallShortStrikeUsd: isIronCondor
-        ? parseFloat(form.bearCallShortStrikeUsd)
-        : undefined,
-      bearCallLongStrikeUsd: isIronCondor
-        ? parseFloat(form.bearCallLongStrikeUsd)
-        : undefined,
-      openDate: form.openDate,
-      openPremiumUsd,
-      openFeesUsd: parseFloat(form.openFeesUsd),
-      maxRiskUsd: showManualMaxRisk ? parseFloat(form.maxRiskUsd) : undefined,
-      userSharePercent: parseFloat(form.userSharePercent),
-      clientSharePercent: parseFloat(form.clientSharePercent),
-      closeDate: form.closeDate,
-      closePremiumUsd: calculateOptionDollarValue(optionPrice, contracts),
-      closeFeesUsd: parseFloat(form.closeFeesUsd),
-      notes: form.notes || undefined,
-    };
+    let draft: ClosedTradeEditDraft;
+    if (isManualClose) {
+      const manual = parseFloat(form.manualRealizedPlUsd);
+      if (!Number.isFinite(manual)) {
+        setErrors({ manualRealizedPlUsd: "Enter the broker final realized P/L" });
+        return;
+      }
+      draft = {
+        tradeType: form.tradeType,
+        strategy: form.strategy,
+        strategyLabel: form.strategyLabel || undefined,
+        underlying: form.underlying,
+        expirationDate: form.expirationDate,
+        contracts,
+        shortStrikeUsd: isVertical ? parseFloat(form.shortStrikeUsd) : undefined,
+        longStrikeUsd: isVertical ? parseFloat(form.longStrikeUsd) : undefined,
+        bullPutShortStrikeUsd: isIronCondor
+          ? parseFloat(form.bullPutShortStrikeUsd)
+          : undefined,
+        bullPutLongStrikeUsd: isIronCondor
+          ? parseFloat(form.bullPutLongStrikeUsd)
+          : undefined,
+        bearCallShortStrikeUsd: isIronCondor
+          ? parseFloat(form.bearCallShortStrikeUsd)
+          : undefined,
+        bearCallLongStrikeUsd: isIronCondor
+          ? parseFloat(form.bearCallLongStrikeUsd)
+          : undefined,
+        openDate: form.openDate,
+        openPremiumUsd,
+        openFeesUsd: parseFloat(form.openFeesUsd),
+        maxRiskUsd: showManualMaxRisk ? parseFloat(form.maxRiskUsd) : undefined,
+        userSharePercent: parseFloat(form.userSharePercent),
+        clientSharePercent: parseFloat(form.clientSharePercent),
+        closeDate: form.closeDate,
+        closeMethod: "manual_pl",
+        manualRealizedPlUsd: manual,
+        notes: form.notes || undefined,
+      };
+    } else {
+      const optionPrice = parseFloat(form.closeDebitOptionPrice);
+      if (!Number.isFinite(optionPrice) || optionPrice < 0) {
+        setErrors({ closePremiumUsd: "Enter a valid close debit option price" });
+        return;
+      }
+      draft = {
+        tradeType: form.tradeType,
+        strategy: form.strategy,
+        strategyLabel: form.strategyLabel || undefined,
+        underlying: form.underlying,
+        expirationDate: form.expirationDate,
+        contracts,
+        shortStrikeUsd: isVertical ? parseFloat(form.shortStrikeUsd) : undefined,
+        longStrikeUsd: isVertical ? parseFloat(form.longStrikeUsd) : undefined,
+        bullPutShortStrikeUsd: isIronCondor
+          ? parseFloat(form.bullPutShortStrikeUsd)
+          : undefined,
+        bullPutLongStrikeUsd: isIronCondor
+          ? parseFloat(form.bullPutLongStrikeUsd)
+          : undefined,
+        bearCallShortStrikeUsd: isIronCondor
+          ? parseFloat(form.bearCallShortStrikeUsd)
+          : undefined,
+        bearCallLongStrikeUsd: isIronCondor
+          ? parseFloat(form.bearCallLongStrikeUsd)
+          : undefined,
+        openDate: form.openDate,
+        openPremiumUsd,
+        openFeesUsd: parseFloat(form.openFeesUsd),
+        maxRiskUsd: showManualMaxRisk ? parseFloat(form.maxRiskUsd) : undefined,
+        userSharePercent: parseFloat(form.userSharePercent),
+        clientSharePercent: parseFloat(form.clientSharePercent),
+        closeDate: form.closeDate,
+        closeMethod: "normal",
+        closePremiumUsd: calculateOptionDollarValue(optionPrice, contracts),
+        closeFeesUsd: parseFloat(form.closeFeesUsd),
+        notes: form.notes || undefined,
+      };
+    }
 
+    setSubmitting(true);
     const result = services.optionsTrades.updateClosedTrade(trade.id, draft);
     setSubmitting(false);
     if (!result.ok) {
@@ -1352,6 +1495,20 @@ export function EditClosedTradeModal({
             onChange={(e) => setForm((p) => ({ ...p, closeDate: e.target.value }))}
             error={errors.closeDate}
           />
+          <Select
+            label="Close Method"
+            value={form.closeMethod}
+            onChange={(e) =>
+              setForm((p) => ({
+                ...p,
+                closeMethod: e.target.value as OptionsCloseMethod,
+              }))
+            }
+            options={CLOSE_METHOD_OPTIONS.map((option) => ({
+              value: option.value,
+              label: option.label,
+            }))}
+          />
           <Input
             label="Premium Received (Option Price)"
             type="number"
@@ -1389,27 +1546,45 @@ export function EditClosedTradeModal({
               </p>
             </div>
           )}
-          <Input
-            label="Close Debit (Option Price)"
-            type="number"
-            step="any"
-            min="0"
-            placeholder="0.24"
-            value={form.closeDebitOptionPrice}
-            onChange={(e) =>
-              setForm((p) => ({ ...p, closeDebitOptionPrice: e.target.value }))
-            }
-            error={errors.closePremiumUsd}
-          />
-          <Input
-            label="Close fees (USD)"
-            type="number"
-            step="any"
-            min="0"
-            value={form.closeFeesUsd}
-            onChange={(e) => setForm((p) => ({ ...p, closeFeesUsd: e.target.value }))}
-            error={errors.closeFeesUsd}
-          />
+          {isManualClose ? (
+            <Input
+              label="Final Realized P/L (USD)"
+              type="number"
+              step="any"
+              placeholder="-1190.59"
+              value={form.manualRealizedPlUsd}
+              onChange={(e) =>
+                setForm((p) => ({ ...p, manualRealizedPlUsd: e.target.value }))
+              }
+              error={errors.manualRealizedPlUsd}
+            />
+          ) : (
+            <>
+              <Input
+                label="Close Debit (Option Price)"
+                type="number"
+                step="any"
+                min="0"
+                placeholder="0.24"
+                value={form.closeDebitOptionPrice}
+                onChange={(e) =>
+                  setForm((p) => ({ ...p, closeDebitOptionPrice: e.target.value }))
+                }
+                error={errors.closePremiumUsd}
+              />
+              <Input
+                label="Close fees (USD)"
+                type="number"
+                step="any"
+                min="0"
+                value={form.closeFeesUsd}
+                onChange={(e) =>
+                  setForm((p) => ({ ...p, closeFeesUsd: e.target.value }))
+                }
+                error={errors.closeFeesUsd}
+              />
+            </>
+          )}
           {showManualMaxRisk && (
             <Input
               label="Max risk (USD) — manual"
@@ -1423,7 +1598,9 @@ export function EditClosedTradeModal({
           )}
         </div>
 
-        {closeDebitOptionPrice != null && closeDebitDollarValue != null && (
+        {!isManualClose &&
+          closeDebitOptionPrice != null &&
+          closeDebitDollarValue != null && (
           <div className="rounded-xl border border-surface-border/60 bg-surface/40 p-3 text-sm text-slate-400">
             <p>
               Close option price:{" "}
@@ -1465,11 +1642,11 @@ export function EditClosedTradeModal({
           <div className="rounded-xl border border-surface-border/60 bg-surface/40 p-3 text-sm text-slate-300">
             <p className="mb-1 text-sm font-medium text-slate-200">Recalculated on save</p>
             <p>Realized P/L: {formatUsd(realizedPreview)}</p>
-            <p>Your leg: {formatUsd(legsPreview.userLegUsd)}</p>
-            <p>Client leg: {formatUsd(legsPreview.clientLegUsd)}</p>
+            <p>Your P/L: {formatUsd(legsPreview.userLegUsd)}</p>
+            <p>Client P/L: {formatUsd(legsPreview.clientLegUsd)}</p>
             <p className="mt-2 text-xs text-slate-500">
-              US Available Cash uses full realized P/L. Editing updates cash by the
-              difference from the previous realized amount.
+              US Available Cash impact: {formatUsd(realizedPreview)} (difference from
+              previous realized amount on save).
             </p>
           </div>
         )}

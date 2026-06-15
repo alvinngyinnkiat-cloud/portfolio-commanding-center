@@ -1,4 +1,9 @@
-import type { OptionsCapacityStatus, OptionsDteStatus } from "@/core/domain/types/options";
+import type {
+  OptionsCapacityStatus,
+  OptionsCloseMethod,
+  OptionsDteStatus,
+} from "@/core/domain/types/options";
+import { formatCloseMethodLabel, getTradeCloseMethod } from "@/core/calculations/options/realized-pl";
 import type { BreakevenDifference } from "@/core/calculations/options/open-trade-display";
 import type { TargetExitKind } from "@/core/calculations/options/open-trade-display";
 import { coerceNumber } from "@/shared/lib/coerce-number";
@@ -79,3 +84,18 @@ export const STRATEGY_OPTIONS = [
   { value: "ironCondor", label: "Iron Condor" },
   { value: "custom", label: "Custom" },
 ] as const;
+
+export const CLOSE_METHOD_OPTIONS = [
+  { value: "normal", label: "Normal Close" },
+  { value: "manual_pl", label: "Manual Realized P/L" },
+] as const;
+
+export function closeMethodBadgeClass(closeMethod?: OptionsCloseMethod): string {
+  return getTradeCloseMethod(closeMethod) === "manual_pl"
+    ? "bg-amber-500/15 text-amber-300"
+    : "bg-surface text-slate-400";
+}
+
+export function closeMethodLabel(closeMethod?: OptionsCloseMethod): string {
+  return formatCloseMethodLabel(closeMethod);
+}
