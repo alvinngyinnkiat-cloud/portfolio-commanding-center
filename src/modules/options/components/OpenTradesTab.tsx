@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useRef, useState } from "react";
 import type { OptionsOpenTradeRow } from "@/core/domain/types/options";
 import type {
   BreakevenDifference,
@@ -10,6 +10,8 @@ import type { ResolvedScannerPrice } from "@/core/calculations/scanner/price-eng
 import { formatScannerPriceSourceLabel } from "@/core/calculations/scanner/price-engine";
 import {
   buildStackedOptionPrice,
+  calculateOptionDollarValue,
+  calculatePerShareOptionPrice,
   compareOpenTradesByOpenDate,
   formatTargetExit,
   hasBreakevenMetrics,
@@ -47,6 +49,145 @@ function StackedPriceCell({ value }: { value: StackedOptionPrice | null }) {
   );
 }
 
+function InlineEditableMarketValueCell({
+  row,
+  onSaved,
+}: {
+  row: OptionsOpenTradeRow;
+  onSaved: () => void;
+}) {
+  const { services } = usePortfolio();
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const cancelRef = useRef(false);
+
+  const contracts = row.trade.contracts;
+  const savedPrice =
+    row.trade.currentValueUsd != null
+      ? calculatePerShareOptionPrice(row.trade.currentValueUsd, contracts)
+      : null;
+  const stacked =
+    row.trade.currentValueUsd != null
+      ? buildStackedOptionPrice(row.trade.currentValueUsd, contracts)
+      : null;
+
+  const draftPrice = draft.trim() === "" ? null : parseFloat(draft);
+  const previewDollar =
+    draftPrice != null && Number.isFinite(draftPrice) && draftPrice >= 0
+      ? calculateOptionDollarValue(draftPrice, contracts)
+      : null;
+
+  const startEdit = () => {
+    cancelRef.current = false;
+    setError(null);
+    setDraft(savedPrice != null ? savedPrice.toFixed(2) : "");
+    setEditing(true);
+  };
+
+  const cancelEdit = () => {
+    cancelRef.current = true;
+    setEditing(false);
+    setError(null);
+    setDraft("");
+  };
+
+  const commitEdit = () => {
+    if (cancelRef.current || saving) return;
+    if (!services) return;
+
+    if (draft.trim() === "") {
+      setError("Enter option price");
+      return;
+    }
+
+    const parsed = parseFloat(draft);
+    if (!Number.isFinite(parsed) || parsed < 0) {
+      setError("Invalid price");
+      return;
+    }
+
+    const dollarValue = calculateOptionDollarValue(parsed, contracts);
+    if (row.trade.currentValueUsd === dollarValue) {
+      setEditing(false);
+      setError(null);
+      return;
+    }
+
+    setSaving(true);
+    const result = services.optionsTrades.updateCurrentValue(row.trade.id, dollarValue);
+    setSaving(false);
+
+    if (!result.ok) {
+      setError(result.errors[0]?.message ?? "Save failed");
+      return;
+    }
+
+    setEditing(false);
+    setError(null);
+    onSaved();
+  };
+
+  if (editing) {
+    return (
+      <div className="min-w-[5.5rem] leading-tight">
+        <input
+          autoFocus
+          type="number"
+          step="any"
+          min="0"
+          value={draft}
+          disabled={saving}
+          onChange={(e) => {
+            setDraft(e.target.value);
+            if (error) setError(null);
+          }}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") {
+              e.preventDefault();
+              commitEdit();
+            }
+            if (e.key === "Escape") {
+              e.preventDefault();
+              cancelEdit();
+            }
+          }}
+          onBlur={() => {
+            window.setTimeout(() => {
+              if (!cancelRef.current) commitEdit();
+            }, 0);
+          }}
+          className="w-20 rounded-lg border border-accent/50 bg-surface px-2 py-1 text-sm font-medium text-white outline-none ring-1 ring-accent/30"
+          aria-label={`Current market value for ${row.trade.underlying}`}
+        />
+        <div className="mt-0.5 text-xs text-slate-500">
+          {previewDollar != null ? formatUsd(previewDollar) : "—"}
+        </div>
+        {error && <div className="mt-0.5 text-[10px] text-accent-red">{error}</div>}
+      </div>
+    );
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={startEdit}
+      title="Click to edit current market value"
+      className="rounded-lg px-1 py-0.5 text-left transition-colors hover:bg-surface/70 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent/60"
+    >
+      {stacked ? (
+        <StackedPriceCell value={stacked} />
+      ) : (
+        <div className="leading-tight text-slate-500">
+          <div className="font-medium">—</div>
+          <div className="text-xs">Click to set</div>
+        </div>
+      )}
+    </button>
+  );
+}
+
 function BreakevenDifferenceCell({
   hasBreakeven,
   underlying,
@@ -67,7 +208,7 @@ function BreakevenDifferenceCell({
         <div className="text-xs text-slate-500">
           {underlying.isWatchlistTicker
             ? "Run Scanner refresh"
-            : "Add watchlist ticker or fallback in Mark"}
+            : "Add watchlist ticker or set fallback in Edit"}
         </div>
       </div>
     );
@@ -119,17 +260,17 @@ function SectionSummaryStrip({
 function OpenTradesTable({
   rows,
   emptyMessage,
-  onMark,
   onEdit,
   onClose,
   onDelete,
+  onValueSaved,
 }: {
   rows: OptionsOpenTradeRow[];
   emptyMessage: string;
-  onMark: (row: OptionsOpenTradeRow) => void;
   onEdit: (row: OptionsOpenTradeRow) => void;
   onClose: (row: OptionsOpenTradeRow) => void;
   onDelete: (row: OptionsOpenTradeRow) => void;
+  onValueSaved: () => void;
 }) {
   return (
     <div className="overflow-x-auto rounded-2xl border border-surface-border/80">
@@ -187,13 +328,6 @@ function OpenTradesTable({
                       row.trade.contracts
                     )
                   : null;
-              const marketValue =
-                row.trade.currentValueUsd != null
-                  ? buildStackedOptionPrice(
-                      row.trade.currentValueUsd,
-                      row.trade.contracts
-                    )
-                  : null;
 
               return (
                 <tr key={row.trade.id} className="text-slate-300">
@@ -244,7 +378,7 @@ function OpenTradesTable({
                     <StackedPriceCell value={tpExit} />
                   </td>
                   <td className="px-4 py-3">
-                    <StackedPriceCell value={marketValue} />
+                    <InlineEditableMarketValueCell row={row} onSaved={onValueSaved} />
                   </td>
                   <td className="px-4 py-3">
                     {formatUsd(row.trade.maxRiskUsd)}
@@ -264,9 +398,6 @@ function OpenTradesTable({
                   </td>
                   <td className="px-4 py-3">
                     <div className="flex flex-wrap gap-1">
-                      <Button size="sm" variant="secondary" onClick={() => onMark(row)}>
-                        Mark
-                      </Button>
                       <Button size="sm" variant="ghost" onClick={() => onEdit(row)}>
                         Edit
                       </Button>
@@ -291,12 +422,10 @@ function OpenTradesTable({
 export function OpenTradesTab({
   onOpenNew,
   onEdit,
-  onMark,
   onClose,
 }: {
   onOpenNew: () => void;
   onEdit: (row: OptionsOpenTradeRow) => void;
-  onMark: (row: OptionsOpenTradeRow) => void;
   onClose: (row: OptionsOpenTradeRow) => void;
 }) {
   const { optionsData, services, refresh } = usePortfolio();
@@ -368,10 +497,10 @@ export function OpenTradesTab({
         <OpenTradesTable
           rows={personalRows}
           emptyMessage="No personal open trades."
-          onMark={onMark}
           onEdit={onEdit}
           onClose={onClose}
           onDelete={handleDelete}
+          onValueSaved={refresh}
         />
       </section>
 
@@ -404,10 +533,10 @@ export function OpenTradesTab({
         <OpenTradesTable
           rows={sharedRows}
           emptyMessage="No shared open trades."
-          onMark={onMark}
           onEdit={onEdit}
           onClose={onClose}
           onDelete={handleDelete}
+          onValueSaved={refresh}
         />
       </section>
     </div>

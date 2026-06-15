@@ -16,7 +16,6 @@ import { PerformanceAnalyticsTab } from "./PerformanceAnalyticsTab";
 import {
   CloseTradeModal,
   OpenTradeModal,
-  UpdateMarkModal,
 } from "./OptionsModals";
 
 function OptionsSkeleton() {
@@ -39,7 +38,6 @@ export function OptionsView() {
   const { isLoaded, optionsData } = usePortfolio();
   const [openForm, setOpenForm] = useState(false);
   const [editTrade, setEditTrade] = useState<OptionsOpenTradeRow | null>(null);
-  const [markRow, setMarkRow] = useState<OptionsOpenTradeRow | null>(null);
   const [closeRow, setCloseRow] = useState<OptionsOpenTradeRow | null>(null);
 
   if (!isLoaded || !optionsData) {
@@ -85,7 +83,6 @@ export function OptionsView() {
                     setEditTrade(row);
                     setOpenForm(true);
                   }}
-                  onMark={setMarkRow}
                   onClose={setCloseRow}
                 />
               </section>
@@ -154,9 +151,6 @@ export function OptionsView() {
             setEditTrade(null);
           }}
         />
-      )}
-      {markRow && (
-        <UpdateMarkModal row={markRow} onClose={() => setMarkRow(null)} />
       )}
       {closeRow && (
         <CloseTradeModal

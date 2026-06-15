@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { buildOptionsTrackerSummary } from "./summary";
+import { buildOpenTradeRows, buildOptionsTrackerSummary } from "./summary";
+import { summarizeOpenTradesHeader } from "./open-trade-display";
 import type { OptionsTrade } from "@/core/domain/types/options";
 
 function openTrade(overrides: Partial<OptionsTrade>): OptionsTrade {
@@ -71,5 +72,34 @@ describe("buildOptionsTrackerSummary ownership unrealized P/L", () => {
     expect(summary.totalUnrealizedPlUsd).toBeNull();
     expect(summary.userUnrealizedPlUsd).toBeNull();
     expect(summary.clientUnrealizedPlUsd).toBeNull();
+  });
+});
+
+describe("inline current value updates", () => {
+  it("recalculates unrealized P/L and summary when mark moves from 0.50 to 0.25", () => {
+    const tradeAt50 = openTrade({
+      contracts: 1,
+      openPremiumUsd: 50,
+      openFeesUsd: 0,
+      currentValueUsd: 50,
+    });
+    const tradeAt25 = openTrade({
+      contracts: 1,
+      openPremiumUsd: 50,
+      openFeesUsd: 0,
+      currentValueUsd: 25,
+    });
+
+    const rowsBefore = buildOpenTradeRows([tradeAt50]);
+    const rowsAfter = buildOpenTradeRows([tradeAt25]);
+
+    expect(rowsBefore[0].unrealizedPlUsd).toBe(0);
+    expect(rowsAfter[0].unrealizedPlUsd).toBe(25);
+
+    const summaryBefore = summarizeOpenTradesHeader(rowsBefore);
+    const summaryAfter = summarizeOpenTradesHeader(rowsAfter);
+
+    expect(summaryBefore.totalUnrealizedPlUsd).toBe(0);
+    expect(summaryAfter.totalUnrealizedPlUsd).toBe(25);
   });
 });
