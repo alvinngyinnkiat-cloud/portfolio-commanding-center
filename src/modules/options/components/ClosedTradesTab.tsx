@@ -3,7 +3,12 @@
 import { Fragment, useMemo, useState } from "react";
 import type { OptionsCloseEvent, OptionsClosedTradeRow } from "@/core/domain/types/options";
 import { calculateCloseCostUsd } from "@/core/calculations/options/realized-pl";
-import { formatDate, formatPercent, formatUsd } from "@/shared/lib/format";
+import {
+  compareOptionsTradeDatesDesc,
+  formatOptionsTradeDate,
+  normalizeOptionsTradeDate,
+} from "@/core/calculations/options/trade-dates";
+import { formatPercent, formatUsd } from "@/shared/lib/format";
 import { Button } from "@/shared/components/ui/Button";
 import { formatSignedPercent, plColorClass, closeMethodBadgeClass, closeMethodLabel } from "./options-utils";
 import { usePortfolio } from "@/context/PortfolioContext";
@@ -13,7 +18,10 @@ const CLOSED_TRADES_DISPLAY_LIMIT = 10;
 
 function sortClosedByDateDesc(rows: OptionsClosedTradeRow[]): OptionsClosedTradeRow[] {
   return [...rows].sort((a, b) => {
-    const byCloseDate = (b.trade.closeDate ?? "").localeCompare(a.trade.closeDate ?? "");
+    const byCloseDate = compareOptionsTradeDatesDesc(
+      a.trade.closeDate,
+      b.trade.closeDate
+    );
     if (byCloseDate !== 0) return byCloseDate;
     return (b.trade.updatedAt ?? b.trade.createdAt).localeCompare(
       a.trade.updatedAt ?? a.trade.createdAt
@@ -107,7 +115,7 @@ function CloseEventSubRow({
         ↳ {underlying} partial close
       </td>
       <td className="px-4 py-2">—</td>
-      <td className="px-4 py-2">{formatDate(event.closeDate)}</td>
+      <td className="px-4 py-2">{formatOptionsTradeDate(event.closeDate)}</td>
       <td className="px-4 py-2">
         <span
           className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${closeMethodBadgeClass(event.closeMethod)}`}
@@ -194,9 +202,12 @@ function ClosedTradesTable({
                 <tr className="text-slate-300">
                   <td className="px-4 py-3 font-medium text-white">{row.trade.underlying}</td>
                   <td className="px-4 py-3">{row.strategyDisplay}</td>
-                  <td className="px-4 py-3">{formatDate(row.trade.openDate)}</td>
+                  <td className="px-4 py-3">{formatOptionsTradeDate(row.trade.openDate)}</td>
                   <td className="px-4 py-3">
-                    {row.trade.closeDate ? formatDate(row.trade.closeDate) : "—"} ({row.daysHeld}d)
+                    {formatOptionsTradeDate(row.trade.closeDate)}
+                    {normalizeOptionsTradeDate(row.trade.closeDate)
+                      ? ` (${row.daysHeld}d)`
+                      : ""}
                   </td>
                   <td className="px-4 py-3">
                     <span
@@ -348,7 +359,7 @@ export function ClosedTradesTab() {
   const years = useMemo(() => {
     const set = new Set<string>();
     for (const row of rows) {
-      const y = (row.trade.closeDate ?? "").slice(0, 4);
+      const y = normalizeOptionsTradeDate(row.trade.closeDate ?? "")?.slice(0, 4);
       if (y) set.add(y);
     }
     return [...set].sort().reverse();
@@ -356,7 +367,10 @@ export function ClosedTradesTab() {
 
   const filtered = useMemo(() => {
     if (year === "all") return rows;
-    return rows.filter((row) => (row.trade.closeDate ?? "").startsWith(year));
+    return rows.filter((row) => {
+      const closeYear = normalizeOptionsTradeDate(row.trade.closeDate ?? "")?.slice(0, 4);
+      return closeYear === year;
+    });
   }, [rows, year]);
 
   const personalRows = useMemo(
@@ -398,7 +412,7 @@ export function ClosedTradesTab() {
       }
     }
     return events.sort((a, b) =>
-      b.event.closeDate.localeCompare(a.event.closeDate)
+      compareOptionsTradeDatesDesc(a.event.closeDate, b.event.closeDate)
     );
   }, [optionsData?.openRows]);
 
@@ -517,7 +531,7 @@ export function ClosedTradesTab() {
                   <tr key={`${tradeId}-${event.id}`} className="text-slate-300">
                     <td className="px-4 py-3 font-medium text-white">{underlying}</td>
                     <td className="px-4 py-3">{strategyDisplay}</td>
-                    <td className="px-4 py-3">{formatDate(event.closeDate)}</td>
+                    <td className="px-4 py-3">{formatOptionsTradeDate(event.closeDate)}</td>
                     <td className="px-4 py-3">{event.contractsClosed}</td>
                     <td className="px-4 py-3">
                       {event.closeMethod === "manual_pl"

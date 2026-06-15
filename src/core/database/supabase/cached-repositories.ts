@@ -10,6 +10,7 @@ import { normalizeDashboardSettings } from "@/core/database/local/normalize-sett
 import { normalizeDailySnapshot } from "@/core/calculations/snapshots";
 import { normalizeStockPrice } from "@/core/calculations/stocks/price-normalize";
 import { normalizeOptionsSettings } from "@/core/domain/defaults-options";
+import { normalizeOptionsTradeForStorage, normalizeOptionsTradesForStorage } from "@/core/calculations/options/trade-dates";
 import { normalizeScannerScanRun } from "@/core/calculations/scanner/normalize-scan-result";
 import {
   normalizeCryptoAllocationSettings,
@@ -442,19 +443,19 @@ class CachedCryptoAllocationRepository implements CryptoAllocationRepository {
 class CachedOptionsTradeRepository implements OptionsTradeRepository {
   constructor(private readonly manager: PersistenceManager) {}
   list() {
-    return [...this.manager.getCache().optionsTrades];
+    return normalizeOptionsTradesForStorage([...this.manager.getCache().optionsTrades]);
   }
   getById(id: string) {
     return this.list().find((row) => row.id === id) ?? null;
   }
   append(trade: Parameters<OptionsTradeRepository["append"]>[0]) {
-    this.manager.getCache().optionsTrades.push(trade);
+    this.manager.getCache().optionsTrades.push(normalizeOptionsTradeForStorage(trade));
     this.manager.queueOptionsTradesSync();
   }
   update(trade: Parameters<OptionsTradeRepository["update"]>[0]) {
     const list = this.manager.getCache().optionsTrades;
     const idx = list.findIndex((row) => row.id === trade.id);
-    if (idx >= 0) list[idx] = trade;
+    if (idx >= 0) list[idx] = normalizeOptionsTradeForStorage(trade);
     this.manager.queueOptionsTradesSync();
   }
   remove(id: string) {

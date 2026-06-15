@@ -8,6 +8,7 @@ import {
   calculateOptionDollarValue,
   calculatePerShareOptionPrice,
   compareOpenTradesByOpenDate,
+  formatOptionsTradeDate,
   getOriginalContracts,
   getRemainingContracts,
   hasBreakevenMetrics,
@@ -18,7 +19,7 @@ import {
   tradeForRemainingContracts,
 } from "@/core/calculations/options";
 import { formatTradeStrikes } from "@/core/calculations/options/helpers";
-import { formatShortDate, formatUsd } from "@/shared/lib/format";
+import { formatUsd } from "@/shared/lib/format";
 import { coerceNumber } from "@/shared/lib/coerce-number";
 import { Button } from "@/shared/components/ui/Button";
 import { SummaryCard } from "@/shared/components/ui/SummaryCard";
@@ -335,11 +336,11 @@ function OpenTradesTable({
                     </td>
                   )}
                   <td className={dataTableTdLeftClass}>
-                    {formatShortDate(row.trade.openDate)}
+                    {formatOptionsTradeDate(row.trade.openDate)}
                   </td>
                   <td className={dataTableTdLeftClass}>
                     <StackedValue
-                      primary={formatShortDate(row.trade.expirationDate)}
+                      primary={formatOptionsTradeDate(row.trade.expirationDate)}
                       secondary={`${row.daysToExpiration} DTE`}
                     />
                   </td>

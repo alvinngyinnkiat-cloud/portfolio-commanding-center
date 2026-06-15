@@ -13,6 +13,7 @@ import {
   calculateVerticalSpreadMetrics,
   isVerticalSpreadStrategy,
 } from "./vertical-spread";
+import { optionsDaysBetween, optionsDaysToExpiration } from "./trade-dates";
 
 const STRATEGY_LABELS: Record<Exclude<OptionsStrategy, "custom">, string> = {
   sellPut: "SELL PUT",
@@ -39,15 +40,11 @@ export function normalizeUnderlying(value: string): string {
 }
 
 export function daysBetween(startDate: string, endDate: string): number {
-  const start = Date.parse(`${startDate}T00:00:00`);
-  const end = Date.parse(`${endDate}T00:00:00`);
-  if (Number.isNaN(start) || Number.isNaN(end)) return 0;
-  return Math.max(0, Math.round((end - start) / 86_400_000));
+  return optionsDaysBetween(startDate, endDate);
 }
 
 export function daysToExpiration(expirationDate: string, asOfDate?: string): number {
-  const today = asOfDate ?? new Date().toISOString().slice(0, 10);
-  return daysBetween(today, expirationDate);
+  return optionsDaysToExpiration(expirationDate, asOfDate);
 }
 
 export function sumRealizedOptionsPlUsd(trades: OptionsTrade[]): number {

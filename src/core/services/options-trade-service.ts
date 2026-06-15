@@ -27,6 +27,7 @@ import {
   type ClosedTradeEditDraft,
   type MarkTradeUpdate,
 } from "@/core/calculations/options";
+import { normalizeOptionsTradeForStorage } from "@/core/calculations/options/trade-dates";
 import { generateId } from "@/core/database/local/local-storage";
 import { compareDateDesc } from "@/shared/lib/sort";
 
@@ -49,7 +50,10 @@ export class OptionsTradeService {
   ) {}
 
   list(): OptionsTrade[] {
-    return this.tradeRepo.list().sort(compareOptionsTradesByDate);
+    return this.tradeRepo
+      .list()
+      .map(normalizeOptionsTradeForStorage)
+      .sort(compareOptionsTradesByDate);
   }
 
   openTrade(draft: OpenTradeDraft): OptionsMutationResult {

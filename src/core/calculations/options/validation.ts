@@ -12,6 +12,7 @@ import {
   isVerticalSpreadStrategy,
   validateVerticalSpreadStrikes,
 } from "./vertical-spread";
+import { normalizeOptionsTradeDate } from "./trade-dates";
 import {
   calculateIronCondorMetrics,
   isIronCondorStrategy,
@@ -116,11 +117,13 @@ export interface ClosedTradeEditDraft {
 }
 
 function isValidDate(value: string): boolean {
-  return /^\d{4}-\d{2}-\d{2}$/.test(value) && !Number.isNaN(Date.parse(`${value}T00:00:00`));
+  return normalizeOptionsTradeDate(value) != null;
 }
 
 function compareDates(a: string, b: string): number {
-  return a.localeCompare(b);
+  const aNorm = normalizeOptionsTradeDate(a) ?? "";
+  const bNorm = normalizeOptionsTradeDate(b) ?? "";
+  return aNorm.localeCompare(bNorm);
 }
 
 export function validateOpenTradeDraft(

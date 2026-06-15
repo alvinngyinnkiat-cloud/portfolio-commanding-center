@@ -11,6 +11,7 @@ import { normalizeDashboardSettings } from "@/core/database/local/normalize-sett
 import { normalizeDailySnapshot } from "@/core/calculations/snapshots";
 import { normalizeStockPrice } from "@/core/calculations/stocks/price-normalize";
 import { normalizeOptionsSettings } from "@/core/domain/defaults-options";
+import { normalizeOptionsTradesForStorage } from "@/core/calculations/options/trade-dates";
 import type { WatchlistEntry } from "@/core/calculations/scanner/watchlist";
 import { LocalScannerWatchlistRepository } from "@/core/database/local/local-scanner-watchlist-repository";
 
@@ -83,7 +84,9 @@ export function exportLocalStorageCache(): PersistenceCache {
     STORAGE_KEYS.cryptoAllocationSettings,
     DEFAULT_CRYPTO_ALLOCATION
   );
-  cache.optionsTrades = readJson(STORAGE_KEYS.optionsTrades, []);
+  cache.optionsTrades = normalizeOptionsTradesForStorage(
+    readJson(STORAGE_KEYS.optionsTrades, [])
+  );
   cache.optionsSettings = normalizeOptionsSettings(
     readJson(STORAGE_KEYS.optionsSettings, DEFAULT_OPTIONS_SETTINGS)
   );

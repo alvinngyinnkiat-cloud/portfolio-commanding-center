@@ -54,6 +54,10 @@ import {
   scaleMaxRiskForRemaining,
   tradeForRemainingContracts,
 } from "./contract-tracking";
+import {
+  compareOptionsTradeDatesDesc,
+  todayOptionsTradeDate,
+} from "./trade-dates";
 import { buildTradeEconomicsFromTrade } from "./trade-economics";
 import {
   compareOpenTradesByOpenDate,
@@ -140,9 +144,9 @@ export function buildClosedTradeRows(trades: OptionsTrade[]): OptionsClosedTrade
   return trades
     .filter((trade) => trade.status === "closed")
     .sort((a, b) => {
-      const byCloseDate = (b.closeDate ?? "").localeCompare(a.closeDate ?? "");
+      const byCloseDate = compareOptionsTradeDatesDesc(b.closeDate, a.closeDate);
       if (byCloseDate !== 0) return byCloseDate;
-      return (b.createdAt ?? "").localeCompare(a.createdAt ?? "");
+      return (b.updatedAt ?? b.createdAt).localeCompare(a.updatedAt ?? a.createdAt);
     })
     .map((trade) => {
       const realized = trade.realizedPlUsd ?? 0;
@@ -225,7 +229,7 @@ export function buildOptionsTrackerSummary(input: {
   const readiness = buildOptionsCapitalReadiness(input);
   const openTrades = input.optionsTrades.filter((trade) => trade.status === "open");
   const closedTrades = input.optionsTrades.filter((trade) => trade.status === "closed");
-  const today = new Date().toISOString().slice(0, 10);
+  const today = todayOptionsTradeDate();
 
   const actionRequired = summarizeActionRequiredOpenRisk(
     openTrades.map((trade) => ({
@@ -322,7 +326,7 @@ export function buildOptionsRiskSummary(input: {
   const readiness = buildOptionsCapitalReadiness(input);
   const openTrades = input.optionsTrades.filter((trade) => trade.status === "open");
   const totalOpenRiskUsd = readiness.totalOpenRiskUsd;
-  const today = input.asOfDate ?? new Date().toISOString().slice(0, 10);
+  const today = input.asOfDate ?? todayOptionsTradeDate();
 
   const byTrade: OptionsRiskByTrade[] = openTrades
     .map((trade) => {

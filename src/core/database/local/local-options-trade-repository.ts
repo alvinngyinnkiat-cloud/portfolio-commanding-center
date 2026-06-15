@@ -1,11 +1,14 @@
 import type { OptionsTrade } from "@/core/domain/types/options";
+import { normalizeOptionsTradeForStorage, normalizeOptionsTradesForStorage } from "@/core/calculations/options/trade-dates";
 import type { OptionsTradeRepository } from "../repositories/options-repository";
 import { STORAGE_KEYS } from "./storage-keys";
 import { readJson, writeJson } from "./local-storage";
 
 export class LocalOptionsTradeRepository implements OptionsTradeRepository {
   list(): OptionsTrade[] {
-    return readJson<OptionsTrade[]>(STORAGE_KEYS.optionsTrades, []);
+    return normalizeOptionsTradesForStorage(
+      readJson<OptionsTrade[]>(STORAGE_KEYS.optionsTrades, [])
+    );
   }
 
   getById(id: string): OptionsTrade | null {
@@ -14,7 +17,7 @@ export class LocalOptionsTradeRepository implements OptionsTradeRepository {
 
   append(trade: OptionsTrade): void {
     const list = this.list();
-    list.push(trade);
+    list.push(normalizeOptionsTradeForStorage(trade));
     writeJson(STORAGE_KEYS.optionsTrades, list);
   }
 
@@ -22,7 +25,7 @@ export class LocalOptionsTradeRepository implements OptionsTradeRepository {
     const list = this.list();
     const idx = list.findIndex((row) => row.id === trade.id);
     if (idx < 0) return;
-    list[idx] = trade;
+    list[idx] = normalizeOptionsTradeForStorage(trade);
     writeJson(STORAGE_KEYS.optionsTrades, list);
   }
 

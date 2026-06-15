@@ -11,6 +11,7 @@ import { normalizeDashboardSettings } from "@/core/database/local/normalize-sett
 import { normalizeDailySnapshot } from "@/core/calculations/snapshots";
 import { normalizeStockPrice } from "@/core/calculations/stocks/price-normalize";
 import { normalizeOptionsSettings } from "@/core/domain/defaults-options";
+import { normalizeOptionsTradesForStorage } from "@/core/calculations/options/trade-dates";
 import type { WatchlistEntry } from "@/core/calculations/scanner/watchlist";
 import {
   resolveFetchSymbol,
@@ -166,7 +167,9 @@ export async function hydrateCacheFromSupabase(
   cache.cryptoTrades = cryptoTradesRes.error
     ? []
     : normalizeCryptoTrades(cryptoTradesRes.data?.map((row) => row.data) ?? []);
-  cache.optionsTrades = optionsRes.data?.map((row) => row.data) ?? [];
+  cache.optionsTrades = normalizeOptionsTradesForStorage(
+    optionsRes.data?.map((row) => row.data) ?? []
+  );
   cache.stockFxConversions = fxRes.error
     ? []
     : fxRes.data?.map((row) => row.data) ?? [];

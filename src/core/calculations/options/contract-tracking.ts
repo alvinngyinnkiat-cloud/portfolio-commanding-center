@@ -1,4 +1,5 @@
 import type { OptionsCloseEvent, OptionsTrade } from "@/core/domain/types/options";
+import { normalizeOptionsTradeDate } from "./trade-dates";
 
 /** Original contract count at open — `contracts` field is the source of truth. */
 export function getOriginalContracts(trade: OptionsTrade): number {
@@ -119,7 +120,7 @@ export function resolveCloseEvents(trade: OptionsTrade): OptionsCloseEvent[] {
   return [
     {
       id: `${trade.id}-legacy`,
-      closeDate: trade.closeDate,
+      closeDate: normalizeOptionsTradeDate(trade.closeDate) ?? trade.closeDate,
       contractsClosed: trade.contracts,
       closePremiumUsd: trade.closePremiumUsd ?? 0,
       closeFeesUsd: trade.closeFeesUsd ?? 0,

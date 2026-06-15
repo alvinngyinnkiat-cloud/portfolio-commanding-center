@@ -26,6 +26,9 @@ import {
   type CloseTradeDraft,
   type ClosedTradeEditDraft,
   type OpenTradeDraft,
+  normalizeOptionsTradeDate,
+  optionsTradeDateForInput,
+  todayOptionsTradeDate,
 } from "@/core/calculations/options";
 import { buildUsAvailableCashResult } from "@/core/calculations/us-cash";
 import { Input } from "@/shared/components/ui/Input";
@@ -38,7 +41,6 @@ import { deriveCapacityStatus } from "@/core/calculations/options/capacity";
 import { splitForTrade } from "@/core/calculations/options/split";
 import { usePortfolio } from "@/context/PortfolioContext";
 import { DEFAULT_OPTIONS_SETTINGS } from "@/core/domain/defaults-options";
-import { normalizeLocalDateString } from "@/shared/lib/date";
 
 function premiumOptionPriceFromTrade(trade: OptionsTrade): string {
   const price = calculatePerShareOptionPrice(trade.openPremiumUsd, trade.contracts);
@@ -76,7 +78,7 @@ const emptyOpenForm = {
   bearCallShortStrikeUsd: "",
   bearCallLongStrikeUsd: "",
   expirationDate: "",
-  openDate: new Date().toISOString().slice(0, 10),
+  openDate: "",
   openPremiumOptionPrice: "",
   openFeesUsd: "0",
   maxRiskUsd: "",
@@ -165,15 +167,15 @@ function buildClosedEditFormState(trade: OptionsTrade) {
       trade.bearCallLongStrikeUsd != null
         ? String(trade.bearCallLongStrikeUsd)
         : "",
-    expirationDate: normalizeLocalDateString(trade.expirationDate) ?? trade.expirationDate,
-    openDate: normalizeLocalDateString(trade.openDate) ?? trade.openDate,
+    expirationDate: optionsTradeDateForInput(trade.expirationDate),
+    openDate: optionsTradeDateForInput(trade.openDate),
     openPremiumOptionPrice: premiumOptionPriceFromTrade(trade),
     openFeesUsd: String(trade.openFeesUsd),
     maxRiskUsd: String(trade.maxRiskUsd),
     userSharePercent: String(trade.userSharePercent),
     clientSharePercent: String(trade.clientSharePercent),
     notes: trade.notes ?? "",
-    closeDate: normalizeLocalDateString(trade.closeDate) ?? "",
+    closeDate: optionsTradeDateForInput(trade.closeDate),
     closeMethod: (trade.closeMethod ?? "normal") as OptionsCloseMethod,
     closeDebitOptionPrice:
       closeDebitOptionPrice != null ? closeDebitOptionPrice.toFixed(2) : "0",
@@ -193,7 +195,9 @@ export function OpenTradeModal({
   const { optionsData, data, stockData, services, refresh } = usePortfolio();
   const settings = optionsData?.settings;
   const [form, setForm] = useState<OpenTradeForm>(() => {
-    if (!editTrade) return { ...emptyOpenForm };
+    if (!editTrade) {
+      return { ...emptyOpenForm, openDate: todayOptionsTradeDate() };
+    }
     return {
       tradeType: editTrade.tradeType,
       strategy: editTrade.strategy,
@@ -220,8 +224,8 @@ export function OpenTradeModal({
         editTrade.bearCallLongStrikeUsd != null
           ? String(editTrade.bearCallLongStrikeUsd)
           : "",
-      expirationDate: editTrade.expirationDate,
-      openDate: editTrade.openDate,
+      expirationDate: optionsTradeDateForInput(editTrade.expirationDate),
+      openDate: optionsTradeDateForInput(editTrade.openDate),
       openPremiumOptionPrice: premiumOptionPriceFromTrade(editTrade),
       openFeesUsd: String(editTrade.openFeesUsd),
       maxRiskUsd: String(editTrade.maxRiskUsd),
@@ -507,6 +511,19 @@ export function OpenTradeModal({
       return;
     }
 
+    const openDate = normalizeOptionsTradeDate(form.openDate);
+    const expirationDate = normalizeOptionsTradeDate(form.expirationDate);
+    if (!openDate) {
+      setSubmitting(false);
+      setErrors({ openDate: "Open date must be YYYY-MM-DD" });
+      return;
+    }
+    if (!expirationDate) {
+      setSubmitting(false);
+      setErrors({ expirationDate: "Expiration date must be YYYY-MM-DD" });
+      return;
+    }
+
     const draft: OpenTradeDraft = {
       id: editTrade?.id,
       tradeType: form.tradeType,
@@ -530,8 +547,8 @@ export function OpenTradeModal({
       bearCallLongStrikeUsd: isIronCondor
         ? parseFloat(form.bearCallLongStrikeUsd)
         : undefined,
-      expirationDate: form.expirationDate,
-      openDate: form.openDate,
+      expirationDate,
+      openDate,
       openPremiumUsd,
       openFeesUsd: parseFloat(form.openFeesUsd),
       maxRiskUsd: showManualMaxRisk ? parseFloat(form.maxRiskUsd) : undefined,
@@ -976,7 +993,7 @@ export function CloseTradeModal({
   const remainingContracts = getRemainingContracts(trade);
   const originalContracts = getOriginalContracts(trade);
   const [form, setForm] = useState({
-    closeDate: new Date().toISOString().slice(0, 10),
+    closeDate: todayOptionsTradeDate(),
     contractsToClose: String(remainingContracts),
     closeMethod: "normal" as OptionsCloseMethod,
     closeDebitOptionPrice: "0",
@@ -1029,6 +1046,12 @@ export function CloseTradeModal({
   const legs = realized != null ? splitForTrade(trade, realized) : null;
 
   const submit = () => {
+    const closeDate = normalizeOptionsTradeDate(form.closeDate);
+    if (!closeDate) {
+      setErrors({ closeDate: "Close date must be YYYY-MM-DD" });
+      return;
+    }
+
     const contractsClosed = parseInt(form.contractsToClose, 10);
     if (!Number.isFinite(contractsClosed) || contractsClosed <= 0) {
       setErrors({ contractsToClose: "Enter contracts to close" });
@@ -1048,7 +1071,7 @@ export function CloseTradeModal({
         return;
       }
       const draft: CloseTradeDraft = {
-        closeDate: form.closeDate,
+        closeDate,
         contractsToClose: contractsClosed,
         closeMethod: "manual_pl",
         manualRealizedPlUsd: manual,
@@ -1074,7 +1097,7 @@ export function CloseTradeModal({
     const closePremiumUsd = calculateOptionDollarValue(optionPrice, contractsClosed);
     const fees = parseFloat(form.closeFeesUsd);
     const draft: CloseTradeDraft = {
-      closeDate: form.closeDate,
+      closeDate,
       contractsToClose: contractsClosed,
       closeMethod: "normal",
       closePremiumUsd,
@@ -1365,9 +1388,9 @@ export function EditClosedTradeModal({
       return;
     }
 
-    const openDate = normalizeLocalDateString(form.openDate);
-    const closeDate = normalizeLocalDateString(form.closeDate);
-    const expirationDate = normalizeLocalDateString(form.expirationDate);
+    const openDate = normalizeOptionsTradeDate(form.openDate);
+    const closeDate = normalizeOptionsTradeDate(form.closeDate);
+    const expirationDate = normalizeOptionsTradeDate(form.expirationDate);
     if (!openDate) {
       setErrors({ openDate: "Open date must be YYYY-MM-DD" });
       return;
