@@ -18,7 +18,7 @@ import { persistCryptoTradeChanges } from "@/modules/crypto/lib/persist-crypto-c
 
 function toCryptoTradeDraft(trade: CryptoTrade): CryptoTradeDraft {
   return {
-    date: parseIsoDateString(trade.date) ?? "",
+    date: trade.date,
     assetName: trade.assetName,
     type: trade.type,
     amountSgd: String(trade.amountSgd),
