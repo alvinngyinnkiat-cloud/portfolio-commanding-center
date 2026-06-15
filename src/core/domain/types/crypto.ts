@@ -108,6 +108,13 @@ export interface CryptoTrackerSummary {
 
   holdingCount: number;
 
+  /** Informational — sum of all trade fees; not used in portfolio math. */
+  totalFeesPaidSgd: number;
+
+  feesThisMonthSgd: number;
+
+  feesThisYearSgd: number;
+
 }
 
 

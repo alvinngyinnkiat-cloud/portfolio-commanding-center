@@ -10,39 +10,16 @@ export function normalizeCryptoAssetName(assetName: string): string {
   return assetName.trim().toUpperCase();
 }
 
-function reduceCostBasis(
-  investedSgd: number,
-  feesSgd: number,
-  reduction: number
-): { investedSgd: number; feesSgd: number } {
-  const invested = coerceNumber(investedSgd);
-  const fees = normalizeFeesSgd(feesSgd);
-  const total = invested + fees;
-  if (total <= 0 || reduction <= 0) {
-    return { investedSgd: invested, feesSgd: fees };
-  }
-
-  const actualReduction = Math.min(total, reduction);
-  const investedReduction = (invested / total) * actualReduction;
-  const feesReduction = actualReduction - investedReduction;
-
-  return {
-    investedSgd: Math.max(0, invested - investedReduction),
-    feesSgd: Math.max(0, fees - feesReduction),
-  };
-}
-
 export function calculateAvailableTradingCashFromTrades(
   totalCryptoCashContributed: number,
   trades: CryptoTrade[]
 ): number {
   let cash = coerceNumber(totalCryptoCashContributed);
   for (const trade of trades) {
-    const fees = normalizeFeesSgd(trade.feesSgd);
     if (trade.type === "buy") {
-      cash -= trade.amountSgd + fees;
+      cash -= trade.amountSgd;
     } else {
-      cash += trade.amountSgd - fees;
+      cash += trade.amountSgd;
     }
   }
   return cash;
@@ -84,13 +61,7 @@ export function rebuildHoldingsFromTrades(
       state.investedSgd += trade.amountSgd;
       state.feesSgd += fees;
     } else {
-      const reduced = reduceCostBasis(
-        state.investedSgd,
-        state.feesSgd,
-        trade.amountSgd
-      );
-      state.investedSgd = reduced.investedSgd;
-      state.feesSgd = reduced.feesSgd;
+      state.investedSgd = Math.max(0, state.investedSgd - trade.amountSgd);
     }
 
     costByAsset.set(key, state);
@@ -99,7 +70,7 @@ export function rebuildHoldingsFromTrades(
   const rebuilt: CryptoHolding[] = [];
 
   for (const [key, state] of costByAsset) {
-    const costBasis = state.investedSgd + state.feesSgd;
+    const costBasis = state.investedSgd;
     const existing = holdingByAsset.get(key);
     if (costBasis <= 0 && (existing?.currentValueSgd ?? 0) <= 0) {
       continue;

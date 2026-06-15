@@ -375,7 +375,7 @@ describe("dashboard integration QA — 9-step plan", () => {
       optionsTrades: [],
     });
 
-    expect(cryptoSummary.availableTradingCashSgd).toBe(1_980);
+    expect(cryptoSummary.availableTradingCashSgd).toBe(2_000);
     expect(cryptoSummary.cryptoContributionSgd).toBe(5_000);
     expect(stockSummary.availableTradingCashSgd).toBe(0);
     expect(metrics.totalContribution).toBe(5_000);

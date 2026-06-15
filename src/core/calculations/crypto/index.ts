@@ -39,6 +39,11 @@ export {
   calculateCryptoContribution,
 } from "./contributions";
 export {
+  calculateTotalCryptoFeesPaid,
+  calculateCryptoFeesForMonth,
+  calculateCryptoFeesForYear,
+} from "./fees";
+export {
   calculateAvailableTradingCashFromTrades,
   rebuildHoldingsFromTrades,
   normalizeCryptoAssetName,

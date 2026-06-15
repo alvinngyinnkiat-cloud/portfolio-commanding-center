@@ -4,7 +4,7 @@ import { usePortfolio } from "@/context/PortfolioContext";
 import { formatPercent, formatSgd } from "@/shared/lib/format";
 import { coerceNumber } from "@/shared/lib/coerce-number";
 import { SummaryCard } from "@/shared/components/ui/SummaryCard";
-import { Wallet, Coins, PiggyBank, TrendingUp } from "lucide-react";
+import { Wallet, Coins, PiggyBank, TrendingUp, Receipt } from "lucide-react";
 
 function plTrend(value: number): "positive" | "negative" | "neutral" {
   if (value > 0) return "positive";
@@ -40,7 +40,7 @@ export function CryptoOverviewSection() {
         />
       </div>
 
-      <div className="grid gap-4 sm:grid-cols-2">
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         <SummaryCard
           label="Crypto Contribution"
           value={formatSgd(summary.cryptoContributionSgd)}
@@ -56,7 +56,13 @@ export function CryptoOverviewSection() {
               ? "neutral"
               : "negative"
           }
-          subValue={`Contribution ${formatSgd(summary.cryptoContributionSgd)} − buys & fees ${formatSgd(summary.cryptoContributionSgd - summary.availableTradingCashSgd)}`}
+          subValue={`Contribution ${formatSgd(summary.cryptoContributionSgd)} − buy/sell totals ${formatSgd(summary.cryptoContributionSgd - summary.availableTradingCashSgd)}`}
+        />
+        <SummaryCard
+          label="Total Fees Paid"
+          value={formatSgd(summary.totalFeesPaidSgd)}
+          icon={<Receipt size={18} />}
+          subValue={`This month ${formatSgd(summary.feesThisMonthSgd)} · This year ${formatSgd(summary.feesThisYearSgd)}`}
         />
       </div>
 

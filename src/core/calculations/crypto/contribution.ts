@@ -8,14 +8,12 @@ export function normalizeFeesSgd(feesSgd: number | undefined): number {
   return feesSgd;
 }
 
-/** Per-holding capital injected = buy amount + associated fees. */
+/** Per-holding cost basis = buy transaction totals only (fees are informational). */
 export function calculateHoldingContribution(holding: CryptoHolding): number {
-  return (
-    coerceNumber(holding.investedSgd) + normalizeFeesSgd(holding.feesSgd)
-  );
+  return coerceNumber(holding.investedSgd);
 }
 
-/** Capital deployed into holdings (buys + fees). Reduces available trading cash only. */
+/** Capital deployed into holdings (buy totals). Fees excluded from cash math. */
 export function calculateCryptoCapitalDeployed(holdings: CryptoHolding[]): number {
   return holdings.reduce(
     (sum, holding) => sum + calculateHoldingContribution(holding),

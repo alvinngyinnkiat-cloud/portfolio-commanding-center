@@ -22,15 +22,15 @@ describe("buildCryptoTrackerSummary", () => {
     expect(summary.holdingCount).toBe(3);
   });
 
-  it("reduces available cash by deployed buys and fees", () => {
+  it("reduces available cash by deployed buy totals only", () => {
     const withFees: CryptoHolding[] = [
       { id: "1", assetName: "BTC", investedSgd: 500, feesSgd: 10, currentValueSgd: 620 },
     ];
     const summary = buildCryptoTrackerSummary(withFees, 1000);
 
     expect(summary.cryptoContributionSgd).toBe(1000);
-    expect(summary.availableTradingCashSgd).toBe(490);
-    expect(summary.cryptoProfitLossSgd).toBe(110);
+    expect(summary.availableTradingCashSgd).toBe(500);
+    expect(summary.cryptoProfitLossSgd).toBe(120);
   });
 
   it("handles zero holdings", () => {
@@ -71,6 +71,23 @@ describe("buildCryptoTrackerSummary", () => {
     const summary = buildCryptoTrackerSummary(holdings, 5000, trades);
 
     expect(summary.cryptoContributionSgd).toBe(5000);
-    expect(summary.availableTradingCashSgd).toBe(1980);
+    expect(summary.availableTradingCashSgd).toBe(2000);
+  });
+
+  it("reports total fees separately from portfolio math", () => {
+    const trades: CryptoTrade[] = [
+      {
+        id: "t1",
+        date: "2026-06-15",
+        assetName: "BTC",
+        type: "buy",
+        amountSgd: 3000,
+        feesSgd: 20,
+      },
+    ];
+    const summary = buildCryptoTrackerSummary(holdings, 5000, trades);
+
+    expect(summary.totalFeesPaidSgd).toBe(20);
+    expect(summary.availableTradingCashSgd).toBe(2000);
   });
 });

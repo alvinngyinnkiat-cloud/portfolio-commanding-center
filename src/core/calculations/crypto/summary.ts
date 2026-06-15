@@ -1,6 +1,11 @@
 import type { CryptoHolding, CryptoTrackerSummary, CryptoTrade } from "@/core/domain/types";
 import { coerceNumber } from "@/shared/lib/coerce-number";
 import { calculateCryptoCapitalDeployed } from "./contribution";
+import {
+  calculateCryptoFeesForMonth,
+  calculateCryptoFeesForYear,
+  calculateTotalCryptoFeesPaid,
+} from "./fees";
 import { calculateAvailableTradingCashFromTrades } from "./trades";
 import { buildCryptoHoldingRows } from "./holdings";
 
@@ -65,6 +70,10 @@ export function buildCryptoTrackerSummary(
     cryptoContributionSgd
   );
 
+  const totalFeesPaidSgd = calculateTotalCryptoFeesPaid(cryptoTrades);
+  const feesThisMonthSgd = calculateCryptoFeesForMonth(cryptoTrades);
+  const feesThisYearSgd = calculateCryptoFeesForYear(cryptoTrades);
+
   return {
     totalValueSgd,
     cryptoHoldingsValueSgd,
@@ -74,6 +83,9 @@ export function buildCryptoTrackerSummary(
     cryptoProfitLossSgd,
     cryptoProfitLossPercent,
     holdingCount: holdings.length,
+    totalFeesPaidSgd,
+    feesThisMonthSgd,
+    feesThisYearSgd,
   };
 }
 

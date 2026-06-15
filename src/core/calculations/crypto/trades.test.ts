@@ -26,7 +26,7 @@ describe("calculateAvailableTradingCashFromTrades", () => {
       },
     ];
 
-    expect(calculateAvailableTradingCashFromTrades(5000, trades)).toBe(3475);
+    expect(calculateAvailableTradingCashFromTrades(5000, trades)).toBe(3500);
   });
 });
 
@@ -78,6 +78,7 @@ describe("rebuildHoldingsFromTrades", () => {
     ];
 
     const rebuilt = rebuildHoldingsFromTrades(trades, []);
-    expect(rebuilt[0].investedSgd + (rebuilt[0].feesSgd ?? 0)).toBe(610);
+    expect(rebuilt[0].investedSgd).toBe(600);
+    expect(rebuilt[0].feesSgd).toBe(10);
   });
 });
