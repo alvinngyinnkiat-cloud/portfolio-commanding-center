@@ -5,6 +5,7 @@ import {
   validateCryptoHoldingValueDraft,
   type CryptoHoldingDraft,
 } from "@/core/calculations/crypto/validation";
+import { calculateHoldingContribution } from "@/core/calculations/crypto/contribution";
 import { generateId } from "@/core/database/local/local-storage";
 
 export class CryptoHoldingService {
@@ -41,6 +42,16 @@ export class CryptoHoldingService {
       currentValueSgd: result.values.currentValueSgd,
       notes: result.values.notes,
     };
+
+    // Manual close: current value zero removes the holding when cost basis is also zero.
+    if (
+      result.values.currentValueSgd === 0 &&
+      calculateHoldingContribution(existing) <= 0
+    ) {
+      this.repo.delete(id);
+      return holding;
+    }
+
     this.repo.upsert(holding);
     return holding;
   }

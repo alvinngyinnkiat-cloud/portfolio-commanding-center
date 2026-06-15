@@ -47,4 +47,6 @@ export {
   calculateAvailableTradingCashFromTrades,
   rebuildHoldingsFromTrades,
   normalizeCryptoAssetName,
+  findHoldingCurrentValue,
+  isCryptoHoldingOpen,
 } from "./trades";

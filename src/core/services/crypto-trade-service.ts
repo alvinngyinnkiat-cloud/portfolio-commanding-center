@@ -73,6 +73,7 @@ export class CryptoTradeService {
     this.syncHoldings(trades);
   }
 
+  /** Sync cost basis from trades; preserve manual current value from holdings. */
   private syncHoldings(trades: CryptoTrade[]): void {
     const rebuilt = rebuildHoldingsFromTrades(trades, this.holdings.list());
     this.holdings.replaceAll(rebuilt);

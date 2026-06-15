@@ -124,4 +124,35 @@ describe("CryptoTradeService", () => {
     expect(trades).toHaveLength(0);
     expect(holdings).toHaveLength(0);
   });
+
+  it("supports partial profit taking when sell exceeds cost basis", () => {
+    const { tradeRepo, holdingRepo, trades, holdings } = createMocks();
+    const service = new CryptoTradeService(tradeRepo, holdingRepo);
+
+    service.upsertFromDraft({
+      date: "2026-01-01",
+      assetName: "HYPE",
+      type: "buy",
+      amountSgd: "300",
+      feesSgd: "0",
+      notes: "",
+    });
+
+    holdings[0]!.currentValueSgd = 700;
+
+    service.upsertFromDraft({
+      date: "2026-02-01",
+      assetName: "HYPE",
+      type: "sell",
+      amountSgd: "400",
+      feesSgd: "0",
+      notes: "",
+    });
+
+    expect(holdings).toHaveLength(1);
+    expect(holdings[0]?.assetName).toBe("HYPE");
+    expect(holdings[0]?.investedSgd).toBe(0);
+    expect(holdings[0]?.currentValueSgd).toBe(700);
+    expect(trades).toHaveLength(2);
+  });
 });

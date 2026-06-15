@@ -25,7 +25,7 @@ export function calculateAvailableTradingCashFromTrades(
   return cash;
 }
 
-/** Rebuild holdings cost basis from trades while preserving manual valuations. */
+/** Rebuild cost basis from trades; holdings current value is manual source of truth. */
 export function rebuildHoldingsFromTrades(
   trades: CryptoTrade[],
   existingHoldings: CryptoHolding[]
@@ -72,7 +72,10 @@ export function rebuildHoldingsFromTrades(
   for (const [key, state] of costByAsset) {
     const costBasis = state.investedSgd;
     const existing = holdingByAsset.get(key);
-    if (costBasis <= 0 && (existing?.currentValueSgd ?? 0) <= 0) {
+    const currentValueSgd = coerceNumber(existing?.currentValueSgd ?? 0);
+
+    // Open/closed is manual: current value > 0 = open. Trades never remove holdings alone.
+    if (currentValueSgd <= 0 && costBasis <= 0) {
       continue;
     }
 
@@ -81,7 +84,7 @@ export function rebuildHoldingsFromTrades(
       assetName: existing?.assetName ?? state.assetName,
       investedSgd: state.investedSgd,
       feesSgd: state.feesSgd > 0 ? state.feesSgd : undefined,
-      currentValueSgd: existing?.currentValueSgd ?? 0,
+      currentValueSgd,
       notes: existing?.notes,
     });
   }
@@ -89,7 +92,8 @@ export function rebuildHoldingsFromTrades(
   for (const holding of existingHoldings) {
     const key = normalizeCryptoAssetName(holding.assetName);
     if (costByAsset.has(key)) continue;
-    if (holding.currentValueSgd > 0) {
+    // Orphan holding with manual value — keep while user marks it open (> 0).
+    if (coerceNumber(holding.currentValueSgd) > 0) {
       rebuilt.push({
         ...holding,
         investedSgd: 0,
@@ -101,6 +105,10 @@ export function rebuildHoldingsFromTrades(
   return rebuilt;
 }
 
+export function isCryptoHoldingOpen(holding: CryptoHolding): boolean {
+  return coerceNumber(holding.currentValueSgd) > 0;
+}
+
 export function findHoldingCostBasis(
   holdings: CryptoHolding[],
   assetName: string
@@ -110,4 +118,15 @@ export function findHoldingCostBasis(
     (row) => normalizeCryptoAssetName(row.assetName) === key
   );
   return holding ? calculateHoldingContribution(holding) : 0;
+}
+
+export function findHoldingCurrentValue(
+  holdings: CryptoHolding[],
+  assetName: string
+): number {
+  const key = normalizeCryptoAssetName(assetName);
+  const holding = holdings.find(
+    (row) => normalizeCryptoAssetName(row.assetName) === key
+  );
+  return holding ? coerceNumber(holding.currentValueSgd) : 0;
 }

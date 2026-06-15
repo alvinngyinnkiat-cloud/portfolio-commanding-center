@@ -1,6 +1,6 @@
 import type { CryptoHolding, CryptoTrade, CryptoTradeType } from "@/core/domain/types";
 import { normalizeFeesSgd } from "./contribution";
-import { findHoldingCostBasis } from "./trades";
+import { findHoldingCostBasis, findHoldingCurrentValue } from "./trades";
 import { parseIsoDateString } from "@/shared/lib/date";
 
 export interface CryptoTradeDraft {
@@ -77,9 +77,10 @@ export function validateCryptoTradeDraft(
     assetName &&
     Number.isFinite(amount) &&
     amount > 0 &&
-    findHoldingCostBasis(holdings, assetName) <= 0
+    findHoldingCostBasis(holdings, assetName) <= 0 &&
+    findHoldingCurrentValue(holdings, assetName) <= 0
   ) {
-    errors.assetName = "No cost basis available for this asset";
+    errors.assetName = "No holding available for this asset";
   }
 
   if (Object.keys(errors).length > 0) {
