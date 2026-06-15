@@ -35,6 +35,10 @@
 --     { id, assetName, investedSgd, feesSgd?, currentValueSgd, notes? }
 --     Crypto deposits/withdrawals are in contributions (category=crypto).
 --
+--   crypto_trades.data → CryptoTrade (buy/sell ledger)
+--     { id, date, assetName, type: buy|sell, amountSgd, feesSgd?, notes?, createdAt? }
+--     Drives cost basis and available trading cash. Current value stays on holdings.
+--
 --   options_trades.data    → OptionsTrade
 --     { id, status, tradeType: personal|shared, userSharePercent, clientSharePercent,
 --       strategy, strikes, premiums, maxRiskUsd, currentValueUsd?, realizedPlUsd?, ... }
@@ -124,6 +128,15 @@ CREATE TABLE IF NOT EXISTS crypto_transactions (
 );
 
 -- ---------------------------------------------------------------------------
+-- crypto_trades (Crypto Tracker buy/sell ledger)
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS crypto_trades (
+  id text PRIMARY KEY,
+  data jsonb NOT NULL,
+  updated_at timestamptz NOT NULL DEFAULT now()
+);
+
+-- ---------------------------------------------------------------------------
 -- options_trades (Options Tracker ledger)
 -- ---------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS options_trades (
@@ -155,6 +168,7 @@ ALTER TABLE portfolio_snapshots ENABLE ROW LEVEL SECURITY;
 ALTER TABLE stock_transactions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE stock_fx_conversions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE crypto_transactions ENABLE ROW LEVEL SECURITY;
+ALTER TABLE crypto_trades ENABLE ROW LEVEL SECURITY;
 ALTER TABLE options_trades ENABLE ROW LEVEL SECURITY;
 ALTER TABLE watchlist_items ENABLE ROW LEVEL SECURITY;
 
@@ -165,5 +179,6 @@ CREATE POLICY "pcc_snapshots_all" ON portfolio_snapshots FOR ALL USING (true) WI
 CREATE POLICY "pcc_stock_tx_all" ON stock_transactions FOR ALL USING (true) WITH CHECK (true);
 CREATE POLICY "pcc_stock_fx_all" ON stock_fx_conversions FOR ALL USING (true) WITH CHECK (true);
 CREATE POLICY "pcc_crypto_tx_all" ON crypto_transactions FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "pcc_crypto_trades_all" ON crypto_trades FOR ALL USING (true) WITH CHECK (true);
 CREATE POLICY "pcc_options_trades_all" ON options_trades FOR ALL USING (true) WITH CHECK (true);
 CREATE POLICY "pcc_watchlist_all" ON watchlist_items FOR ALL USING (true) WITH CHECK (true);

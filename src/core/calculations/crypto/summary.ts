@@ -1,6 +1,7 @@
-import type { CryptoHolding, CryptoTrackerSummary } from "@/core/domain/types";
+import type { CryptoHolding, CryptoTrackerSummary, CryptoTrade } from "@/core/domain/types";
 import { coerceNumber } from "@/shared/lib/coerce-number";
 import { calculateCryptoCapitalDeployed } from "./contribution";
+import { calculateAvailableTradingCashFromTrades } from "./trades";
 import { buildCryptoHoldingRows } from "./holdings";
 
 export function calculateCryptoHoldingsValue(holdings: CryptoHolding[]): number {
@@ -38,16 +39,19 @@ export function calculateCryptoProfitLossPercent(
 
 export function buildCryptoTrackerSummary(
   holdings: CryptoHolding[],
-  totalCryptoCashContributed: number
+  totalCryptoCashContributed: number,
+  cryptoTrades: CryptoTrade[] = []
 ): CryptoTrackerSummary {
   const safeCashContributed = coerceNumber(totalCryptoCashContributed);
   const cryptoHoldingsValueSgd = calculateCryptoHoldingsValue(holdings);
   const cryptoContributionSgd = safeCashContributed;
-  const cryptoCapitalDeployedSgd = calculateCryptoCapitalDeployed(holdings);
-  const availableTradingCashSgd = calculateAvailableTradingCash(
-    safeCashContributed,
-    cryptoCapitalDeployedSgd
-  );
+  const availableTradingCashSgd =
+    cryptoTrades.length > 0
+      ? calculateAvailableTradingCashFromTrades(safeCashContributed, cryptoTrades)
+      : calculateAvailableTradingCash(
+          safeCashContributed,
+          calculateCryptoCapitalDeployed(holdings)
+        );
   const totalValueSgd = calculateTotalValueSgd(
     cryptoHoldingsValueSgd,
     availableTradingCashSgd

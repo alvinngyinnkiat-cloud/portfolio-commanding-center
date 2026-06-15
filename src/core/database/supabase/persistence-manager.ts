@@ -18,6 +18,7 @@ import {
 import {
   syncContributions,
   syncCryptoHoldings,
+  syncCryptoTrades,
   syncGoals,
   syncOptionsTrades,
   syncStockFxConversions,
@@ -30,6 +31,8 @@ import {
   hasLegacyStockDeposits,
   migrateLegacyStockDepositsToCashFlow,
 } from "@/core/calculations/stocks/migrate-stock-cash-flow";
+import { migrateLegacyCryptoHoldingsToTrades } from "@/core/calculations/crypto/migrate-crypto-trades";
+import { rebuildHoldingsFromTrades } from "@/core/calculations/crypto/trades";
 
 export type PersistenceStatus = "local" | "supabase" | "supabase_migrated";
 
@@ -98,6 +101,7 @@ export class PersistenceManager {
       this.cache.migratedFromLocal = true;
     }
     await this.applyStockCashFlowMigrationIfNeeded();
+    await this.applyCryptoTradesMigrationIfNeeded();
     this.cache = normalizeCache(this.cache);
   }
 
@@ -128,6 +132,28 @@ export class PersistenceManager {
     await syncStockFxConversions(this.client, this.cache.stockFxConversions);
   }
 
+  /** One-time legacy holding → buy trade migration for transaction ledger cash math. */
+  private async applyCryptoTradesMigrationIfNeeded(): Promise<void> {
+    const migratedTrades = migrateLegacyCryptoHoldingsToTrades(
+      this.cache.cryptoHoldings,
+      this.cache.cryptoTrades
+    );
+    if (migratedTrades.length === this.cache.cryptoTrades.length) {
+      return;
+    }
+
+    this.cache.cryptoTrades = migratedTrades;
+    this.cache.cryptoHoldings = rebuildHoldingsFromTrades(
+      migratedTrades,
+      this.cache.cryptoHoldings
+    );
+
+    if (!this.client) return;
+
+    await syncCryptoTrades(this.client, this.cache.cryptoTrades);
+    await syncCryptoHoldings(this.client, this.cache.cryptoHoldings);
+  }
+
   private async bootstrapServer(): Promise<void> {
     const client = getServerSupabaseClient();
     if (!client) {
@@ -140,6 +166,7 @@ export class PersistenceManager {
     this.status = "supabase";
     this.cache = await hydrateCacheFromSupabase(this.client);
     await this.applyStockCashFlowMigrationIfNeeded();
+    await this.applyCryptoTradesMigrationIfNeeded();
     this.cache = normalizeCache(this.cache);
   }
 
@@ -197,6 +224,14 @@ export class PersistenceManager {
     void this.runSync(() =>
       this.client
         ? syncCryptoHoldings(this.client, this.cache.cryptoHoldings)
+        : Promise.resolve()
+    );
+  }
+
+  queueCryptoTradesSync(): void {
+    void this.runSync(() =>
+      this.client
+        ? syncCryptoTrades(this.client, this.cache.cryptoTrades)
         : Promise.resolve()
     );
   }

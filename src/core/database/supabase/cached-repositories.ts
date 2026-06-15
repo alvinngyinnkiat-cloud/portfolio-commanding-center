@@ -15,6 +15,7 @@ import {
   normalizeCryptoAllocationSettings,
   normalizeCryptoHolding,
 } from "@/core/calculations/crypto/normalize";
+import { normalizeCryptoTrade } from "@/core/calculations/crypto/trade-normalize";
 import type { DashboardSettingsRepository } from "../repositories/dashboard-settings-repository";
 import type { ContributionRepository } from "../repositories/contribution-repository";
 import type { GoalRepository } from "../repositories/goal-repository";
@@ -31,6 +32,7 @@ import type {
 } from "../repositories/scanner-repository";
 import type { ScannerWatchlistRepository } from "../repositories/scanner-watchlist-repository";
 import type { CryptoHoldingRepository } from "../repositories/crypto-holding-repository";
+import type { CryptoTradeRepository } from "../repositories/crypto-trade-repository";
 import type { CryptoAllocationRepository } from "../repositories/crypto-allocation-repository";
 import type { StockFxConversionRepository } from "../repositories/stock-fx-conversion-repository";
 import type {
@@ -390,6 +392,38 @@ class CachedCryptoHoldingRepository implements CryptoHoldingRepository {
   }
 }
 
+class CachedCryptoTradeRepository implements CryptoTradeRepository {
+  constructor(private readonly manager: PersistenceManager) {}
+  list() {
+    return this.manager.getCache().cryptoTrades.map((row) => {
+      const normalized = normalizeCryptoTrade(row);
+      return normalized ?? row;
+    });
+  }
+  upsert(trade: Parameters<CryptoTradeRepository["upsert"]>[0]) {
+    const normalized = normalizeCryptoTrade(trade);
+    if (!normalized) return;
+
+    const list = this.manager.getCache().cryptoTrades;
+    const idx = list.findIndex((row) => row.id === normalized.id);
+    if (idx >= 0) list[idx] = normalized;
+    else list.push(normalized);
+    this.manager.queueCryptoTradesSync();
+  }
+  delete(id: string) {
+    this.manager.getCache().cryptoTrades = this.manager
+      .getCache()
+      .cryptoTrades.filter((row) => row.id !== id);
+    this.manager.queueCryptoTradesSync();
+  }
+  replaceAll(trades: Parameters<CryptoTradeRepository["replaceAll"]>[0]) {
+    this.manager.getCache().cryptoTrades = trades
+      .map((row) => normalizeCryptoTrade(row))
+      .filter((row): row is NonNullable<typeof row> => row != null);
+    this.manager.queueCryptoTradesSync();
+  }
+}
+
 class CachedCryptoAllocationRepository implements CryptoAllocationRepository {
   constructor(private readonly manager: PersistenceManager) {}
   get() {
@@ -459,6 +493,7 @@ export function createCachedRepositories(
     scannerSchedule: new CachedScannerScheduleRepository(manager),
     scannerWatchlist: new CachedScannerWatchlistRepository(manager),
     cryptoHoldings: new CachedCryptoHoldingRepository(manager),
+    cryptoTrades: new CachedCryptoTradeRepository(manager),
     cryptoAllocation: new CachedCryptoAllocationRepository(manager),
     optionsTrades: new CachedOptionsTradeRepository(manager),
     optionsSettings: new CachedOptionsSettingsRepository(manager),

@@ -16,6 +16,7 @@ import { LocalScannerResultRepository } from "./local-scanner-result-repository"
 import { LocalScannerScheduleRepository } from "./local-scanner-schedule-repository";
 import { LocalScannerWatchlistRepository } from "./local-scanner-watchlist-repository";
 import { LocalCryptoHoldingRepository } from "./local-crypto-holding-repository";
+import { LocalCryptoTradeRepository } from "./local-crypto-trade-repository";
 import { LocalCryptoAllocationRepository } from "./local-crypto-allocation-repository";
 import { LocalOptionsTradeRepository } from "./local-options-trade-repository";
 import { LocalOptionsSettingsRepository } from "./local-options-settings-repository";
@@ -39,6 +40,7 @@ export function createLocalRepositories() {
     scannerSchedule: new LocalScannerScheduleRepository(),
     scannerWatchlist: new LocalScannerWatchlistRepository(),
     cryptoHoldings: new LocalCryptoHoldingRepository(),
+    cryptoTrades: new LocalCryptoTradeRepository(),
     cryptoAllocation: new LocalCryptoAllocationRepository(),
     optionsTrades: new LocalOptionsTradeRepository(),
     optionsSettings: new LocalOptionsSettingsRepository(),

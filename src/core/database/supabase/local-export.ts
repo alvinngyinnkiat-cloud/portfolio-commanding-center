@@ -78,6 +78,7 @@ export function exportLocalStorageCache(): PersistenceCache {
   });
   cache.scannerWatchlist = watchlistRepo.get();
   cache.cryptoHoldings = readJson(STORAGE_KEYS.cryptoHoldings, []);
+  cache.cryptoTrades = readJson(STORAGE_KEYS.cryptoTrades, []);
   cache.cryptoAllocation = readJson(
     STORAGE_KEYS.cryptoAllocationSettings,
     DEFAULT_CRYPTO_ALLOCATION

@@ -14,6 +14,7 @@ export const STORAGE_KEYS = {
   scannerSchedule: "portfolio:scanner_schedule",
   scannerWatchlist: "portfolio:scanner_watchlist",
   cryptoHoldings: "portfolio:crypto_holdings",
+  cryptoTrades: "portfolio:crypto_trades",
   cryptoAllocationSettings: "portfolio:crypto_allocation_settings",
   optionsTrades: "portfolio:options_trades",
   optionsSettings: "portfolio:options_settings",

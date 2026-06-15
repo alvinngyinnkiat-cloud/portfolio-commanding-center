@@ -5,6 +5,7 @@ import {
   normalizeCryptoAllocationSettings,
   normalizeCryptoHoldings,
 } from "@/core/calculations/crypto/normalize";
+import { normalizeCryptoTrades } from "@/core/calculations/crypto/trade-normalize";
 import { DEFAULT_SCANNER_WATCHLIST } from "@/core/calculations/scanner/watchlist";
 import { normalizeDashboardSettings } from "@/core/database/local/normalize-settings";
 import { normalizeDailySnapshot } from "@/core/calculations/snapshots";
@@ -113,13 +114,14 @@ export async function hydrateCacheFromSupabase(
     cache.migratedFromLocal = row.migrated_from_local === true;
   }
 
-  const [contributionsRes, goalsRes, snapshotsRes, stockRes, cryptoRes, optionsRes, fxRes, watchlistRes] =
+  const [contributionsRes, goalsRes, snapshotsRes, stockRes, cryptoRes, cryptoTradesRes, optionsRes, fxRes, watchlistRes] =
     await Promise.all([
       client.from("contributions").select("data"),
       client.from("goals").select("data"),
       client.from("portfolio_snapshots").select("data"),
       client.from("stock_transactions").select("data"),
       client.from("crypto_transactions").select("data"),
+      client.from("crypto_trades").select("data"),
       client.from("options_trades").select("data"),
       client.from("stock_fx_conversions").select("data"),
       client.from("watchlist_items").select("data, sort_order").order("sort_order"),
@@ -138,6 +140,13 @@ export async function hydrateCacheFromSupabase(
     if (res.error) throw res.error;
   }
 
+  if (cryptoTradesRes.error) {
+    const message = cryptoTradesRes.error.message ?? "";
+    if (!message.includes("crypto_trades")) {
+      throw cryptoTradesRes.error;
+    }
+  }
+
   cache.contributions = contributionsRes.data?.map((row) => row.data) ?? [];
   cache.goals = goalsRes.data?.map((row) => row.data) ?? [];
   cache.snapshots =
@@ -146,6 +155,9 @@ export async function hydrateCacheFromSupabase(
   cache.cryptoHoldings = normalizeCryptoHoldings(
     cryptoRes.data?.map((row) => row.data) ?? []
   );
+  cache.cryptoTrades = cryptoTradesRes.error
+    ? []
+    : normalizeCryptoTrades(cryptoTradesRes.data?.map((row) => row.data) ?? []);
   cache.optionsTrades = optionsRes.data?.map((row) => row.data) ?? [];
   cache.stockFxConversions = fxRes.data?.map((row) => row.data) ?? [];
 
@@ -204,6 +216,12 @@ export async function importCacheToSupabase(
     cache.cryptoHoldings,
     (row) => row.id
   );
+  await replaceJsonRows(
+    client,
+    "crypto_trades",
+    cache.cryptoTrades,
+    (row) => row.id
+  );
   await replaceJsonRows(client, "options_trades", cache.optionsTrades, (row) => row.id);
   await replaceJsonRows(
     client,
@@ -240,6 +258,7 @@ async function replaceJsonRows<T>(
     | "portfolio_snapshots"
     | "stock_transactions"
     | "crypto_transactions"
+    | "crypto_trades"
     | "options_trades"
     | "stock_fx_conversions",
   rows: T[],

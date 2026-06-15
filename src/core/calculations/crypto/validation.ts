@@ -20,6 +20,7 @@ export interface CryptoHoldingValidationResult {
   };
 }
 
+/** @deprecated Legacy holding draft — use validateCryptoTradeDraft for buys/sells. */
 export function validateCryptoHoldingDraft(
   draft: CryptoHoldingDraft
 ): CryptoHoldingValidationResult {
@@ -65,3 +66,10 @@ export function validateCryptoHoldingDraft(
 export function validateAllocationPercent(value: number): boolean {
   return Number.isFinite(value) && value >= 0;
 }
+
+export {
+  validateCryptoTradeDraft,
+  validateCryptoHoldingValueDraft,
+  type CryptoTradeDraft,
+  type CryptoHoldingValueDraft,
+} from "./trade-validation";

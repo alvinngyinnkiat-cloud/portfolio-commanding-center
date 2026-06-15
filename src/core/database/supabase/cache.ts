@@ -3,6 +3,7 @@ import type {
   ContributionTransaction,
   CryptoAllocationSettings,
   CryptoHolding,
+  CryptoTrade,
   DailySnapshot,
   DashboardSettings,
   Goal,
@@ -23,6 +24,7 @@ import {
   normalizeCryptoAllocationSettings,
   normalizeCryptoHoldings,
 } from "@/core/calculations/crypto/normalize";
+import { normalizeCryptoTrades } from "@/core/calculations/crypto/trade-normalize";
 import { DEFAULT_DASHBOARD_SETTINGS } from "@/core/domain/defaults";
 import { DEFAULT_OPTIONS_SETTINGS } from "@/core/domain/defaults-options";
 import { DEFAULT_SCANNER_WATCHLIST } from "@/core/calculations/scanner/watchlist";
@@ -52,6 +54,7 @@ export interface PersistenceCache {
   scannerSchedule: ScannerScheduleState;
   scannerWatchlist: WatchlistEntry[];
   cryptoHoldings: CryptoHolding[];
+  cryptoTrades: CryptoTrade[];
   cryptoAllocation: CryptoAllocationSettings;
   optionsTrades: OptionsTrade[];
   optionsSettings: OptionsSettings;
@@ -88,6 +91,7 @@ export function createEmptyCache(): PersistenceCache {
     scannerSchedule: { ...EMPTY_SCHEDULE },
     scannerWatchlist: DEFAULT_SCANNER_WATCHLIST.map((row) => ({ ...row })),
     cryptoHoldings: [],
+    cryptoTrades: [],
     cryptoAllocation: { ...DEFAULT_CRYPTO_ALLOCATION },
     optionsTrades: [],
     optionsSettings: { ...DEFAULT_OPTIONS_SETTINGS },
@@ -112,6 +116,7 @@ export function normalizeCache(cache: PersistenceCache): PersistenceCache {
       },
     optionsSettings: normalizeOptionsSettings(cache.optionsSettings),
     cryptoHoldings: normalizeCryptoHoldings(cache.cryptoHoldings),
+    cryptoTrades: normalizeCryptoTrades(cache.cryptoTrades ?? []),
     cryptoAllocation: normalizeCryptoAllocationSettings(cache.cryptoAllocation),
     stockFxConversions: cache.stockFxConversions ?? [],
   };

@@ -14,13 +14,16 @@ import {
 import { migrateLegacyStockDepositsToCashFlow } from "@/core/calculations/stocks/migrate-stock-cash-flow";
 import { normalizeStockUsdAllocationPercent } from "@/core/calculations/contribution-cash";
 import type { StockFxConversion } from "@/core/domain/types/stock-fx-conversion";
+import type { CryptoHolding, CryptoTrade } from "@/core/domain/types";
+import { migrateLegacyCryptoHoldingsToTrades } from "@/core/calculations/crypto/migrate-crypto-trades";
+import { rebuildHoldingsFromTrades } from "@/core/calculations/crypto/trades";
 import { STORAGE_KEYS } from "./storage-keys";
 import { readJson, writeJson } from "./local-storage";
 import { normalizeDashboardSettings } from "./normalize-settings";
 import { normalizeDailySnapshot } from "@/core/calculations/snapshots";
 
 const SCHEMA_VERSION_KEY = "portfolio:schema_version";
-const CURRENT_SCHEMA_VERSION = 10;
+const CURRENT_SCHEMA_VERSION = 11;
 
 interface LegacyBlob {
   usdSgdFxRate?: number;
@@ -182,6 +185,19 @@ export function migrateSchemaIfNeeded(): void {
     );
     writeJson(STORAGE_KEYS.contributions, migrated.contributions);
     writeJson(STORAGE_KEYS.stockFxConversions, migrated.fxConversions);
+  }
+
+  if (version < 11) {
+    const holdings = readJson<CryptoHolding[]>(STORAGE_KEYS.cryptoHoldings, []);
+    const trades = readJson<CryptoTrade[]>(STORAGE_KEYS.cryptoTrades, []);
+    const migratedTrades = migrateLegacyCryptoHoldingsToTrades(holdings, trades);
+    if (migratedTrades.length > trades.length) {
+      writeJson(STORAGE_KEYS.cryptoTrades, migratedTrades);
+      writeJson(
+        STORAGE_KEYS.cryptoHoldings,
+        rebuildHoldingsFromTrades(migratedTrades, holdings)
+      );
+    }
   }
 
   if (version < CURRENT_SCHEMA_VERSION) {

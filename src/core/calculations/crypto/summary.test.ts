@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { CryptoHolding } from "@/core/domain/types";
 import { buildCryptoTrackerSummary } from "./summary";
+import type { CryptoTrade } from "@/core/domain/types";
 
 const holdings: CryptoHolding[] = [
   { id: "1", assetName: "BTC", investedSgd: 500, currentValueSgd: 620 },
@@ -51,5 +52,25 @@ describe("buildCryptoTrackerSummary", () => {
     expect(summary.availableTradingCashSgd).toBe(11_575);
     expect(summary.totalValueSgd).toBe(11_575);
     expect(summary.cryptoProfitLossSgd).toBe(0);
+  });
+
+  it("uses trade ledger for available cash when trades exist", () => {
+    const holdings: CryptoHolding[] = [
+      { id: "1", assetName: "BTC", investedSgd: 3000, feesSgd: 20, currentValueSgd: 3500 },
+    ];
+    const trades: CryptoTrade[] = [
+      {
+        id: "t1",
+        date: "2025-01-01",
+        assetName: "BTC",
+        type: "buy",
+        amountSgd: 3000,
+        feesSgd: 20,
+      },
+    ];
+    const summary = buildCryptoTrackerSummary(holdings, 5000, trades);
+
+    expect(summary.cryptoContributionSgd).toBe(5000);
+    expect(summary.availableTradingCashSgd).toBe(1980);
   });
 });

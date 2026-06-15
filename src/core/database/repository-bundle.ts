@@ -14,6 +14,7 @@ import type {
 } from "./repositories/scanner-repository";
 import type { ScannerWatchlistRepository } from "./repositories/scanner-watchlist-repository";
 import type { CryptoHoldingRepository } from "./repositories/crypto-holding-repository";
+import type { CryptoTradeRepository } from "./repositories/crypto-trade-repository";
 import type { CryptoAllocationRepository } from "./repositories/crypto-allocation-repository";
 import type {
   OptionsTradeRepository,
@@ -36,6 +37,7 @@ export interface RepositoryBundle {
   scannerSchedule: ScannerScheduleRepository;
   scannerWatchlist: ScannerWatchlistRepository;
   cryptoHoldings: CryptoHoldingRepository;
+  cryptoTrades: CryptoTradeRepository;
   cryptoAllocation: CryptoAllocationRepository;
   optionsTrades: OptionsTradeRepository;
   optionsSettings: OptionsSettingsRepository;

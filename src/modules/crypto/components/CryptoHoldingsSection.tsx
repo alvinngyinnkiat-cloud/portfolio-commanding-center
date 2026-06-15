@@ -2,17 +2,32 @@
 
 import { useState } from "react";
 import { usePortfolio } from "@/context/PortfolioContext";
-import type { CryptoHoldingRow } from "@/core/domain/types";
-import { validateCryptoHoldingDraft } from "@/core/calculations/crypto";
+import type { CryptoHoldingRow, CryptoTradeType } from "@/core/domain/types";
+import { validateCryptoHoldingValueDraft, validateCryptoTradeDraft } from "@/core/calculations/crypto";
 import { formatPercent, formatSgd } from "@/shared/lib/format";
 import { coerceNumber } from "@/shared/lib/coerce-number";
+import { toLocalDateString } from "@/shared/lib/date";
 import { Input } from "@/shared/components/ui/Input";
+import { Select } from "@/shared/components/ui/Select";
 import { Button } from "@/shared/components/ui/Button";
 
-const emptyForm = {
+const emptyTradeForm = (): {
+  date: string;
+  assetName: string;
+  type: CryptoTradeType;
+  amountSgd: string;
+  feesSgd: string;
+  notes: string;
+} => ({
+  date: toLocalDateString(),
   assetName: "",
-  investedSgd: "",
+  type: "buy",
+  amountSgd: "",
   feesSgd: "",
+  notes: "",
+});
+
+const emptyValueForm = {
   currentValueSgd: "",
   notes: "",
 };
@@ -28,7 +43,6 @@ function HoldingCells({ row }: { row: CryptoHoldingRow }) {
   return (
     <>
       <td className="px-4 py-3 font-medium text-white">{row.assetName}</td>
-      <td className="px-4 py-3 text-slate-300">{formatSgd(row.investedSgd)}</td>
       <td className="px-4 py-3 text-slate-300">
         {formatSgd(row.contributionSgd)}
       </td>
@@ -47,129 +61,193 @@ function HoldingCells({ row }: { row: CryptoHoldingRow }) {
 
 export function CryptoHoldingsSection() {
   const { cryptoData, services, refresh } = usePortfolio();
-  const [form, setForm] = useState(emptyForm);
-  const [editingId, setEditingId] = useState<string | null>(null);
-  const [formErrors, setFormErrors] = useState<Record<string, string>>({});
+  const [tradeForm, setTradeForm] = useState(emptyTradeForm);
+  const [valueForm, setValueForm] = useState(emptyValueForm);
+  const [editingHoldingId, setEditingHoldingId] = useState<string | null>(null);
+  const [tradeErrors, setTradeErrors] = useState<Record<string, string>>({});
+  const [valueErrors, setValueErrors] = useState<Record<string, string>>({});
 
   const rows = cryptoData?.rows ?? [];
 
-  const handleSubmit = () => {
-    const validation = validateCryptoHoldingDraft(form);
-    if (!validation.valid) {
-      setFormErrors(
+  const handleTradeSubmit = () => {
+    if (!services?.cryptoTrades) return;
+
+    const result = validateCryptoTradeDraft(
+      tradeForm,
+      rows.map((row) => ({
+        id: row.id,
+        assetName: row.assetName,
+        investedSgd: row.investedSgd,
+        feesSgd: row.feesSgd,
+        currentValueSgd: row.currentValueSgd,
+        notes: row.notes,
+      }))
+    );
+
+    if (!result.valid) {
+      setTradeErrors(
         Object.fromEntries(
-          Object.entries(validation.errors).map(([k, v]) => [k, v ?? ""])
+          Object.entries(result.errors).map(([key, value]) => [key, value ?? ""])
         )
       );
       return;
     }
 
-    services.cryptoHoldings.upsertFromDraft(form, editingId ?? undefined);
-    setFormErrors({});
-    setEditingId(null);
-    setForm(emptyForm);
+    services.cryptoTrades.upsertFromDraft(tradeForm);
+    setTradeErrors({});
+    setTradeForm(emptyTradeForm());
     refresh();
   };
 
-  const handleEdit = (row: CryptoHoldingRow) => {
-    setEditingId(row.id);
-    setForm({
-      assetName: row.assetName,
-      investedSgd: String(row.investedSgd),
-      feesSgd: String(row.feesSgd ?? 0),
+  const handleEditHolding = (row: CryptoHoldingRow) => {
+    setEditingHoldingId(row.id);
+    setValueForm({
       currentValueSgd: String(row.currentValueSgd),
       notes: row.notes ?? "",
     });
-    setFormErrors({});
+    setValueErrors({});
   };
 
-  const handleDelete = (id: string) => {
-    services.cryptoHoldings.delete(id);
-    if (editingId === id) {
-      setEditingId(null);
-      setForm(emptyForm);
-      setFormErrors({});
+  const handleValueSubmit = () => {
+    if (!editingHoldingId || !services?.cryptoHoldings) return;
+
+    const validation = validateCryptoHoldingValueDraft(valueForm);
+    if (!validation.valid) {
+      setValueErrors(
+        Object.fromEntries(
+          Object.entries(validation.errors).map(([key, value]) => [key, value ?? ""])
+        )
+      );
+      return;
+    }
+
+    services.cryptoHoldings.updateValuation(editingHoldingId, valueForm);
+    setEditingHoldingId(null);
+    setValueForm(emptyValueForm);
+    setValueErrors({});
+    refresh();
+  };
+
+  const handleDeleteHolding = (row: CryptoHoldingRow) => {
+    if (!services?.cryptoTrades || !services?.cryptoHoldings) return;
+    if (!window.confirm(`Delete ${row.assetName} and all related buy/sell records?`)) {
+      return;
+    }
+
+    const trades = services.cryptoTrades.list();
+    const assetKey = row.assetName.trim().toUpperCase();
+    const remaining = trades.filter(
+      (trade) => trade.assetName.trim().toUpperCase() !== assetKey
+    );
+    services.cryptoTrades.replaceAll(remaining);
+    services.cryptoHoldings.delete(row.id);
+    if (editingHoldingId === row.id) {
+      setEditingHoldingId(null);
+      setValueForm(emptyValueForm);
     }
     refresh();
   };
 
-  const handleCancel = () => {
-    setEditingId(null);
-    setForm(emptyForm);
-    setFormErrors({});
+  const handleCancelEdit = () => {
+    setEditingHoldingId(null);
+    setValueForm(emptyValueForm);
+    setValueErrors({});
   };
 
   return (
-    <div className="min-w-0 space-y-6">
-      <div
-        className={`grid gap-4 rounded-xl border p-4 sm:grid-cols-2 lg:grid-cols-3 ${
-          editingId
-            ? "border-accent/50 bg-accent/5"
-            : "border-surface-border/60 bg-surface/40"
-        }`}
-      >
-        {editingId && (
-          <p className="text-xs font-semibold uppercase tracking-wide text-accent sm:col-span-2 lg:col-span-3">
-            Editing Holding
-          </p>
-        )}
-        <Input
-          label="Asset Name"
-          value={form.assetName}
-          onChange={(e) => setForm({ ...form, assetName: e.target.value })}
-          error={formErrors.assetName}
-        />
-        <Input
-          label="Buy Amount (SGD)"
-          type="number"
-          step="0.01"
-          min="0"
-          value={form.investedSgd}
-          onChange={(e) => setForm({ ...form, investedSgd: e.target.value })}
-          error={formErrors.investedSgd}
-        />
-        <Input
-          label="Fees (SGD)"
-          type="number"
-          step="0.01"
-          min="0"
-          value={form.feesSgd}
-          onChange={(e) => setForm({ ...form, feesSgd: e.target.value })}
-          error={formErrors.feesSgd}
-        />
-        <Input
-          label="Current Value (SGD)"
-          type="number"
-          step="0.01"
-          min="0"
-          value={form.currentValueSgd}
-          onChange={(e) => setForm({ ...form, currentValueSgd: e.target.value })}
-          error={formErrors.currentValueSgd}
-        />
-        <Input
-          label="Notes (optional)"
-          value={form.notes}
-          onChange={(e) => setForm({ ...form, notes: e.target.value })}
-        />
-      </div>
+    <div className="min-w-0 space-y-8">
+      <section className="space-y-4">
+        <h3 className="text-sm font-semibold text-white">Add Buy / Sell Transaction</h3>
+        <div className="grid gap-4 rounded-xl border border-surface-border/60 bg-surface/40 p-4 sm:grid-cols-2 lg:grid-cols-3">
+          <Input
+            label="Date"
+            type="date"
+            value={tradeForm.date}
+            onChange={(e) => setTradeForm({ ...tradeForm, date: e.target.value })}
+            error={tradeErrors.date}
+          />
+          <Input
+            label="Asset Name"
+            value={tradeForm.assetName}
+            onChange={(e) => setTradeForm({ ...tradeForm, assetName: e.target.value })}
+            error={tradeErrors.assetName}
+          />
+          <Select
+            label="Transaction Type"
+            value={tradeForm.type}
+            onChange={(e) =>
+              setTradeForm({
+                ...tradeForm,
+                type: e.target.value as "buy" | "sell",
+              })
+            }
+            options={[
+              { value: "buy", label: "Buy" },
+              { value: "sell", label: "Sell" },
+            ]}
+          />
+          <Input
+            label="Buy/Sell Amount (SGD)"
+            type="number"
+            step="0.01"
+            min="0"
+            value={tradeForm.amountSgd}
+            onChange={(e) => setTradeForm({ ...tradeForm, amountSgd: e.target.value })}
+            error={tradeErrors.amountSgd}
+          />
+          <Input
+            label="Fees (SGD)"
+            type="number"
+            step="0.01"
+            min="0"
+            value={tradeForm.feesSgd}
+            onChange={(e) => setTradeForm({ ...tradeForm, feesSgd: e.target.value })}
+            error={tradeErrors.feesSgd}
+          />
+          <Input
+            label="Notes (optional)"
+            value={tradeForm.notes}
+            onChange={(e) => setTradeForm({ ...tradeForm, notes: e.target.value })}
+          />
+        </div>
+        <Button onClick={handleTradeSubmit}>Add Transaction</Button>
+      </section>
 
-      <div className="flex flex-wrap gap-2">
-        <Button onClick={handleSubmit}>
-          {editingId ? "Update Holding" : "Add Holding"}
-        </Button>
-        {editingId && (
-          <Button variant="ghost" onClick={handleCancel}>
-            Cancel
-          </Button>
-        )}
-      </div>
+      {editingHoldingId && (
+        <section className="space-y-4 rounded-xl border border-accent/50 bg-accent/5 p-4">
+          <h3 className="text-sm font-semibold text-accent">Edit Holding Valuation</h3>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <Input
+              label="Current Value (SGD)"
+              type="number"
+              step="0.01"
+              min="0"
+              value={valueForm.currentValueSgd}
+              onChange={(e) =>
+                setValueForm({ ...valueForm, currentValueSgd: e.target.value })
+              }
+              error={valueErrors.currentValueSgd}
+            />
+            <Input
+              label="Notes (optional)"
+              value={valueForm.notes}
+              onChange={(e) => setValueForm({ ...valueForm, notes: e.target.value })}
+            />
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <Button onClick={handleValueSubmit}>Update Valuation</Button>
+            <Button variant="ghost" onClick={handleCancelEdit}>
+              Cancel
+            </Button>
+          </div>
+        </section>
+      )}
 
       <div className="overflow-x-auto rounded-xl border border-surface-border/60">
         <table className="w-full min-w-[640px] text-sm">
           <thead className="bg-surface/60">
             <tr className="border-b border-surface-border text-left text-xs font-medium uppercase tracking-wide text-slate-500">
               <th className="px-4 py-3">Asset</th>
-              <th className="px-4 py-3">Buy SGD</th>
               <th className="px-4 py-3">Cost Basis</th>
               <th className="px-4 py-3">Current Value</th>
               <th className="px-4 py-3">P/L SGD</th>
@@ -180,10 +258,10 @@ export function CryptoHoldingsSection() {
           <tbody>
             {rows.length === 0 ? (
               <tr>
-                <td colSpan={7} className="px-4 py-8 text-center text-slate-500">
+                <td colSpan={6} className="px-4 py-8 text-center text-slate-500">
                   <p>No crypto holdings yet.</p>
                   <p className="mt-2 text-xs text-slate-600">
-                    Add your first holding above.
+                    Record a buy transaction above, then set current value from Edit.
                   </p>
                 </td>
               </tr>
@@ -199,14 +277,14 @@ export function CryptoHoldingsSection() {
                       <Button
                         size="sm"
                         variant="ghost"
-                        onClick={() => handleEdit(row)}
+                        onClick={() => handleEditHolding(row)}
                       >
                         Edit
                       </Button>
                       <Button
                         size="sm"
                         variant="danger"
-                        onClick={() => handleDelete(row.id)}
+                        onClick={() => handleDeleteHolding(row)}
                       >
                         Delete
                       </Button>

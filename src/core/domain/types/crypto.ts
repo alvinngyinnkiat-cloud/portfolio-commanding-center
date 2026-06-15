@@ -20,6 +20,32 @@ export interface CryptoHolding {
 
 
 
+export type CryptoTradeType = "buy" | "sell";
+
+
+
+export interface CryptoTrade {
+
+  id: string;
+
+  date: string;
+
+  assetName: string;
+
+  type: CryptoTradeType;
+
+  amountSgd: number;
+
+  feesSgd?: number;
+
+  notes?: string;
+
+  createdAt?: string;
+
+}
+
+
+
 export type CryptoHoldingCategory =
 
   | "Top Holding"

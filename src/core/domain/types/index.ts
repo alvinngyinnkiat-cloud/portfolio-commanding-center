@@ -29,6 +29,8 @@ export type {
   CryptoTrackerSummary,
   DashboardCryptoOutputs,
   CryptoAllocationBucket,
+  CryptoTrade,
+  CryptoTradeType,
 } from "./crypto";
 export type {
   StockMarket,

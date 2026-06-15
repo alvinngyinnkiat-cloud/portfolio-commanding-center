@@ -67,7 +67,7 @@ export function CryptoView() {
               <section className="min-w-0">
                 <SectionHeader
                   title="Crypto Holdings"
-                  description="Add, edit, or delete manual valuations — sorted by largest position"
+                  description="Record buy/sell transactions and update manual valuations per holding"
                 />
                 <CryptoHoldingsSection />
               </section>
@@ -80,7 +80,7 @@ export function CryptoView() {
               <section className="min-w-0">
                 <SectionHeader
                   title="Transaction History"
-                  description="Buy entries derived from holdings — newest first"
+                  description="Buy and sell records with date, amount, and fees — newest first"
                 />
                 <CryptoTransactionsSection />
               </section>

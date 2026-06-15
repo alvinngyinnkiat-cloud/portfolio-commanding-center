@@ -2,8 +2,10 @@ import type {
   CryptoAllocationSettings,
   CryptoHoldingRow,
   CryptoTrackerSummary,
+  CryptoTrade,
 } from "@/core/domain/types";
 import type { CryptoHoldingRepository } from "@/core/database/repositories/crypto-holding-repository";
+import type { CryptoTradeRepository } from "@/core/database/repositories/crypto-trade-repository";
 import type { CryptoAllocationRepository } from "@/core/database/repositories/crypto-allocation-repository";
 import type { ContributionRepository } from "@/core/database/repositories/contribution-repository";
 import { calculateTotalCryptoCashContributed } from "@/core/calculations/crypto/contributions";
@@ -16,6 +18,7 @@ import { deriveDashboardCryptoOutputs } from "@/core/adapters/dashboard-crypto-a
 export interface CryptoTrackerData {
   summary: CryptoTrackerSummary;
   rows: CryptoHoldingRow[];
+  trades: CryptoTrade[];
   allocationSettings: CryptoAllocationSettings;
   dashboardOutputs: ReturnType<typeof deriveDashboardCryptoOutputs>;
 }
@@ -23,12 +26,14 @@ export interface CryptoTrackerData {
 export class CryptoTrackerService {
   constructor(
     private readonly holdings: CryptoHoldingRepository,
+    private readonly trades: CryptoTradeRepository,
     private readonly allocation: CryptoAllocationRepository,
     private readonly contributions: ContributionRepository
   ) {}
 
   getData(): CryptoTrackerData {
     const holdingList = this.holdings.list();
+    const tradeList = this.trades.list();
     const contributions = this.contributions.list();
 
     const totalCryptoCashContributed =
@@ -36,7 +41,8 @@ export class CryptoTrackerService {
 
     const summary = buildCryptoTrackerSummary(
       holdingList,
-      totalCryptoCashContributed
+      totalCryptoCashContributed,
+      tradeList
     );
     const rows = buildCryptoHoldingRows(holdingList);
     const allocationSettings = this.allocation.get();
@@ -44,6 +50,7 @@ export class CryptoTrackerService {
     return {
       summary,
       rows,
+      trades: tradeList,
       allocationSettings,
       dashboardOutputs: deriveDashboardCryptoOutputs(summary),
     };

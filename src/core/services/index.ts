@@ -10,6 +10,7 @@ import { StockTrackerService } from "./stock-tracker-service";
 import { StockPriceUpdateService } from "./stock-price-update-service";
 import { createBrowserStockQuoteFetcher } from "./stock-price-fetcher";
 import { CryptoHoldingService } from "./crypto-holding-service";
+import { CryptoTradeService } from "./crypto-trade-service";
 import { CryptoAllocationService } from "./crypto-allocation-service";
 import { CryptoTrackerService } from "./crypto-tracker-service";
 import { StockCandleUpdateService } from "./stock-candle-update-service";
@@ -80,6 +81,7 @@ export function createPortfolioServices(
 
   const cryptoTracker = new CryptoTrackerService(
     repos.cryptoHoldings,
+    repos.cryptoTrades,
     repos.cryptoAllocation,
     repos.contributions
   );
@@ -125,6 +127,7 @@ export function createPortfolioServices(
     scannerWatchlist,
     scanner,
     cryptoHoldings: new CryptoHoldingService(repos.cryptoHoldings),
+    cryptoTrades: new CryptoTradeService(repos.cryptoTrades, repos.cryptoHoldings),
     cryptoAllocation: new CryptoAllocationService(repos.cryptoAllocation),
     cryptoTracker,
     optionsTrades: new OptionsTradeService(

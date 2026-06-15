@@ -28,8 +28,18 @@ export {
 export {
   validateCryptoHoldingDraft,
   validateAllocationPercent,
+  validateCryptoTradeDraft,
+  validateCryptoHoldingValueDraft,
+  type CryptoHoldingDraft,
+  type CryptoTradeDraft,
+  type CryptoHoldingValueDraft,
 } from "./validation";
 export {
   calculateTotalCryptoCashContributed,
   calculateCryptoContribution,
 } from "./contributions";
+export {
+  calculateAvailableTradingCashFromTrades,
+  rebuildHoldingsFromTrades,
+  normalizeCryptoAssetName,
+} from "./trades";
