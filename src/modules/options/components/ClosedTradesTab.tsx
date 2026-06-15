@@ -9,6 +9,29 @@ import { formatSignedPercent, plColorClass, closeMethodBadgeClass, closeMethodLa
 import { usePortfolio } from "@/context/PortfolioContext";
 import { EditClosedNotesModal, EditClosedTradeModal } from "./OptionsModals";
 
+const CLOSED_TRADES_DISPLAY_LIMIT = 10;
+
+function sortClosedByDateDesc(rows: OptionsClosedTradeRow[]): OptionsClosedTradeRow[] {
+  return [...rows].sort((a, b) => {
+    const byCloseDate = (b.trade.closeDate ?? "").localeCompare(a.trade.closeDate ?? "");
+    if (byCloseDate !== 0) return byCloseDate;
+    return (b.trade.updatedAt ?? b.trade.createdAt).localeCompare(
+      a.trade.updatedAt ?? a.trade.createdAt
+    );
+  });
+}
+
+function visibleClosedRows(
+  rows: OptionsClosedTradeRow[],
+  showAll: boolean
+): OptionsClosedTradeRow[] {
+  const sorted = sortClosedByDateDesc(rows);
+  if (showAll || sorted.length <= CLOSED_TRADES_DISPLAY_LIMIT) {
+    return sorted;
+  }
+  return sorted.slice(0, CLOSED_TRADES_DISPLAY_LIMIT);
+}
+
 interface ClosedSectionSummary {
   closedCount: number;
   totalRealizedPlUsd: number;
@@ -250,9 +273,74 @@ function ClosedTradesTable({
   );
 }
 
+function ClosedTradesSection({
+  title,
+  rows,
+  summaryItems,
+  variant,
+  emptyMessage,
+  showAll,
+  onShowAll,
+  onShowLatest,
+  onEdit,
+  onNotes,
+  onDelete,
+}: {
+  title: string;
+  rows: OptionsClosedTradeRow[];
+  summaryItems: Array<{ label: string; value: string }>;
+  variant: "personal" | "shared";
+  emptyMessage: string;
+  showAll: boolean;
+  onShowAll: () => void;
+  onShowLatest: () => void;
+  onEdit: (row: OptionsClosedTradeRow) => void;
+  onNotes: (row: OptionsClosedTradeRow) => void;
+  onDelete: (row: OptionsClosedTradeRow) => void;
+}) {
+  const totalCount = rows.length;
+  const displayRows = visibleClosedRows(rows, showAll);
+  const showingCount = displayRows.length;
+  const canExpand = totalCount > CLOSED_TRADES_DISPLAY_LIMIT;
+
+  return (
+    <section className="space-y-4">
+      <h2 className="text-lg font-semibold text-white">{title}</h2>
+      <SectionSummaryStrip items={summaryItems} />
+      <ClosedTradesTable
+        rows={displayRows}
+        variant={variant}
+        emptyMessage={emptyMessage}
+        onEdit={onEdit}
+        onNotes={onNotes}
+        onDelete={onDelete}
+      />
+      {totalCount > 0 && (
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <p className="text-xs text-slate-500">
+            Showing {showingCount} of {totalCount} closed trade
+            {totalCount === 1 ? "" : "s"}
+          </p>
+          {canExpand && (
+            <Button
+              size="sm"
+              variant="secondary"
+              onClick={showAll ? onShowLatest : onShowAll}
+            >
+              {showAll ? "Show Latest 10" : "View All"}
+            </Button>
+          )}
+        </div>
+      )}
+    </section>
+  );
+}
+
 export function ClosedTradesTab() {
   const { optionsData, services, refresh } = usePortfolio();
   const [year, setYear] = useState<string>("all");
+  const [personalShowAll, setPersonalShowAll] = useState(false);
+  const [sharedShowAll, setSharedShowAll] = useState(false);
   const [notesRow, setNotesRow] = useState<OptionsClosedTradeRow | null>(null);
   const [editRow, setEditRow] = useState<OptionsClosedTradeRow | null>(null);
   const rows = optionsData?.closedRows ?? [];
@@ -348,65 +436,63 @@ export function ClosedTradesTab() {
         </select>
       </div>
 
-      <section className="space-y-4">
-        <h2 className="text-lg font-semibold text-white">Personal Closed Trades</h2>
-        <SectionSummaryStrip
-          items={[
-            {
-              label: "Closed Trades",
-              value: String(personalSummary.closedCount),
-            },
-            {
-              label: "Realized P/L",
-              value: formatUsd(personalSummary.totalRealizedPlUsd),
-            },
-            {
-              label: "Win Rate",
-              value: formatPercent(personalSummary.winRatePercent, 1),
-            },
-          ]}
-        />
-        <ClosedTradesTable
-          rows={personalRows}
-          variant="personal"
-          emptyMessage="No personal closed trades."
-          onEdit={setEditRow}
-          onNotes={setNotesRow}
-          onDelete={handleDelete}
-        />
-      </section>
+      <ClosedTradesSection
+        title="Personal Closed Trades"
+        rows={personalRows}
+        variant="personal"
+        emptyMessage="No personal closed trades."
+        showAll={personalShowAll}
+        onShowAll={() => setPersonalShowAll(true)}
+        onShowLatest={() => setPersonalShowAll(false)}
+        onEdit={setEditRow}
+        onNotes={setNotesRow}
+        onDelete={handleDelete}
+        summaryItems={[
+          {
+            label: "Closed Trades",
+            value: String(personalSummary.closedCount),
+          },
+          {
+            label: "Realized P/L",
+            value: formatUsd(personalSummary.totalRealizedPlUsd),
+          },
+          {
+            label: "Win Rate",
+            value: formatPercent(personalSummary.winRatePercent, 1),
+          },
+        ]}
+      />
 
-      <section className="space-y-4">
-        <h2 className="text-lg font-semibold text-white">Shared Closed Trades</h2>
-        <SectionSummaryStrip
-          items={[
-            {
-              label: "Closed Trades",
-              value: String(sharedSummary.closedCount),
-            },
-            {
-              label: "Total Realized P/L",
-              value: formatUsd(sharedSummary.totalRealizedPlUsd),
-            },
-            {
-              label: "Your Realized P/L",
-              value: formatUsd(sharedSummary.userRealizedPlUsd),
-            },
-            {
-              label: "Client Realized P/L",
-              value: formatUsd(sharedSummary.clientRealizedPlUsd),
-            },
-          ]}
-        />
-        <ClosedTradesTable
-          rows={sharedRows}
-          variant="shared"
-          emptyMessage="No shared closed trades."
-          onEdit={setEditRow}
-          onNotes={setNotesRow}
-          onDelete={handleDelete}
-        />
-      </section>
+      <ClosedTradesSection
+        title="Shared Closed Trades"
+        rows={sharedRows}
+        variant="shared"
+        emptyMessage="No shared closed trades."
+        showAll={sharedShowAll}
+        onShowAll={() => setSharedShowAll(true)}
+        onShowLatest={() => setSharedShowAll(false)}
+        onEdit={setEditRow}
+        onNotes={setNotesRow}
+        onDelete={handleDelete}
+        summaryItems={[
+          {
+            label: "Closed Trades",
+            value: String(sharedSummary.closedCount),
+          },
+          {
+            label: "Total Realized P/L",
+            value: formatUsd(sharedSummary.totalRealizedPlUsd),
+          },
+          {
+            label: "Your Realized P/L",
+            value: formatUsd(sharedSummary.userRealizedPlUsd),
+          },
+          {
+            label: "Client Realized P/L",
+            value: formatUsd(sharedSummary.clientRealizedPlUsd),
+          },
+        ]}
+      />
 
       {openPartialCloseEvents.length > 0 && (
         <section className="space-y-4">
