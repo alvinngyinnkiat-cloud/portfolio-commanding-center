@@ -28,7 +28,7 @@ export function SummaryCard({
 
   return (
     <div
-      className={`group relative overflow-hidden rounded-2xl border transition-all ${
+      className={`group relative min-w-0 max-w-full overflow-hidden rounded-2xl border transition-all ${
         highlight
           ? "border-accent/40 bg-gradient-to-br from-accent/15 via-surface-card to-surface-card shadow-lg shadow-accent/10"
           : "border-surface-border/80 bg-surface-card/90 shadow-md shadow-black/15 hover:border-surface-border"
@@ -40,8 +40,8 @@ export function SummaryCard({
           aria-hidden
         />
       )}
-      <div className="flex items-start justify-between gap-3">
-        <p className="text-xs font-medium uppercase tracking-wide text-slate-500 sm:text-sm sm:normal-case sm:tracking-normal sm:text-slate-400">
+      <div className="flex min-w-0 items-start justify-between gap-3">
+        <p className="min-w-0 break-words text-xs font-medium uppercase tracking-wide text-slate-500 sm:text-sm sm:normal-case sm:tracking-normal sm:text-slate-400">
           {label}
         </p>
         {icon && (
@@ -55,14 +55,14 @@ export function SummaryCard({
         )}
       </div>
       <p
-        className={`mt-3 font-bold tracking-tight ${trendColor} ${
+        className={`mt-3 break-words font-bold tracking-tight ${trendColor} ${
           compact ? "text-xl sm:text-2xl" : "text-2xl sm:text-3xl"
         }`}
       >
         {value}
       </p>
       {subValue && (
-        <p className="mt-2 whitespace-pre-line text-xs leading-relaxed text-slate-500">
+        <p className="mt-2 break-words whitespace-pre-line text-xs leading-relaxed text-slate-500">
           {subValue}
         </p>
       )}

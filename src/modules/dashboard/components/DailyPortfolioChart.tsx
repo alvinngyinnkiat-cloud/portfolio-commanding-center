@@ -155,7 +155,7 @@ export function DailyPortfolioChart({ snapshots }: DailyPortfolioChartProps) {
               </p>
             </div>
           </div>
-          <div className="h-56 sm:h-64">
+          <div className="h-56 w-full min-w-0 sm:h-64">
             <ResponsiveContainer width="100%" height="100%">
               <LineChart data={chartData}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#334155" />

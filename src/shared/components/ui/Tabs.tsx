@@ -21,7 +21,7 @@ export function Tabs({ items, defaultTab }: TabsProps) {
   return (
     <div className="min-w-0 space-y-4">
       <div
-        className="-mx-1 flex min-w-0 gap-1 overflow-x-auto pb-1 scrollbar-thin sm:mx-0"
+        className="-mx-1 flex min-w-0 gap-1 overflow-x-auto pb-1 scrollbar-hide sm:mx-0"
         role="tablist"
       >
         {items.map((tab) => {
@@ -33,7 +33,7 @@ export function Tabs({ items, defaultTab }: TabsProps) {
               role="tab"
               aria-selected={isActive}
               onClick={() => setActiveId(tab.id)}
-              className={`shrink-0 rounded-lg px-4 py-2.5 text-sm font-medium transition-all ${
+              className={`shrink-0 whitespace-nowrap rounded-lg px-4 py-2.5 text-sm font-medium transition-all ${
                 isActive
                   ? "bg-accent text-white shadow-md shadow-accent/20"
                   : "bg-surface-card text-slate-400 hover:bg-surface-border hover:text-slate-200"

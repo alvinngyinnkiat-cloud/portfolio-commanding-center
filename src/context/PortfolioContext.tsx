@@ -180,9 +180,9 @@ export function PortfolioProvider({ children }: { children: ReactNode }) {
           <p className="mt-2 text-sm text-accent-red/90">{initError}</p>
         </div>
       ) : isLoading || !services ? (
-        <div className="space-y-6">
+        <div className="min-w-0 space-y-6">
           <div className="h-8 w-64 animate-pulse rounded-lg bg-surface-border/50" />
-          <div className="grid gap-4 sm:grid-cols-3">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
             {[1, 2, 3].map((i) => (
               <div
                 key={i}

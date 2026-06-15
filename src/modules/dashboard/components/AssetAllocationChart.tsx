@@ -26,7 +26,7 @@ export function AssetAllocationChart({ data, total }: AssetAllocationChartProps)
           <p className="text-sm text-slate-500">No assets to display.</p>
         </div>
       ) : (
-        <div className="h-64 sm:h-72">
+        <div className="h-64 w-full min-w-0 sm:h-72">
           <ResponsiveContainer width="100%" height="100%">
             <PieChart>
               <Pie

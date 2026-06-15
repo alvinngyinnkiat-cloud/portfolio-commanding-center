@@ -14,11 +14,11 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en" className="h-full">
-      <body className="min-h-screen bg-surface text-slate-200 antialiased">
+    <html lang="en" className="h-full overflow-x-hidden">
+      <body className="min-h-screen overflow-x-hidden bg-surface text-slate-200 antialiased">
         <Header />
         <PortfolioProvider>
-          <main className="mx-auto max-w-7xl px-4 py-6 sm:px-6 sm:py-8">
+          <main className="mx-auto min-w-0 max-w-full overflow-x-hidden px-4 py-6 sm:max-w-7xl sm:px-6 sm:py-8">
             {children}
           </main>
         </PortfolioProvider>

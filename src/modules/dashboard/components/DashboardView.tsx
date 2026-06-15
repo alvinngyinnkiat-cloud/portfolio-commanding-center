@@ -31,7 +31,7 @@ function DashboardSkeleton() {
         <div className="h-8 w-48 rounded-lg bg-surface-border/50 animate-pulse" />
         <div className="h-4 w-64 rounded bg-surface-border/30 animate-pulse" />
       </div>
-      <div className="grid gap-4 sm:grid-cols-3">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
         {[1, 2, 3].map((i) => (
           <div
             key={i}
@@ -62,7 +62,7 @@ export function DashboardView() {
 
   if (!fxRateValid || !metrics) {
     return (
-      <div className="space-y-8 pb-8">
+      <div className="min-w-0 space-y-8 pb-8">
         <header className="space-y-1">
           <h1 className="text-2xl font-bold tracking-tight text-white sm:text-3xl">
             Portfolio Dashboard
@@ -84,7 +84,7 @@ export function DashboardView() {
   );
 
   return (
-    <div className="space-y-8 pb-8">
+    <div className="min-w-0 space-y-8 pb-8">
       <header className="space-y-1">
         <h1 className="text-2xl font-bold tracking-tight text-white sm:text-3xl">
           Portfolio Dashboard
@@ -109,7 +109,7 @@ export function DashboardView() {
           title="Portfolio Ownership"
           description="Own Portfolio from Stock + Crypto + Personal Options Unrealised P/L"
         />
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
           <SummaryCard
             label="Own Portfolio"
             value={formatSgd(metrics.totalPortfolioValue)}
@@ -143,7 +143,7 @@ export function DashboardView() {
           title="Performance & Contributions"
           description="Capital model P/L and contribution from Stock + Crypto trackers"
         />
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
           <SummaryCard
             label="Total P/L"
             value={formatSgd(metrics.totalPL)}

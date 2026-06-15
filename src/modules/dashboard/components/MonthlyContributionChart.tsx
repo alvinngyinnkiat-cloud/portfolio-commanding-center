@@ -122,7 +122,7 @@ export function MonthlyContributionChart({
           </p>
         </div>
       ) : (
-        <div className="h-56 sm:h-72">
+        <div className="h-56 w-full min-w-0 sm:h-72">
           <ResponsiveContainer width="100%" height="100%">
             <BarChart data={monthlyData}>
               <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
