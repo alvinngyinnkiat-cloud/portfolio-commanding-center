@@ -4,7 +4,6 @@ import { useMemo, useRef, useState } from "react";
 import { usePortfolio } from "@/context/PortfolioContext";
 import type { CryptoTrade, CryptoTradeType } from "@/core/domain/types";
 import {
-  cryptoTradeToDraft,
   rebuildHoldingsFromTrades,
   validateCryptoTradeDraft,
   type CryptoTradeDraft,
@@ -16,6 +15,17 @@ import { Input } from "@/shared/components/ui/Input";
 import { Select } from "@/shared/components/ui/Select";
 import { Button } from "@/shared/components/ui/Button";
 import { persistCryptoTradeChanges } from "@/modules/crypto/lib/persist-crypto-changes";
+
+function toCryptoTradeDraft(trade: CryptoTrade): CryptoTradeDraft {
+  return {
+    date: parseIsoDateString(trade.date) ?? "",
+    assetName: trade.assetName,
+    type: trade.type,
+    amountSgd: String(trade.amountSgd),
+    feesSgd: trade.feesSgd != null ? String(trade.feesSgd) : "",
+    notes: trade.notes ?? "",
+  };
+}
 
 export function CryptoTransactionsSection() {
   const { cryptoData, services, refresh } = usePortfolio();
@@ -63,7 +73,7 @@ export function CryptoTransactionsSection() {
 
   const handleEdit = (trade: CryptoTrade) => {
     setEditingId(trade.id);
-    setForm(cryptoTradeToDraft(trade));
+    setForm(toCryptoTradeDraft(trade));
     setFormErrors({});
     setSaveError(null);
     formRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
