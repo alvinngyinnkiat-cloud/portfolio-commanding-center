@@ -22,6 +22,9 @@ import { Button } from "@/shared/components/ui/Button";
 import { SummaryCard } from "@/shared/components/ui/SummaryCard";
 import { FxRateErrorBanner } from "@/shared/components/ui/FxRateErrorBanner";
 import { Wallet, ArrowLeftRight } from "lucide-react";
+import { Modal } from "@/shared/components/ui/Modal";
+
+const HISTORY_PREVIEW_LIMIT = 5;
 
 interface DepositForm {
   date: string;
@@ -53,18 +56,196 @@ const emptyFxForm = (): FxForm => ({
   notes: "",
 });
 
+function HistoryFooter({
+  total,
+  previewCount,
+  onViewAll,
+}: {
+  total: number;
+  previewCount: number;
+  onViewAll: () => void;
+}) {
+  if (total === 0) return null;
+
+  return (
+    <div className="flex flex-wrap items-center justify-between gap-3">
+      <p className="text-sm text-slate-500">
+        Showing {previewCount} of {total} record{total === 1 ? "" : "s"}
+      </p>
+      {total > HISTORY_PREVIEW_LIMIT && (
+        <Button variant="secondary" className="px-3 py-1.5 text-xs" onClick={onViewAll}>
+          View All
+        </Button>
+      )}
+    </div>
+  );
+}
+
+function DepositHistoryTable({
+  rows,
+  onEdit,
+  onDelete,
+}: {
+  rows: ContributionTransaction[];
+  onEdit: (row: ContributionTransaction) => void;
+  onDelete: (id: string) => void;
+}) {
+  return (
+    <div className="overflow-x-auto rounded-xl border border-surface-border/60">
+      <table className="w-full min-w-[640px] text-sm">
+        <thead className="bg-surface/60 text-xs uppercase text-slate-500">
+          <tr>
+            <th className="px-4 py-3 text-left">Date</th>
+            <th className="px-4 py-3 text-left">Type</th>
+            <th className="px-4 py-3 text-left">Amount SGD</th>
+            <th className="px-4 py-3 text-left">Notes</th>
+            <th className="px-4 py-3 text-left">Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.length === 0 ? (
+            <tr>
+              <td colSpan={5} className="px-4 py-8 text-center text-slate-500">
+                No deposit or withdrawal records yet.
+              </td>
+            </tr>
+          ) : (
+            rows.map((row) => (
+              <tr
+                key={row.id}
+                className="border-b border-surface-border/40 text-slate-300 last:border-0"
+              >
+                <td className="px-4 py-3">{formatDate(row.date)}</td>
+                <td className="px-4 py-3 capitalize">{row.type}</td>
+                <td className="px-4 py-3 font-medium text-white">
+                  {formatSgd(row.amountSgd)}
+                </td>
+                <td className="px-4 py-3">{row.notes ?? "—"}</td>
+                <td className="px-4 py-3">
+                  <div className="flex gap-2">
+                    <Button
+                      variant="secondary"
+                      className="px-2 py-1 text-xs"
+                      onClick={() => onEdit(row)}
+                    >
+                      Edit
+                    </Button>
+                    <Button
+                      variant="secondary"
+                      className="px-2 py-1 text-xs text-accent-red"
+                      onClick={() => onDelete(row.id)}
+                    >
+                      Delete
+                    </Button>
+                  </div>
+                </td>
+              </tr>
+            ))
+          )}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+function FxHistoryTable({
+  rows,
+  onEdit,
+  onDelete,
+}: {
+  rows: StockFxConversion[];
+  onEdit: (row: StockFxConversion) => void;
+  onDelete: (id: string) => void;
+}) {
+  return (
+    <div className="overflow-x-auto rounded-xl border border-surface-border/60">
+      <table className="w-full min-w-[760px] text-sm">
+        <thead className="bg-surface/60 text-xs uppercase text-slate-500">
+          <tr>
+            <th className="px-4 py-3 text-left">Date</th>
+            <th className="px-4 py-3 text-left">Direction</th>
+            <th className="px-4 py-3 text-left">SGD Amount</th>
+            <th className="px-4 py-3 text-left">USD Amount</th>
+            <th className="px-4 py-3 text-left">FX Rate</th>
+            <th className="px-4 py-3 text-left">Notes</th>
+            <th className="px-4 py-3 text-left">Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.length === 0 ? (
+            <tr>
+              <td colSpan={7} className="px-4 py-8 text-center text-slate-500">
+                No FX conversions yet.
+              </td>
+            </tr>
+          ) : (
+            rows.map((row) => (
+              <tr
+                key={row.id}
+                className="border-b border-surface-border/40 text-slate-300 last:border-0"
+              >
+                <td className="px-4 py-3">{formatDate(row.date)}</td>
+                <td className="px-4 py-3">
+                  {row.direction === "sgd_to_usd" ? "SGD → USD" : "USD → SGD"}
+                </td>
+                <td className="px-4 py-3">{formatSgd(row.sgdAmount)}</td>
+                <td className="px-4 py-3">{formatUsd(row.usdAmount)}</td>
+                <td className="px-4 py-3">
+                  {calculateStockFxRate(row.sgdAmount, row.usdAmount).toFixed(4)}
+                </td>
+                <td className="px-4 py-3">{row.notes ?? "—"}</td>
+                <td className="px-4 py-3">
+                  <div className="flex gap-2">
+                    <Button
+                      variant="secondary"
+                      className="px-2 py-1 text-xs"
+                      onClick={() => onEdit(row)}
+                    >
+                      Edit
+                    </Button>
+                    <Button
+                      variant="secondary"
+                      className="px-2 py-1 text-xs text-accent-red"
+                      onClick={() => onDelete(row.id)}
+                    >
+                      Delete
+                    </Button>
+                  </div>
+                </td>
+              </tr>
+            ))
+          )}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
 export function StockCashFlowSection() {
   const { stockData, services, refresh } = usePortfolio();
   const [depositForm, setDepositForm] = useState<DepositForm>(emptyDepositForm);
   const [fxForm, setFxForm] = useState<FxForm>(emptyFxForm);
   const [editingDepositId, setEditingDepositId] = useState<string | null>(null);
   const [editingFxId, setEditingFxId] = useState<string | null>(null);
+  const [showAllDeposits, setShowAllDeposits] = useState(false);
+  const [showAllFx, setShowAllFx] = useState(false);
 
   const cashFlow = stockData?.cashFlow;
   const summary = cashFlow?.summary;
   const deposits = cashFlow?.deposits ?? [];
   const fxConversions = cashFlow?.fxConversions ?? [];
   const fxRateValid = summary?.fxRateValid ?? false;
+
+  const previewDeposits = useMemo(
+    () => deposits.slice(0, HISTORY_PREVIEW_LIMIT),
+    [deposits]
+  );
+  const previewFxConversions = useMemo(
+    () => fxConversions.slice(0, HISTORY_PREVIEW_LIMIT),
+    [fxConversions]
+  );
+  const depositPreviewCount = Math.min(deposits.length, HISTORY_PREVIEW_LIMIT);
+  const fxPreviewCount = Math.min(fxConversions.length, HISTORY_PREVIEW_LIMIT);
 
   const fxPreviewRate = useMemo(() => {
     const sgd = parseFloat(fxForm.sgdAmount);
@@ -124,6 +305,7 @@ export function StockCashFlowSection() {
   };
 
   const handleEditDeposit = (row: ContributionTransaction) => {
+    setShowAllDeposits(false);
     setEditingDepositId(row.id);
     setDepositForm({
       date: row.date,
@@ -134,6 +316,7 @@ export function StockCashFlowSection() {
   };
 
   const handleEditFx = (row: StockFxConversion) => {
+    setShowAllFx(false);
     setEditingFxId(row.id);
     setFxForm({
       date: row.date,
@@ -325,125 +508,67 @@ export function StockCashFlowSection() {
 
       <section className="space-y-4">
         <h3 className="font-medium text-white">Deposit / Withdrawal History</h3>
-        <div className="overflow-x-auto rounded-xl border border-surface-border/60">
-          <table className="w-full min-w-[640px] text-sm">
-            <thead className="bg-surface/60 text-xs uppercase text-slate-500">
-              <tr>
-                <th className="px-4 py-3 text-left">Date</th>
-                <th className="px-4 py-3 text-left">Type</th>
-                <th className="px-4 py-3 text-left">Amount SGD</th>
-                <th className="px-4 py-3 text-left">Notes</th>
-                <th className="px-4 py-3 text-left">Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {deposits.length === 0 ? (
-                <tr>
-                  <td colSpan={5} className="px-4 py-8 text-center text-slate-500">
-                    No deposit or withdrawal records yet.
-                  </td>
-                </tr>
-              ) : (
-                deposits.map((row) => (
-                  <tr
-                    key={row.id}
-                    className="border-b border-surface-border/40 text-slate-300 last:border-0"
-                  >
-                    <td className="px-4 py-3">{formatDate(row.date)}</td>
-                    <td className="px-4 py-3 capitalize">{row.type}</td>
-                    <td className="px-4 py-3 font-medium text-white">
-                      {formatSgd(row.amountSgd)}
-                    </td>
-                    <td className="px-4 py-3">{row.notes ?? "—"}</td>
-                    <td className="px-4 py-3">
-                      <div className="flex gap-2">
-                        <Button
-                          variant="secondary"
-                          className="px-2 py-1 text-xs"
-                          onClick={() => handleEditDeposit(row)}
-                        >
-                          Edit
-                        </Button>
-                        <Button
-                          variant="secondary"
-                          className="px-2 py-1 text-xs text-accent-red"
-                          onClick={() => handleDeleteDeposit(row.id)}
-                        >
-                          Delete
-                        </Button>
-                      </div>
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
+        <DepositHistoryTable
+          rows={previewDeposits}
+          onEdit={handleEditDeposit}
+          onDelete={handleDeleteDeposit}
+        />
+        <HistoryFooter
+          total={deposits.length}
+          previewCount={depositPreviewCount}
+          onViewAll={() => setShowAllDeposits(true)}
+        />
       </section>
 
       <section className="space-y-4">
         <h3 className="font-medium text-white">FX Conversion History</h3>
-        <div className="overflow-x-auto rounded-xl border border-surface-border/60">
-          <table className="w-full min-w-[760px] text-sm">
-            <thead className="bg-surface/60 text-xs uppercase text-slate-500">
-              <tr>
-                <th className="px-4 py-3 text-left">Date</th>
-                <th className="px-4 py-3 text-left">Direction</th>
-                <th className="px-4 py-3 text-left">SGD Amount</th>
-                <th className="px-4 py-3 text-left">USD Amount</th>
-                <th className="px-4 py-3 text-left">FX Rate</th>
-                <th className="px-4 py-3 text-left">Notes</th>
-                <th className="px-4 py-3 text-left">Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {fxConversions.length === 0 ? (
-                <tr>
-                  <td colSpan={7} className="px-4 py-8 text-center text-slate-500">
-                    No FX conversions yet.
-                  </td>
-                </tr>
-              ) : (
-                fxConversions.map((row) => (
-                  <tr
-                    key={row.id}
-                    className="border-b border-surface-border/40 text-slate-300 last:border-0"
-                  >
-                    <td className="px-4 py-3">{formatDate(row.date)}</td>
-                    <td className="px-4 py-3">
-                      {row.direction === "sgd_to_usd" ? "SGD → USD" : "USD → SGD"}
-                    </td>
-                    <td className="px-4 py-3">{formatSgd(row.sgdAmount)}</td>
-                    <td className="px-4 py-3">{formatUsd(row.usdAmount)}</td>
-                    <td className="px-4 py-3">
-                      {calculateStockFxRate(row.sgdAmount, row.usdAmount).toFixed(4)}
-                    </td>
-                    <td className="px-4 py-3">{row.notes ?? "—"}</td>
-                    <td className="px-4 py-3">
-                      <div className="flex gap-2">
-                        <Button
-                          variant="secondary"
-                          className="px-2 py-1 text-xs"
-                          onClick={() => handleEditFx(row)}
-                        >
-                          Edit
-                        </Button>
-                        <Button
-                          variant="secondary"
-                          className="px-2 py-1 text-xs text-accent-red"
-                          onClick={() => handleDeleteFx(row.id)}
-                        >
-                          Delete
-                        </Button>
-                      </div>
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
+        <FxHistoryTable
+          rows={previewFxConversions}
+          onEdit={handleEditFx}
+          onDelete={handleDeleteFx}
+        />
+        <HistoryFooter
+          total={fxConversions.length}
+          previewCount={fxPreviewCount}
+          onViewAll={() => setShowAllFx(true)}
+        />
       </section>
+
+      {showAllDeposits && (
+        <Modal
+          title="Deposit / Withdrawal History"
+          onClose={() => setShowAllDeposits(false)}
+          wide
+        >
+          <DepositHistoryTable
+            rows={deposits}
+            onEdit={handleEditDeposit}
+            onDelete={handleDeleteDeposit}
+          />
+          <p className="mt-4 text-sm text-slate-500">
+            Showing {deposits.length} of {deposits.length} record
+            {deposits.length === 1 ? "" : "s"}
+          </p>
+        </Modal>
+      )}
+
+      {showAllFx && (
+        <Modal
+          title="FX Conversion History"
+          onClose={() => setShowAllFx(false)}
+          wide
+        >
+          <FxHistoryTable
+            rows={fxConversions}
+            onEdit={handleEditFx}
+            onDelete={handleDeleteFx}
+          />
+          <p className="mt-4 text-sm text-slate-500">
+            Showing {fxConversions.length} of {fxConversions.length} record
+            {fxConversions.length === 1 ? "" : "s"}
+          </p>
+        </Modal>
+      )}
     </div>
   );
 }
