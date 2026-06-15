@@ -8,10 +8,14 @@ import {
   calculateOptionDollarValue,
   calculatePerShareOptionPrice,
   compareOpenTradesByOpenDate,
+  getOriginalContracts,
+  getRemainingContracts,
   hasBreakevenMetrics,
   resolveBreakevenDifference,
+  scaleMaxRiskForRemaining,
   summarizeOpenTradesHeader,
   summarizeOpenTradesOwnership,
+  tradeForRemainingContracts,
 } from "@/core/calculations/options";
 import { formatTradeStrikes } from "@/core/calculations/options/helpers";
 import { formatShortDate, formatUsd } from "@/shared/lib/format";
@@ -62,7 +66,7 @@ function InlineEditableMarketValueCell({
   const [error, setError] = useState<string | null>(null);
   const cancelRef = useRef(false);
 
-  const contracts = row.trade.contracts;
+  const contracts = getRemainingContracts(row.trade);
   const savedPrice =
     row.trade.currentValueUsd != null
       ? calculatePerShareOptionPrice(row.trade.currentValueUsd, contracts)
@@ -264,7 +268,7 @@ function OpenTradesTable({
   onDelete: (row: OptionsOpenTradeRow) => void;
   onValueSaved: () => void;
 }) {
-  const colCount = showSplitColumn ? 13 : 12;
+  const colCount = showSplitColumn ? 15 : 14;
 
   return (
     <div className={dataTableWrapperClass}>
@@ -277,7 +281,9 @@ function OpenTradesTable({
               <th className={`${dataTableThRightClass} w-[3rem]`}>Split</th>
             )}
             <th className={`${dataTableThLeftClass} w-[4.5rem]`}>Opened</th>
-            <th className={`${dataTableThLeftClass} w-[5rem]`}>Expiration</th>
+            <th className={`${dataTableThLeftClass} w-[4.5rem]`}>Expiration</th>
+            <th className={`${dataTableThRightClass} w-[3.5rem]`}>Orig</th>
+            <th className={`${dataTableThRightClass} w-[3.5rem]`}>Rem</th>
             <th className={`${dataTableThRightClass} w-[4rem]`}>Strikes</th>
             <th className={`${dataTableThRightClass} w-[4.5rem]`}>Premium</th>
             <th className={`${dataTableThRightClass} w-[4rem]`}>75% TP</th>
@@ -300,17 +306,20 @@ function OpenTradesTable({
               const economics = row.tradeEconomics;
               const metrics =
                 economics ?? row.spreadMetrics ?? row.ironCondorMetrics;
+              const effectiveTrade = tradeForRemainingContracts(row.trade);
               const premiumStacked = buildStackedOptionPrice(
-                row.trade.openPremiumUsd,
-                row.trade.contracts
+                effectiveTrade.openPremiumUsd,
+                effectiveTrade.contracts
               );
               const tpExit =
                 metrics != null
                   ? buildStackedOptionPrice(
                       metrics.tpExitPrice75Usd,
-                      row.trade.contracts
+                      effectiveTrade.contracts
                     )
                   : null;
+              const originalContracts = getOriginalContracts(row.trade);
+              const remainingContracts = getRemainingContracts(row.trade);
 
               return (
                 <tr key={row.trade.id} className={dataTableRowClass}>
@@ -334,6 +343,8 @@ function OpenTradesTable({
                       secondary={`${row.daysToExpiration} DTE`}
                     />
                   </td>
+                  <td className={dataTableTdRightClass}>{originalContracts}</td>
+                  <td className={dataTableTdRightClass}>{remainingContracts}</td>
                   <td className={`${dataTableTdRightClass} text-xs`}>
                     {formatTradeStrikes(row.trade)}
                   </td>
@@ -353,7 +364,7 @@ function OpenTradesTable({
                     <CompactBreakevenCell row={row} />
                   </td>
                   <td className={dataTableTdRightClass}>
-                    {formatUsd(row.trade.maxRiskUsd)}
+                    {formatUsd(scaleMaxRiskForRemaining(row.trade))}
                   </td>
                   <td
                     className={`${dataTableTdRightClass} ${plColorClass(

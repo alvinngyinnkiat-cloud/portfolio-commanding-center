@@ -48,6 +48,12 @@ import {
 } from "./return-percent";
 import { splitForTrade, splitTradeAmount } from "./split";
 import { calculateUnrealizedPlUsd } from "./unrealized-pl";
+import {
+  allocateOpenAmountsForContracts,
+  resolveCloseEvents,
+  scaleMaxRiskForRemaining,
+  tradeForRemainingContracts,
+} from "./contract-tracking";
 import { buildTradeEconomicsFromTrade } from "./trade-economics";
 import {
   compareOpenTradesByOpenDate,
@@ -77,14 +83,19 @@ export function buildOpenTradeRows(
   const rows = trades
     .filter((trade) => trade.status === "open")
     .map((trade) => {
+      const effectiveTrade = tradeForRemainingContracts(trade);
       const dte = daysToExpiration(trade.expirationDate, asOfDate);
+      const remainingAmounts = allocateOpenAmountsForContracts(
+        trade,
+        effectiveTrade.contracts
+      );
       const unrealizedPlUsd =
         trade.currentValueUsd == null
           ? null
           : calculateUnrealizedPlUsd({
               strategy: trade.strategy,
-              openPremiumUsd: trade.openPremiumUsd,
-              openFeesUsd: trade.openFeesUsd,
+              openPremiumUsd: remainingAmounts.openPremiumUsd,
+              openFeesUsd: remainingAmounts.openFeesUsd,
               currentValueUsd: trade.currentValueUsd,
             });
       const split =
@@ -95,9 +106,9 @@ export function buildOpenTradeRows(
 
       return {
         trade,
-        spreadMetrics: buildVerticalSpreadMetricsFromTrade(trade),
-        ironCondorMetrics: buildIronCondorMetricsFromTrade(trade),
-        tradeEconomics: buildTradeEconomicsFromTrade(trade),
+        spreadMetrics: buildVerticalSpreadMetricsFromTrade(effectiveTrade),
+        ironCondorMetrics: buildIronCondorMetricsFromTrade(effectiveTrade),
+        tradeEconomics: buildTradeEconomicsFromTrade(effectiveTrade),
         underlyingPrice: scannerPriceContext
           ? resolveScannerWatchlistPrice({
               underlying: trade.underlying,
@@ -150,6 +161,7 @@ export function buildClosedTradeRows(trades: OptionsTrade[]): OptionsClosedTrade
         returnPercent,
         daysHeld: daysBetween(trade.openDate, trade.closeDate ?? trade.openDate),
         strategyDisplay: formatOptionsStrategy(trade.strategy, trade.strategyLabel),
+        closeEvents: resolveCloseEvents(trade),
       };
     });
 }
@@ -218,7 +230,7 @@ export function buildOptionsTrackerSummary(input: {
   const actionRequired = summarizeActionRequiredOpenRisk(
     openTrades.map((trade) => ({
       daysToExpiration: daysToExpiration(trade.expirationDate, today),
-      maxRiskUsd: trade.maxRiskUsd,
+      maxRiskUsd: scaleMaxRiskForRemaining(trade),
     }))
   );
 
@@ -232,10 +244,14 @@ export function buildOptionsTrackerSummary(input: {
     if (trade.currentValueUsd == null) continue;
     markedOpenCount += 1;
     hasMarked = true;
+    const remainingAmounts = allocateOpenAmountsForContracts(
+      trade,
+      tradeForRemainingContracts(trade).contracts
+    );
     const unrealized = calculateUnrealizedPlUsd({
       strategy: trade.strategy,
-      openPremiumUsd: trade.openPremiumUsd,
-      openFeesUsd: trade.openFeesUsd,
+      openPremiumUsd: remainingAmounts.openPremiumUsd,
+      openFeesUsd: remainingAmounts.openFeesUsd,
       currentValueUsd: trade.currentValueUsd,
     });
     totalUnrealized! += unrealized;
@@ -310,36 +326,38 @@ export function buildOptionsRiskSummary(input: {
 
   const byTrade: OptionsRiskByTrade[] = openTrades
     .map((trade) => {
-      const legs = splitForTrade(trade, trade.maxRiskUsd);
+      const openRiskUsd = scaleMaxRiskForRemaining(trade);
+      const legs = splitForTrade(trade, openRiskUsd);
       return {
         tradeId: trade.id,
         underlying: trade.underlying,
         strategyDisplay: formatOptionsStrategy(trade.strategy, trade.strategyLabel),
         tradeType: trade.tradeType,
         splitLabel: `${trade.userSharePercent}/${trade.clientSharePercent}`,
-        maxRiskUsd: trade.maxRiskUsd,
+        maxRiskUsd: openRiskUsd,
         userRiskUsd: legs.userLegUsd,
         percentOfPool:
-          totalOpenRiskUsd > 0 ? (trade.maxRiskUsd / totalOpenRiskUsd) * 100 : 0,
+          totalOpenRiskUsd > 0 ? (openRiskUsd / totalOpenRiskUsd) * 100 : 0,
       };
     })
     .sort((a, b) => b.maxRiskUsd - a.maxRiskUsd);
 
   const strategyMap = new Map<OptionsStrategy, OptionsRiskByStrategy>();
   for (const trade of openTrades) {
+    const openRiskUsd = scaleMaxRiskForRemaining(trade);
     const existing = strategyMap.get(trade.strategy);
     if (!existing) {
       strategyMap.set(trade.strategy, {
         strategy: trade.strategy,
         strategyDisplay: formatOptionsStrategy(trade.strategy, trade.strategyLabel),
         openCount: 1,
-        totalRiskUsd: trade.maxRiskUsd,
-        avgRiskUsd: trade.maxRiskUsd,
+        totalRiskUsd: openRiskUsd,
+        avgRiskUsd: openRiskUsd,
         percentOfPool: 0,
       });
     } else {
       existing.openCount += 1;
-      existing.totalRiskUsd += trade.maxRiskUsd;
+      existing.totalRiskUsd += openRiskUsd;
       existing.avgRiskUsd = existing.totalRiskUsd / existing.openCount;
     }
   }
@@ -360,15 +378,16 @@ export function buildOptionsRiskSummary(input: {
   let expiring30DayRiskUsd = 0;
 
   for (const trade of openTrades) {
-    const legs = splitForTrade(trade, trade.maxRiskUsd);
+    const openRiskUsd = scaleMaxRiskForRemaining(trade);
+    const legs = splitForTrade(trade, openRiskUsd);
     userRiskLegUsd += legs.userLegUsd;
     clientRiskLegUsd += legs.clientLegUsd;
-    if (trade.tradeType === "personal") personalRiskUsd += trade.maxRiskUsd;
-    else sharedRiskUsd += trade.maxRiskUsd;
+    if (trade.tradeType === "personal") personalRiskUsd += openRiskUsd;
+    else sharedRiskUsd += openRiskUsd;
 
     const dte = daysToExpiration(trade.expirationDate, today);
-    if (dte <= 7) expiring7DayRiskUsd += trade.maxRiskUsd;
-    if (dte <= 30) expiring30DayRiskUsd += trade.maxRiskUsd;
+    if (dte <= 7) expiring7DayRiskUsd += openRiskUsd;
+    if (dte <= 30) expiring30DayRiskUsd += openRiskUsd;
   }
 
   const largest = byTrade[0];
@@ -470,10 +489,14 @@ export function buildOptionsPerformanceSummary(
     if (trade.currentValueUsd == null) continue;
     markedOpenCount += 1;
     hasMarked = true;
+    const remainingAmounts = allocateOpenAmountsForContracts(
+      trade,
+      tradeForRemainingContracts(trade).contracts
+    );
     totalUnrealized! += calculateUnrealizedPlUsd({
       strategy: trade.strategy,
-      openPremiumUsd: trade.openPremiumUsd,
-      openFeesUsd: trade.openFeesUsd,
+      openPremiumUsd: remainingAmounts.openPremiumUsd,
+      openFeesUsd: remainingAmounts.openFeesUsd,
       currentValueUsd: trade.currentValueUsd,
     });
   }

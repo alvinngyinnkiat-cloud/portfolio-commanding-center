@@ -4,6 +4,7 @@ import type {
   OptionsTrade,
   OptionsVerticalSpreadMetrics,
 } from "@/core/domain/types/options";
+import { getTradeTotalRealizedPlUsd } from "./contract-tracking";
 import {
   calculateIronCondorMetrics,
   isIronCondorStrategy,
@@ -50,12 +51,10 @@ export function daysToExpiration(expirationDate: string, asOfDate?: string): num
 }
 
 export function sumRealizedOptionsPlUsd(trades: OptionsTrade[]): number {
-  /** Full realized P/L hits US Available Cash; client leg is reporting only. */
+  /** Realized P/L from close events hits US Available Cash; client leg is reporting only. */
   let total = 0;
   for (const trade of trades) {
-    if (trade.status !== "closed") continue;
-    if (trade.realizedPlUsd == null) continue;
-    total += trade.realizedPlUsd;
+    total += getTradeTotalRealizedPlUsd(trade);
   }
   return total;
 }

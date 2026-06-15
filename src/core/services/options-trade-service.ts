@@ -1,12 +1,19 @@
-import type { OptionsTrade } from "@/core/domain/types/options";
+import type { OptionsCloseEvent, OptionsTrade } from "@/core/domain/types/options";
 import type {
   OptionsSettingsRepository,
   OptionsTradeRepository,
 } from "@/core/database/repositories/options-repository";
 import {
-  calculateRealizedPlUsd,
-  resolveClosedTradeRealizedPlUsd,
+  appendCloseEvent,
+  getOriginalContracts,
+  getRemainingContracts,
+  initializeContractTracking,
+  sumCloseEventRealizedPlUsd,
+} from "@/core/calculations/options/contract-tracking";
+import { resolvePartialCloseRealizedPlUsd } from "@/core/calculations/options/partial-close";
+import {
   calculateTradeReturnPercent,
+  resolveClosedTradeRealizedPlUsd,
   type CloseTradeDraft,
   defaultSplitForTradeType,
   normalizeUnderlying,
@@ -74,6 +81,13 @@ export class OptionsTradeService {
       underlying: resolved.underlying,
       expirationDate: resolved.expirationDate,
       contracts: resolved.contracts,
+      ...(existing
+        ? {
+            remainingContracts: existing.remainingContracts ?? existing.contracts,
+            closedContracts: existing.closedContracts ?? 0,
+            closeEvents: existing.closeEvents ?? [],
+          }
+        : initializeContractTracking(resolved.contracts)),
       shortStrikeUsd: resolved.shortStrikeUsd,
       longStrikeUsd: resolved.longStrikeUsd,
       bullPutShortStrikeUsd: resolved.bullPutShortStrikeUsd,
@@ -156,25 +170,61 @@ export class OptionsTradeService {
     const errors = validateCloseTradeDraft(trade, draft);
     if (errors.length > 0) return { ok: false, errors };
 
-    const realizedPlUsd = resolveClosedTradeRealizedPlUsd({
+    const remaining = getRemainingContracts(trade);
+    const contractsToClose = draft.contractsToClose ?? remaining;
+    const isManual = draft.closeMethod === "manual_pl";
+    const now = new Date().toISOString();
+
+    const realizedPlUsd = resolvePartialCloseRealizedPlUsd({
       strategy: trade.strategy,
       closeMethod: draft.closeMethod,
-      openPremiumUsd: trade.openPremiumUsd,
-      openFeesUsd: trade.openFeesUsd,
+      originalOpenPremiumUsd: trade.openPremiumUsd,
+      originalOpenFeesUsd: trade.openFeesUsd,
+      originalContracts: getOriginalContracts(trade),
+      contractsClosed: contractsToClose,
       closePremiumUsd: draft.closePremiumUsd,
       closeFeesUsd: draft.closeFeesUsd,
       manualRealizedPlUsd: draft.manualRealizedPlUsd,
     });
 
+    const closeEvent: OptionsCloseEvent = {
+      id: generateId(),
+      closeDate: draft.closeDate,
+      contractsClosed: contractsToClose,
+      closePremiumUsd: isManual ? 0 : draft.closePremiumUsd ?? 0,
+      closeFeesUsd: isManual ? 0 : draft.closeFeesUsd ?? 0,
+      closeMethod: draft.closeMethod,
+      manualRealizedPlUsd: isManual ? draft.manualRealizedPlUsd : undefined,
+      realizedPlUsd,
+      notes: draft.notesAppend?.trim() || undefined,
+      createdAt: now,
+    };
+
+    const tracking = appendCloseEvent(trade, closeEvent);
     const notes = [trade.notes, draft.notesAppend?.trim()]
       .filter(Boolean)
       .join(" · ");
+    const remainingAfterClose = tracking.remainingContracts ?? 0;
+    const totalRealizedPlUsd = sumCloseEventRealizedPlUsd({
+      ...trade,
+      closeEvents: tracking.closeEvents,
+    });
 
-    const now = new Date().toISOString();
+    if (remainingAfterClose > 0) {
+      const updated: OptionsTrade = {
+        ...trade,
+        ...tracking,
+        notes: notes || undefined,
+        updatedAt: now,
+      };
+      this.tradeRepo.update(updated);
+      return { ok: true, trade: updated };
+    }
+
     const closedMaxRiskUsd = trade.maxRiskUsd;
-    const isManual = draft.closeMethod === "manual_pl";
     const closed: OptionsTrade = {
       ...trade,
+      ...tracking,
       status: "closed",
       maxRiskUsd: closedMaxRiskUsd,
       closeDate: draft.closeDate,
@@ -182,9 +232,9 @@ export class OptionsTradeService {
       closePremiumUsd: isManual ? 0 : draft.closePremiumUsd,
       closeFeesUsd: isManual ? 0 : draft.closeFeesUsd,
       manualRealizedPlUsd: isManual ? draft.manualRealizedPlUsd : undefined,
-      realizedPlUsd,
+      realizedPlUsd: totalRealizedPlUsd,
       returnPercent:
-        calculateTradeReturnPercent(realizedPlUsd, closedMaxRiskUsd) ?? undefined,
+        calculateTradeReturnPercent(totalRealizedPlUsd, closedMaxRiskUsd) ?? undefined,
       currentValueUsd: undefined,
       currentValueUpdatedAt: undefined,
       underlyingPriceUsd: undefined,

@@ -52,7 +52,7 @@ describe("options calculations", () => {
     expect(legs.clientLegUsd).toBe(155.25);
   });
 
-  it("sums closed realized options P/L only", () => {
+  it("sums realized P/L from closed trades and partial close events on open trades", () => {
     const trades: OptionsTrade[] = [
       {
         id: "1",
@@ -64,7 +64,23 @@ describe("options calculations", () => {
         status: "open",
         realizedPlUsd: 500,
       } as OptionsTrade,
+      {
+        id: "3",
+        status: "open",
+        closeEvents: [
+          {
+            id: "e1",
+            closeDate: "2026-01-01",
+            contractsClosed: 1,
+            closePremiumUsd: 0,
+            closeFeesUsd: 0,
+            closeMethod: "manual_pl",
+            realizedPlUsd: 75,
+            createdAt: "2026-01-01T00:00:00.000Z",
+          },
+        ],
+      } as OptionsTrade,
     ];
-    expect(sumRealizedOptionsPlUsd(trades)).toBe(100);
+    expect(sumRealizedOptionsPlUsd(trades)).toBe(175);
   });
 });

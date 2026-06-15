@@ -19,7 +19,10 @@ import {
   isIronCondorStrategy,
   requiresManualMaxRisk,
   resolveClosedTradeRealizedPlUsd,
+  resolvePartialCloseRealizedPlUsd,
   sumOpenRiskUsd,
+  getRemainingContracts,
+  getOriginalContracts,
   type CloseTradeDraft,
   type ClosedTradeEditDraft,
   type OpenTradeDraft,
@@ -926,8 +929,11 @@ export function CloseTradeModal({
   onClose: () => void;
 }) {
   const { services, refresh } = usePortfolio();
+  const remainingContracts = getRemainingContracts(trade);
+  const originalContracts = getOriginalContracts(trade);
   const [form, setForm] = useState({
     closeDate: new Date().toISOString().slice(0, 10),
+    contractsToClose: String(remainingContracts),
     closeMethod: "normal" as OptionsCloseMethod,
     closeDebitOptionPrice: "0",
     closeFeesUsd: "0",
@@ -938,6 +944,11 @@ export function CloseTradeModal({
 
   const isManualClose = form.closeMethod === "manual_pl";
   const closePremiumLabel = getClosePremiumFieldLabel(trade.strategy);
+  const contractsToClose = parseInt(form.contractsToClose, 10);
+  const validContractsToClose =
+    Number.isFinite(contractsToClose) &&
+    contractsToClose > 0 &&
+    contractsToClose <= remainingContracts;
   const closeDebitOptionPrice =
     form.closeDebitOptionPrice.trim() === ""
       ? null
@@ -947,8 +958,8 @@ export function CloseTradeModal({
     closeDebitOptionPrice != null &&
     Number.isFinite(closeDebitOptionPrice) &&
     closeDebitOptionPrice >= 0 &&
-    trade.contracts > 0
-      ? calculateOptionDollarValue(closeDebitOptionPrice, trade.contracts)
+    validContractsToClose
+      ? calculateOptionDollarValue(closeDebitOptionPrice, contractsToClose)
       : null;
   const closeFeesUsd = parseFloat(form.closeFeesUsd);
   const manualRealizedPlUsd =
@@ -958,19 +969,15 @@ export function CloseTradeModal({
 
   const realized =
     isManualClose && manualRealizedPlUsd != null && Number.isFinite(manualRealizedPlUsd)
-      ? resolveClosedTradeRealizedPlUsd({
-          strategy: trade.strategy,
-          closeMethod: "manual_pl",
-          openPremiumUsd: trade.openPremiumUsd,
-          openFeesUsd: trade.openFeesUsd,
-          manualRealizedPlUsd,
-        })
-      : closeDebitDollarValue != null && Number.isFinite(closeFeesUsd)
-        ? resolveClosedTradeRealizedPlUsd({
+      ? manualRealizedPlUsd
+      : closeDebitDollarValue != null && Number.isFinite(closeFeesUsd) && validContractsToClose
+        ? resolvePartialCloseRealizedPlUsd({
             strategy: trade.strategy,
             closeMethod: "normal",
-            openPremiumUsd: trade.openPremiumUsd,
-            openFeesUsd: trade.openFeesUsd,
+            originalOpenPremiumUsd: trade.openPremiumUsd,
+            originalOpenFeesUsd: trade.openFeesUsd,
+            originalContracts,
+            contractsClosed: contractsToClose,
             closePremiumUsd: closeDebitDollarValue,
             closeFeesUsd: Number.isFinite(closeFeesUsd) ? closeFeesUsd : 0,
           })
@@ -978,6 +985,18 @@ export function CloseTradeModal({
   const legs = realized != null ? splitForTrade(trade, realized) : null;
 
   const submit = () => {
+    const contractsClosed = parseInt(form.contractsToClose, 10);
+    if (!Number.isFinite(contractsClosed) || contractsClosed <= 0) {
+      setErrors({ contractsToClose: "Enter contracts to close" });
+      return;
+    }
+    if (contractsClosed > remainingContracts) {
+      setErrors({
+        contractsToClose: `Cannot exceed ${remainingContracts} remaining contract${remainingContracts === 1 ? "" : "s"}`,
+      });
+      return;
+    }
+
     if (isManualClose) {
       const manual = parseFloat(form.manualRealizedPlUsd);
       if (!Number.isFinite(manual)) {
@@ -986,6 +1005,7 @@ export function CloseTradeModal({
       }
       const draft: CloseTradeDraft = {
         closeDate: form.closeDate,
+        contractsToClose: contractsClosed,
         closeMethod: "manual_pl",
         manualRealizedPlUsd: manual,
         notesAppend: form.notesAppend || undefined,
@@ -1002,22 +1022,16 @@ export function CloseTradeModal({
       return;
     }
 
-    if (trade.contracts <= 0) {
-      setErrors({ closePremiumUsd: "Contracts must be greater than zero" });
-      return;
-    }
     const optionPrice = parseFloat(form.closeDebitOptionPrice);
     if (!Number.isFinite(optionPrice) || optionPrice < 0) {
       setErrors({ closePremiumUsd: "Enter a valid close debit option price" });
       return;
     }
-    const closePremiumUsd = calculateOptionDollarValue(
-      optionPrice,
-      trade.contracts
-    );
+    const closePremiumUsd = calculateOptionDollarValue(optionPrice, contractsClosed);
     const fees = parseFloat(form.closeFeesUsd);
     const draft: CloseTradeDraft = {
       closeDate: form.closeDate,
+      contractsToClose: contractsClosed,
       closeMethod: "normal",
       closePremiumUsd,
       closeFeesUsd: Number.isFinite(fees) ? fees : 0,
@@ -1046,21 +1060,36 @@ export function CloseTradeModal({
             onChange={(e) => setForm((p) => ({ ...p, closeDate: e.target.value }))}
             error={errors.closeDate}
           />
-          <Select
-            label="Close Method"
-            value={form.closeMethod}
+          <Input
+            label="Contracts to close"
+            type="number"
+            min={1}
+            max={remainingContracts}
+            value={form.contractsToClose}
             onChange={(e) =>
-              setForm((p) => ({
-                ...p,
-                closeMethod: e.target.value as OptionsCloseMethod,
-              }))
+              setForm((p) => ({ ...p, contractsToClose: e.target.value }))
             }
-            options={CLOSE_METHOD_OPTIONS.map((option) => ({
-              value: option.value,
-              label: option.label,
-            }))}
+            error={errors.contractsToClose}
           />
         </div>
+        <p className="text-xs text-slate-500">
+          Original: {originalContracts} · Remaining: {remainingContracts}
+          {remainingContracts < originalContracts ? " (partial close enabled)" : ""}
+        </p>
+        <Select
+          label="Close Method"
+          value={form.closeMethod}
+          onChange={(e) =>
+            setForm((p) => ({
+              ...p,
+              closeMethod: e.target.value as OptionsCloseMethod,
+            }))
+          }
+          options={CLOSE_METHOD_OPTIONS.map((option) => ({
+            value: option.value,
+            label: option.label,
+          }))}
+        />
 
         {isManualClose ? (
           <Input
@@ -1132,7 +1161,8 @@ export function CloseTradeModal({
         {!isManualClose && (
           <p className="text-xs text-slate-500">
             Enter broker option price (e.g. 0.24). Close debit dollar value = price ×
-            100 × {trade.contracts} contract{trade.contracts === 1 ? "" : "s"}.
+            100 × {validContractsToClose ? contractsToClose : "—"} contract
+            {contractsToClose === 1 ? "" : "s"} being closed.
           </p>
         )}
         {isManualClose && (
@@ -1150,7 +1180,11 @@ export function CloseTradeModal({
           <Button variant="secondary" onClick={onClose}>
             Cancel
           </Button>
-          <Button onClick={submit}>Confirm Close</Button>
+          <Button onClick={submit}>
+            {validContractsToClose && contractsToClose < remainingContracts
+              ? `Close ${contractsToClose} Contract${contractsToClose === 1 ? "" : "s"}`
+              : "Confirm Close"}
+          </Button>
         </div>
       </div>
     </Modal>

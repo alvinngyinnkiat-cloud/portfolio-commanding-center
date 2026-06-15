@@ -4,6 +4,7 @@ import type {
   OptionsOpenTradeRow,
   OptionsSettings,
 } from "@/core/domain/types/options";
+import { scaleMaxRiskForRemaining } from "./contract-tracking";
 
 export function buildOptionsClientSummary(
   settings: OptionsSettings,
@@ -37,7 +38,7 @@ export function buildOptionsClientSummary(
 
   let openSharedRiskUsd = 0;
   for (const row of sharedOpen) {
-    openSharedRiskUsd += row.trade.maxRiskUsd;
+    openSharedRiskUsd += scaleMaxRiskForRemaining(row.trade);
   }
 
   return {

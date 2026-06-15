@@ -1,10 +1,11 @@
 import type { OptionsCapacityStatus, OptionsTrade } from "@/core/domain/types/options";
+import { scaleMaxRiskForRemaining } from "./contract-tracking";
 
 export function sumOpenRiskUsd(trades: OptionsTrade[]): number {
   let total = 0;
   for (const trade of trades) {
     if (trade.status !== "open") continue;
-    total += trade.maxRiskUsd;
+    total += scaleMaxRiskForRemaining(trade);
   }
   return total;
 }

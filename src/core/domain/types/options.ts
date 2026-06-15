@@ -4,6 +4,19 @@ export type OptionsTradeType = "personal" | "shared";
 
 export type OptionsCloseMethod = "normal" | "manual_pl";
 
+export interface OptionsCloseEvent {
+  id: string;
+  closeDate: string;
+  contractsClosed: number;
+  closePremiumUsd: number;
+  closeFeesUsd: number;
+  closeMethod: OptionsCloseMethod;
+  manualRealizedPlUsd?: number;
+  realizedPlUsd: number;
+  notes?: string;
+  createdAt: string;
+}
+
 export type OptionsStrategy =
   | "sellPut"
   | "sellCall"
@@ -76,6 +89,12 @@ export interface OptionsTrade {
   underlying: string;
   expirationDate: string;
   contracts: number;
+  /** Contracts still open; defaults to `contracts` when unset on open trades. */
+  remainingContracts?: number;
+  /** Cumulative contracts closed via partial or full close events. */
+  closedContracts?: number;
+  /** Each partial or final close stored separately; original open trade is not overwritten. */
+  closeEvents?: OptionsCloseEvent[];
   /** Sold leg strike — bull put / bear call vertical spreads. */
   shortStrikeUsd?: number;
   /** Bought leg strike — bull put / bear call vertical spreads. */
@@ -141,6 +160,7 @@ export interface OptionsClosedTradeRow {
   returnPercent: number | null;
   daysHeld: number;
   strategyDisplay: string;
+  closeEvents: OptionsCloseEvent[];
 }
 
 export interface OptionsTradeTypePerformanceDetail {

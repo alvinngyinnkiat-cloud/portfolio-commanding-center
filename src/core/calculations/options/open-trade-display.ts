@@ -4,6 +4,7 @@ import type {
   OptionsStrategy,
   OptionsVerticalSpreadMetrics,
 } from "@/core/domain/types/options";
+import { scaleMaxRiskForRemaining } from "./contract-tracking";
 export const OPTION_CONTRACT_MULTIPLIER = 100;
 
 export interface BreakevenDifference {
@@ -231,7 +232,7 @@ export function summarizeOpenTradesHeader(
   let nearestExpiryDte: number | null = null;
 
   for (const row of rows) {
-    totalOpenRiskUsd += row.trade.maxRiskUsd;
+    totalOpenRiskUsd += scaleMaxRiskForRemaining(row.trade);
     if (row.unrealizedPlUsd != null) {
       hasUnrealized = true;
       totalUnrealizedPlUsd += row.unrealizedPlUsd;

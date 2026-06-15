@@ -26,6 +26,10 @@ import {
   validateDebitOptionStrike,
 } from "./debit-option";
 import {
+  getOriginalContracts,
+  getRemainingContracts,
+} from "./contract-tracking";
+import {
   getOpenPremiumFieldLabel,
   isDebitStrategy,
   isNakedCreditStrategy,
@@ -75,6 +79,8 @@ export interface ResolvedOpenTradeDraft extends OpenTradeDraft {
 
 export interface CloseTradeDraft {
   closeDate: string;
+  /** Contracts to close this event; defaults to all remaining when omitted. */
+  contractsToClose?: number;
   closeMethod: OptionsCloseMethod;
   closePremiumUsd?: number;
   closeFeesUsd?: number;
@@ -460,6 +466,26 @@ export function validateCloseTradeDraft(
   if (trade.status !== "open") {
     errors.push({ field: "status", message: "Only open trades can be closed" });
     return errors;
+  }
+
+  const remaining = getRemainingContracts(trade);
+  const contractsToClose = draft.contractsToClose ?? remaining;
+
+  if (!Number.isFinite(contractsToClose) || contractsToClose <= 0) {
+    errors.push({
+      field: "contractsToClose",
+      message: "Contracts to close must be greater than zero",
+    });
+  } else if (contractsToClose > remaining) {
+    errors.push({
+      field: "contractsToClose",
+      message: `Cannot close more than ${remaining} remaining contract${remaining === 1 ? "" : "s"}`,
+    });
+  } else if (contractsToClose > getOriginalContracts(trade)) {
+    errors.push({
+      field: "contractsToClose",
+      message: "Contracts to close cannot exceed original contracts",
+    });
   }
 
   if (!isValidDate(draft.closeDate)) {
