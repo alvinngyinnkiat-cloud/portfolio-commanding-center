@@ -25,4 +25,28 @@ describe("normalizeCryptoTrade", () => {
       })
     ).toBeNull();
   });
+
+  it("rejects locale-formatted dates from persistence", () => {
+    expect(
+      normalizeCryptoTrade({
+        id: "t1",
+        date: "15/06/2026",
+        assetName: "BTC",
+        type: "buy",
+        amountSgd: 1000,
+      })
+    ).toBeNull();
+  });
+
+  it("allows legacy rows without a transaction date", () => {
+    const trade = normalizeCryptoTrade({
+      id: "legacy-h1",
+      date: "",
+      assetName: "BTC",
+      type: "buy",
+      amountSgd: 1000,
+    });
+
+    expect(trade?.date).toBe("");
+  });
 });

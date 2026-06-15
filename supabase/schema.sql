@@ -36,8 +36,8 @@
 --     Crypto deposits/withdrawals are in contributions (category=crypto).
 --
 --   crypto_trades.data → CryptoTrade (buy/sell ledger)
---     { id, date, assetName, type: buy|sell, amountSgd, feesSgd?, notes?, createdAt? }
---     Drives cost basis and available trading cash. Current value stays on holdings.
+--     { id, date: "YYYY-MM-DD", assetName, type: buy|sell, amountSgd, feesSgd?, notes?, createdAt? }
+--     Stored as JSON in `data` column (id + data + updated_at). date must be YYYY-MM-DD for user trades.
 --
 --   options_trades.data    → OptionsTrade
 --     { id, status, tradeType: personal|shared, userSharePercent, clientSharePercent,

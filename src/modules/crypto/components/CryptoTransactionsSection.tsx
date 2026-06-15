@@ -3,7 +3,7 @@
 import { useMemo } from "react";
 import { usePortfolio } from "@/context/PortfolioContext";
 import type { CryptoTrade } from "@/core/domain/types";
-import { formatDate, formatSgd } from "@/shared/lib/format";
+import { formatCryptoTradeDate, formatSgd } from "@/shared/lib/format";
 import { compareDateDescWithCreatedAt } from "@/shared/lib/sort";
 
 export function CryptoTransactionsSection() {
@@ -51,7 +51,7 @@ export function CryptoTransactionsSection() {
                   key={row.id}
                   className="border-b border-surface-border/40 text-slate-300 last:border-0"
                 >
-                  <td className="px-4 py-3">{formatDate(row.date)}</td>
+                  <td className="px-4 py-3">{formatCryptoTradeDate(row.date)}</td>
                   <td className="px-4 py-3 font-medium text-white">
                     {row.assetName}
                   </td>

@@ -9,7 +9,7 @@ import {
 } from "@/core/calculations/crypto";
 import { formatPercent, formatSgd } from "@/shared/lib/format";
 import { coerceNumber } from "@/shared/lib/coerce-number";
-import { toLocalDateString } from "@/shared/lib/date";
+import { parseIsoDateString, toLocalDateString } from "@/shared/lib/date";
 import { getPersistenceManager } from "@/core/database/supabase";
 import { Input } from "@/shared/components/ui/Input";
 import { Select } from "@/shared/components/ui/Select";
@@ -137,7 +137,7 @@ export function CryptoHoldingsSection() {
   const rows = cryptoData?.rows ?? [];
   const editingRow = rows.find((row) => row.id === editingHoldingId) ?? null;
 
-  const handleTradeSubmit = () => {
+  const handleTradeSubmit = async () => {
     if (!services?.cryptoTrades) return;
 
     const result = validateCryptoTradeDraft(
@@ -161,9 +161,15 @@ export function CryptoHoldingsSection() {
       return;
     }
 
-    services.cryptoTrades.upsertFromDraft(tradeForm);
+    const trade = services.cryptoTrades.upsertFromDraft(tradeForm);
+    if (!trade) return;
+
     setTradeErrors({});
     setTradeForm(emptyTradeForm());
+
+    const manager = getPersistenceManager();
+    await manager?.drainSyncQueue();
+    await manager?.rehydrateCryptoTradesFromSupabase();
     refresh();
   };
 
@@ -215,6 +221,7 @@ export function CryptoHoldingsSection() {
       setNotesDraft("");
     }
     await getPersistenceManager()?.drainSyncQueue();
+    await getPersistenceManager()?.rehydrateCryptoTradesFromSupabase();
     refresh();
   };
 
@@ -231,8 +238,14 @@ export function CryptoHoldingsSection() {
           <Input
             label="Date"
             type="date"
-            value={tradeForm.date}
-            onChange={(e) => setTradeForm({ ...tradeForm, date: e.target.value })}
+            value={parseIsoDateString(tradeForm.date) ?? ""}
+            onChange={(e) => {
+              const next = e.target.value;
+              setTradeForm({ ...tradeForm, date: next });
+              if (tradeErrors.date) {
+                setTradeErrors((prev) => ({ ...prev, date: "" }));
+              }
+            }}
             error={tradeErrors.date}
           />
           <Input
@@ -279,7 +292,7 @@ export function CryptoHoldingsSection() {
             onChange={(e) => setTradeForm({ ...tradeForm, notes: e.target.value })}
           />
         </div>
-        <Button onClick={handleTradeSubmit}>Add Transaction</Button>
+        <Button onClick={() => void handleTradeSubmit()}>Add Transaction</Button>
       </section>
 
       {editingRow && (

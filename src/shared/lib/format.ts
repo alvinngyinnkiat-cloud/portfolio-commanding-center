@@ -33,15 +33,27 @@ export function formatPercent(
   })}%`;
 }
 
-import { parseLocalDate } from "./date";
+import { parseIsoDateString, parseLocalDate } from "./date";
 
 export function formatDate(dateStr: string): string {
-  const d = parseLocalDate(dateStr);
+  const iso = parseIsoDateString(dateStr);
+  if (!iso) return dateStr;
+  const d = parseLocalDate(iso);
+  if (Number.isNaN(d.getTime())) return dateStr;
   return d.toLocaleDateString("en-SG", {
     year: "numeric",
     month: "short",
     day: "numeric",
   });
+}
+
+/** Display crypto trade dates (DD MMM YYYY); storage remains YYYY-MM-DD. */
+export function formatCryptoTradeDate(dateStr: string | undefined | null): string {
+  const iso = parseIsoDateString(dateStr ?? "");
+  if (!iso || iso === "1970-01-01") {
+    return "Date missing";
+  }
+  return formatDate(iso);
 }
 
 export function formatDateTime(isoStr: string): string {

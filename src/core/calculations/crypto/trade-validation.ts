@@ -1,7 +1,7 @@
 import type { CryptoHolding, CryptoTradeType } from "@/core/domain/types";
 import { normalizeFeesSgd } from "./contribution";
 import { findHoldingCostBasis } from "./trades";
-import { normalizeLocalDateString } from "@/shared/lib/date";
+import { parseIsoDateString } from "@/shared/lib/date";
 
 export interface CryptoTradeDraft {
   date: string;
@@ -36,9 +36,9 @@ export function validateCryptoTradeDraft(
 ): CryptoTradeValidationResult {
   const errors: Partial<Record<keyof CryptoTradeDraft, string>> = {};
 
-  const date = normalizeLocalDateString(draft.date);
+  const date = parseIsoDateString(draft.date);
   if (!date) {
-    errors.date = "Date is required (YYYY-MM-DD)";
+    errors.date = "Select a valid transaction date";
   }
 
   const assetName = draft.assetName.trim();

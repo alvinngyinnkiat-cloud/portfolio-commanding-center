@@ -33,6 +33,9 @@ import {
 } from "@/core/calculations/stocks/migrate-stock-cash-flow";
 import { migrateLegacyCryptoHoldingsToTrades } from "@/core/calculations/crypto/migrate-crypto-trades";
 import { rebuildHoldingsFromTrades } from "@/core/calculations/crypto/trades";
+import { normalizeCryptoTrades } from "@/core/calculations/crypto/trade-normalize";
+import { STORAGE_KEYS } from "../local/storage-keys";
+import { readJson, writeJson } from "../local/local-storage";
 import {
   formatPersistenceError,
   isMissingSupabaseTableError,
@@ -120,6 +123,8 @@ export class PersistenceManager {
       }
 
       await this.refreshOptionalTableAvailability();
+      this.mergeLocalCryptoTradesIfSupabaseEmpty();
+      this.markCryptoLegacyMigratedIfTradesPresent();
       await this.applyStockCashFlowMigrationIfNeeded();
       await this.applyCryptoTradesMigrationIfNeeded();
       this.cache = normalizeCache(this.cache);
@@ -209,19 +214,25 @@ export class PersistenceManager {
       migratedTrades,
       this.cache.cryptoHoldings
     );
-    this.cache.dashboardSettings = {
-      ...this.cache.dashboardSettings,
-      cryptoLegacyTradesMigrated: true,
-    };
-    this.queueSettingsSync();
+    this.persistCryptoTradesLocalBackup();
 
     if (!this.client || !this.cryptoTradesSyncAvailable) {
+      this.cache.dashboardSettings = {
+        ...this.cache.dashboardSettings,
+        cryptoLegacyTradesMigrated: true,
+      };
+      this.queueSettingsSync();
       return;
     }
 
     try {
       await syncCryptoTrades(this.client, this.cache.cryptoTrades);
       await syncCryptoHoldings(this.client, this.cache.cryptoHoldings);
+      this.cache.dashboardSettings = {
+        ...this.cache.dashboardSettings,
+        cryptoLegacyTradesMigrated: true,
+      };
+      this.queueSettingsSync();
     } catch (error) {
       if (isMissingSupabaseTableError(error, "crypto_trades")) {
         this.cryptoTradesSyncAvailable = false;
@@ -249,6 +260,8 @@ export class PersistenceManager {
     try {
       this.cache = await hydrateCacheFromSupabase(this.client);
       await this.refreshOptionalTableAvailability();
+      this.mergeLocalCryptoTradesIfSupabaseEmpty();
+      this.markCryptoLegacyMigratedIfTradesPresent();
       await this.applyStockCashFlowMigrationIfNeeded();
       await this.applyCryptoTradesMigrationIfNeeded();
       this.cache = normalizeCache(this.cache);
@@ -256,6 +269,63 @@ export class PersistenceManager {
       logPersistenceError("server bootstrap failed", error);
       throw error;
     }
+  }
+
+  /** Mirror crypto trades to localStorage so refresh survives when cloud sync is delayed. */
+  persistCryptoTradesLocalBackup(): void {
+    if (typeof window === "undefined") return;
+    writeJson(STORAGE_KEYS.cryptoTrades, this.cache.cryptoTrades);
+  }
+
+  /** Reload crypto trades from Supabase after a write (verifies persistence). */
+  async rehydrateCryptoTradesFromSupabase(): Promise<boolean> {
+    if (!this.client || !this.cryptoTradesSyncAvailable) {
+      return false;
+    }
+
+    const res = await this.client.from("crypto_trades").select("data");
+    if (res.error) {
+      logPersistenceError("rehydrate crypto trades failed", res.error);
+      return false;
+    }
+
+    this.cache.cryptoTrades = normalizeCryptoTrades(
+      res.data?.map((row) => row.data) ?? []
+    );
+    this.persistCryptoTradesLocalBackup();
+    return true;
+  }
+
+  private mergeLocalCryptoTradesIfSupabaseEmpty(): void {
+    if (typeof window === "undefined") return;
+    if (this.cache.cryptoTrades.length > 0) return;
+
+    const local = readJson<unknown[]>(STORAGE_KEYS.cryptoTrades, []);
+    const normalized = normalizeCryptoTrades(local);
+    if (normalized.length === 0) return;
+
+    this.cache.cryptoTrades = normalized;
+
+    if (this.client && this.cryptoTradesSyncAvailable) {
+      void this.runSync(() =>
+        syncCryptoTrades(this.client!, this.cache.cryptoTrades)
+      );
+    }
+  }
+
+  private markCryptoLegacyMigratedIfTradesPresent(): void {
+    if (
+      this.cache.cryptoTrades.length === 0 ||
+      this.cache.dashboardSettings.cryptoLegacyTradesMigrated === true
+    ) {
+      return;
+    }
+
+    this.cache.dashboardSettings = {
+      ...this.cache.dashboardSettings,
+      cryptoLegacyTradesMigrated: true,
+    };
+    this.queueSettingsSync();
   }
 
   /** Wait for queued Supabase writes to finish (used by cron routes). */
@@ -317,9 +387,10 @@ export class PersistenceManager {
   }
 
   queueCryptoTradesSync(): void {
+    this.persistCryptoTradesLocalBackup();
     if (!this.cryptoTradesSyncAvailable) {
       console.warn(
-        "[PersistenceManager] Skipping crypto_trades sync — table unavailable"
+        "[PersistenceManager] Skipping crypto_trades cloud sync — table unavailable"
       );
       return;
     }

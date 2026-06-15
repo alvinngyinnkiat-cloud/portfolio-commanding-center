@@ -1,8 +1,9 @@
 import type { CryptoHolding, CryptoTrade } from "@/core/domain/types";
 import { calculateHoldingContribution } from "./contribution";
 
-/** Stable sentinel when legacy holdings have no original transaction date. */
-export const LEGACY_CRYPTO_TRADE_DATE = "1970-01-01";
+export function isLegacyCryptoTradeId(id: string): boolean {
+  return id.startsWith("legacy-");
+}
 
 export function hasLegacyCryptoHoldingsToMigrate(
   holdings: CryptoHolding[],
@@ -35,7 +36,7 @@ export function migrateLegacyCryptoHoldingsToTrades(
 
     migrated.push({
       id: `legacy-${holding.id}`,
-      date: LEGACY_CRYPTO_TRADE_DATE,
+      date: "",
       assetName: holding.assetName,
       type: "buy",
       amountSgd: holding.investedSgd,

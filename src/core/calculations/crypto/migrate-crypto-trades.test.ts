@@ -1,9 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { CryptoHolding, CryptoTrade } from "@/core/domain/types";
-import { toLocalDateString } from "@/shared/lib/date";
 import {
   hasLegacyCryptoHoldingsToMigrate,
-  LEGACY_CRYPTO_TRADE_DATE,
   migrateLegacyCryptoHoldingsToTrades,
 } from "./migrate-crypto-trades";
 
@@ -36,13 +34,12 @@ describe("migrateLegacyCryptoHoldingsToTrades", () => {
     ).toEqual([]);
   });
 
-  it("uses a stable legacy date instead of today", () => {
-    const today = toLocalDateString();
+  it("leaves legacy trade date empty instead of using epoch or today", () => {
     const migrated = migrateLegacyCryptoHoldingsToTrades([holding], []);
 
     expect(migrated).toHaveLength(1);
-    expect(migrated[0].date).toBe(LEGACY_CRYPTO_TRADE_DATE);
-    expect(migrated[0].date).not.toBe(today);
+    expect(migrated[0].date).toBe("");
+    expect(migrated[0].id).toBe("legacy-h1");
   });
 
   it("reports pending migration only when holdings have cost basis", () => {
