@@ -93,7 +93,7 @@ export function CryptoView() {
               <section className="min-w-0">
                 <SectionHeader
                   title="Crypto Cash Flow"
-                  description="Deposit and withdrawal history — newest first"
+                  description="Deposits increase crypto cash and contribution. No FX conversion layer."
                 />
                 <CryptoCashFlowSection />
               </section>
