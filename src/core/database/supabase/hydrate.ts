@@ -19,6 +19,11 @@ import {
 import type { ScannerCategory } from "@/core/domain/types/scanner";
 import { normalizeTicker } from "@/core/calculations/stocks/normalize";
 import { watchlistStorageKey } from "./local-export";
+import { isMissingSupabaseTableError } from "./supabase-errors";
+
+function isOptionalTableQueryError(error: unknown, tableName: string): boolean {
+  return isMissingSupabaseTableError(error, tableName);
+}
 
 function normalizeWatchlistEntry(raw: WatchlistEntry): WatchlistEntry {
   const ticker = normalizeTicker(raw.ticker);
@@ -134,17 +139,20 @@ export async function hydrateCacheFromSupabase(
     stockRes,
     cryptoRes,
     optionsRes,
-    fxRes,
     watchlistRes,
   ]) {
     if (res.error) throw res.error;
   }
 
-  if (cryptoTradesRes.error) {
-    const message = cryptoTradesRes.error.message ?? "";
-    if (!message.includes("crypto_trades")) {
-      throw cryptoTradesRes.error;
-    }
+  if (fxRes.error && !isOptionalTableQueryError(fxRes.error, "stock_fx_conversions")) {
+    throw fxRes.error;
+  }
+
+  if (
+    cryptoTradesRes.error &&
+    !isOptionalTableQueryError(cryptoTradesRes.error, "crypto_trades")
+  ) {
+    throw cryptoTradesRes.error;
   }
 
   cache.contributions = contributionsRes.data?.map((row) => row.data) ?? [];
@@ -159,7 +167,9 @@ export async function hydrateCacheFromSupabase(
     ? []
     : normalizeCryptoTrades(cryptoTradesRes.data?.map((row) => row.data) ?? []);
   cache.optionsTrades = optionsRes.data?.map((row) => row.data) ?? [];
-  cache.stockFxConversions = fxRes.data?.map((row) => row.data) ?? [];
+  cache.stockFxConversions = fxRes.error
+    ? []
+    : fxRes.data?.map((row) => row.data) ?? [];
 
   const watchlistRows = watchlistRes.data ?? [];
   if (watchlistRows.length > 0) {
@@ -216,12 +226,21 @@ export async function importCacheToSupabase(
     cache.cryptoHoldings,
     (row) => row.id
   );
-  await replaceJsonRows(
-    client,
-    "crypto_trades",
-    cache.cryptoTrades,
-    (row) => row.id
-  );
+  try {
+    await replaceJsonRows(
+      client,
+      "crypto_trades",
+      cache.cryptoTrades,
+      (row) => row.id
+    );
+  } catch (error) {
+    if (!isMissingSupabaseTableError(error, "crypto_trades")) {
+      throw error;
+    }
+    console.warn(
+      "[hydrate] crypto_trades table missing — skipped import for optional ledger"
+    );
+  }
   await replaceJsonRows(client, "options_trades", cache.optionsTrades, (row) => row.id);
   await replaceJsonRows(
     client,

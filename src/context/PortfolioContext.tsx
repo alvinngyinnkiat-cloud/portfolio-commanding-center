@@ -37,6 +37,7 @@ interface PortfolioContextValue {
   initError: string | null;
   persistenceStatus: PersistenceStatus | null;
   persistenceError: string | null;
+  persistenceWarning: string | null;
   clearPersistenceError: () => void;
 }
 
@@ -58,25 +59,55 @@ export function PortfolioProvider({ children }: { children: ReactNode }) {
   const [persistenceStatus, setPersistenceStatus] =
     useState<PersistenceStatus | null>(null);
   const [persistenceError, setPersistenceError] = useState<string | null>(null);
+  const [persistenceWarning, setPersistenceWarning] = useState<string | null>(
+    null
+  );
 
   const refresh = useCallback(() => {
     if (!services) return;
-    setData(services.aggregator.getDashboardData());
-    setStockData(services.stockTracker.getData());
-    setCryptoData(services.cryptoTracker.getData());
-    setScannerData(services.scanner.getData());
-    setOptionsData(services.optionsTracker.getData());
+
+    try {
+      setData(services.aggregator.getDashboardData());
+    } catch (error) {
+      console.error("[PortfolioProvider] dashboard refresh failed", error);
+    }
+
+    try {
+      setStockData(services.stockTracker.getData());
+    } catch (error) {
+      console.error("[PortfolioProvider] stock tracker refresh failed", error);
+    }
+
+    try {
+      setCryptoData(services.cryptoTracker.getData());
+    } catch (error) {
+      console.error("[PortfolioProvider] crypto tracker refresh failed", error);
+    }
+
+    try {
+      setScannerData(services.scanner.getData());
+    } catch (error) {
+      console.error("[PortfolioProvider] scanner refresh failed", error);
+    }
+
+    try {
+      setOptionsData(services.optionsTracker.getData());
+    } catch (error) {
+      console.error("[PortfolioProvider] options tracker refresh failed", error);
+    }
 
     const manager = getPersistenceManager();
     if (manager) {
       setPersistenceStatus(manager.getStatus());
       setPersistenceError(manager.getLastError());
+      setPersistenceWarning(manager.getLastWarning());
     }
   }, [services]);
 
   const clearPersistenceError = useCallback(() => {
     getPersistenceManager()?.clearError();
     setPersistenceError(null);
+    setPersistenceWarning(null);
   }, []);
 
   useEffect(() => {
@@ -87,11 +118,14 @@ export function PortfolioProvider({ children }: { children: ReactNode }) {
         if (cancelled) return;
         setServices(createPortfolioServices(repos));
         setPersistenceStatus(manager?.getStatus() ?? "local");
+        setPersistenceError(manager?.getLastError() ?? null);
+        setPersistenceWarning(manager?.getLastWarning() ?? null);
         setInitError(null);
         setIsLoaded(true);
       })
       .catch((error: unknown) => {
         if (cancelled) return;
+        console.error("[PortfolioProvider] persistence init failed", error);
         setInitError(
           error instanceof Error
             ? error.message
@@ -165,21 +199,18 @@ export function PortfolioProvider({ children }: { children: ReactNode }) {
         initError,
         persistenceStatus,
         persistenceError,
+        persistenceWarning,
         clearPersistenceError,
       }}
     >
       <PersistenceStatusBanner
         isLoading={isLoading}
         error={initError ?? persistenceError}
+        warning={persistenceWarning}
         status={persistenceStatus}
         onDismiss={clearPersistenceError}
       />
-      {initError ? (
-        <div className="rounded-2xl border border-accent-red/40 bg-accent-red/10 px-6 py-8 text-center">
-          <p className="font-medium text-accent-red">Failed to load portfolio data</p>
-          <p className="mt-2 text-sm text-accent-red/90">{initError}</p>
-        </div>
-      ) : isLoading || !services ? (
+      {isLoading || !services ? (
         <div className="min-w-0 space-y-6">
           <div className="h-8 w-64 animate-pulse rounded-lg bg-surface-border/50" />
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">

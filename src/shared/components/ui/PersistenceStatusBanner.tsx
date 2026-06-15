@@ -5,6 +5,7 @@ import { Loader2, AlertTriangle } from "lucide-react";
 interface PersistenceStatusBannerProps {
   isLoading: boolean;
   error: string | null;
+  warning?: string | null;
   status: "local" | "supabase" | "supabase_migrated" | null;
   onDismiss?: () => void;
 }
@@ -12,6 +13,7 @@ interface PersistenceStatusBannerProps {
 export function PersistenceStatusBanner({
   isLoading,
   error,
+  warning,
   status,
   onDismiss,
 }: PersistenceStatusBannerProps) {
@@ -37,6 +39,27 @@ export function PersistenceStatusBanner({
             type="button"
             onClick={onDismiss}
             className="text-xs text-accent-red/80 hover:text-accent-red"
+          >
+            Dismiss
+          </button>
+        )}
+      </div>
+    );
+  }
+
+  if (warning) {
+    return (
+      <div className="mb-6 flex items-start gap-3 rounded-2xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-200">
+        <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+        <div className="flex-1">
+          <p className="font-medium">Persistence notice</p>
+          <p className="mt-1 text-xs text-amber-100/90">{warning}</p>
+        </div>
+        {onDismiss && (
+          <button
+            type="button"
+            onClick={onDismiss}
+            className="text-xs text-amber-100/80 hover:text-amber-50"
           >
             Dismiss
           </button>
