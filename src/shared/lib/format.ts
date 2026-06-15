@@ -47,6 +47,19 @@ export function formatDate(dateStr: string): string {
   });
 }
 
+/** Compact table date — e.g. 29 Oct 24 */
+export function formatShortDate(dateStr: string): string {
+  const iso = parseIsoDateString(dateStr);
+  if (!iso) return dateStr;
+  const d = parseLocalDate(iso);
+  if (Number.isNaN(d.getTime())) return dateStr;
+  return d.toLocaleDateString("en-SG", {
+    day: "numeric",
+    month: "short",
+    year: "2-digit",
+  });
+}
+
 /** Display crypto trade dates (DD MMM YYYY); storage remains YYYY-MM-DD. */
 export function formatCryptoTradeDate(dateStr: string | undefined | null): string {
   const iso = parseIsoDateString(dateStr ?? "");

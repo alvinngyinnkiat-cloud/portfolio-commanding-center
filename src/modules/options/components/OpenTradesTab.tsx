@@ -2,50 +2,49 @@
 
 import { useMemo, useRef, useState } from "react";
 import type { OptionsOpenTradeRow } from "@/core/domain/types/options";
-import type {
-  BreakevenDifference,
-  StackedOptionPrice,
-} from "@/core/calculations/options/open-trade-display";
-import type { ResolvedScannerPrice } from "@/core/calculations/scanner/price-engine";
-import { formatScannerPriceSourceLabel } from "@/core/calculations/scanner/price-engine";
+import type { StackedOptionPrice } from "@/core/calculations/options/open-trade-display";
 import {
   buildStackedOptionPrice,
   calculateOptionDollarValue,
   calculatePerShareOptionPrice,
   compareOpenTradesByOpenDate,
-  formatTargetExit,
   hasBreakevenMetrics,
   resolveBreakevenDifference,
   summarizeOpenTradesHeader,
   summarizeOpenTradesOwnership,
 } from "@/core/calculations/options";
 import { formatTradeStrikes } from "@/core/calculations/options/helpers";
-import { formatDate, formatUsd } from "@/shared/lib/format";
+import { formatShortDate, formatUsd } from "@/shared/lib/format";
 import { coerceNumber } from "@/shared/lib/coerce-number";
 import { Button } from "@/shared/components/ui/Button";
+import { SummaryCard } from "@/shared/components/ui/SummaryCard";
+import { StackedValue } from "@/shared/components/ui/StackedValue";
+import {
+  dataTableClass,
+  dataTableHeadClass,
+  dataTableRowClass,
+  dataTableTdLeftClass,
+  dataTableTdRightClass,
+  dataTableThLeftClass,
+  dataTableThRightClass,
+  dataTableWrapperClass,
+} from "@/shared/components/ui/data-table";
 import {
   breakevenDiffColorClass,
-  dteStatusBadgeClass,
-  dteStatusLabel,
   formatSignedPercent,
   formatSignedUsdCompact,
   plColorClass,
-  targetExitClass,
 } from "./options-utils";
 import { usePortfolio } from "@/context/PortfolioContext";
 
 function StackedPriceCell({ value }: { value: StackedOptionPrice | null }) {
-  if (!value) {
-    return <span className="text-slate-500">—</span>;
-  }
-
+  if (!value) return <span className="text-slate-500">—</span>;
   return (
-    <div className="leading-tight">
-      <div className="font-medium text-slate-200">
-        {coerceNumber(value.pricePerShare).toFixed(2)}
-      </div>
-      <div className="text-xs text-slate-500">{formatUsd(value.dollarValueUsd)}</div>
-    </div>
+    <StackedValue
+      align="right"
+      primary={coerceNumber(value.pricePerShare).toFixed(2)}
+      secondary={formatUsd(value.dollarValueUsd)}
+    />
   );
 }
 
@@ -94,17 +93,16 @@ function InlineEditableMarketValueCell({
   };
 
   const commitEdit = () => {
-    if (cancelRef.current || saving) return;
-    if (!services) return;
+    if (cancelRef.current || saving || !services) return;
 
     if (draft.trim() === "") {
-      setError("Enter option price");
+      setError("Required");
       return;
     }
 
     const parsed = parseFloat(draft);
     if (!Number.isFinite(parsed) || parsed < 0) {
-      setError("Invalid price");
+      setError("Invalid");
       return;
     }
 
@@ -120,7 +118,7 @@ function InlineEditableMarketValueCell({
     setSaving(false);
 
     if (!result.ok) {
-      setError(result.errors[0]?.message ?? "Save failed");
+      setError(result.errors[0]?.message ?? "Failed");
       return;
     }
 
@@ -131,7 +129,7 @@ function InlineEditableMarketValueCell({
 
   if (editing) {
     return (
-      <div className="min-w-[5.5rem] leading-tight">
+      <div className="leading-tight">
         <input
           autoFocus
           type="number"
@@ -158,13 +156,15 @@ function InlineEditableMarketValueCell({
               if (!cancelRef.current) commitEdit();
             }, 0);
           }}
-          className="w-20 rounded-lg border border-accent/50 bg-surface px-2 py-1 text-sm font-medium text-white outline-none ring-1 ring-accent/30"
-          aria-label={`Current market value for ${row.trade.underlying}`}
+          className="w-14 rounded border border-accent/50 bg-surface px-1.5 py-0.5 text-right text-sm font-medium text-white outline-none"
+          aria-label={`Current value for ${row.trade.underlying}`}
         />
-        <div className="mt-0.5 text-xs text-slate-500">
+        <div className="mt-0.5 text-right text-[11px] text-slate-500">
           {previewDollar != null ? formatUsd(previewDollar) : "—"}
         </div>
-        {error && <div className="mt-0.5 text-[10px] text-accent-red">{error}</div>}
+        {error && (
+          <div className="text-right text-[10px] text-accent-red">{error}</div>
+        )}
       </div>
     );
   }
@@ -173,85 +173,75 @@ function InlineEditableMarketValueCell({
     <button
       type="button"
       onClick={startEdit}
-      title="Click to edit current market value"
-      className="rounded-lg px-1 py-0.5 text-left transition-colors hover:bg-surface/70 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent/60"
+      title="Edit current value"
+      className="w-full rounded px-0.5 py-0.5 text-right transition-colors hover:bg-surface/70"
     >
       {stacked ? (
         <StackedPriceCell value={stacked} />
       ) : (
-        <div className="leading-tight text-slate-500">
-          <div className="font-medium">—</div>
-          <div className="text-xs">Click to set</div>
-        </div>
+        <StackedValue align="right" primary="—" secondary="Set" />
       )}
     </button>
   );
 }
 
-function BreakevenDifferenceCell({
-  hasBreakeven,
-  underlying,
-  diff,
+function CompactBreakevenCell({
+  row,
 }: {
-  hasBreakeven: boolean;
-  underlying: ResolvedScannerPrice;
-  diff: BreakevenDifference | null;
+  row: OptionsOpenTradeRow;
 }) {
-  if (!hasBreakeven) {
-    return <span className="text-slate-500">—</span>;
-  }
+  const economics = row.tradeEconomics;
+  const hasBreakeven = hasBreakevenMetrics(
+    row.trade.strategy,
+    row.spreadMetrics,
+    row.ironCondorMetrics,
+    economics
+  );
+  const diff = resolveBreakevenDifference(
+    row.trade.strategy,
+    row.underlyingPrice.priceUsd,
+    row.spreadMetrics,
+    row.ironCondorMetrics,
+    economics
+  );
 
-  if (underlying.source === "unavailable" || diff == null) {
-    return (
-      <div className="leading-tight text-amber-300/90">
-        <div className="text-sm font-medium">Price unavailable</div>
-        <div className="text-xs text-slate-500">
-          {underlying.isWatchlistTicker
-            ? "Run Scanner refresh"
-            : "Add watchlist ticker or set fallback in Edit"}
-        </div>
-      </div>
-    );
+  if (!hasBreakeven) return <span className="text-slate-500">—</span>;
+  if (row.underlyingPrice.source === "unavailable" || diff == null) {
+    return <span className="text-amber-300/90">—</span>;
   }
-
-  const sourceLabel = formatScannerPriceSourceLabel(underlying.source);
-  const priceLabel = `${formatUsd(underlying.priceUsd!)} · ${sourceLabel}`;
 
   return (
-    <div
-      className={`leading-tight ${breakevenDiffColorClass(diff)}`}
-      title={`Latest stock price: ${priceLabel}`}
-    >
-      {diff.activeSide && (
-        <div className="text-[10px] uppercase tracking-wide text-slate-500">
-          {diff.activeSide === "lower" ? "Lower Side" : "Upper Side"}
-        </div>
-      )}
-      <div className="font-medium">
-        {formatSignedPercent(diff.differencePercent)}
-      </div>
-      <div className="text-xs">{formatSignedUsdCompact(diff.differenceUsd)}</div>
-      <div className="mt-0.5 text-[10px] text-slate-500">@ {priceLabel}</div>
-    </div>
+    <StackedValue
+      align="right"
+      primary={formatSignedPercent(diff.differencePercent)}
+      secondary={formatSignedUsdCompact(diff.differenceUsd)}
+      primaryClassName={`font-medium ${breakevenDiffColorClass(diff)}`}
+      secondaryClassName={`text-[11px] ${breakevenDiffColorClass(diff)}`}
+    />
   );
 }
 
 function SectionSummaryStrip({
   items,
 }: {
-  items: Array<{ label: string; value: string }>;
+  items: Array<{ label: string; value: string; subValue?: string }>;
 }) {
   return (
     <div
-      className={`grid gap-3 rounded-2xl border border-surface-border/80 bg-surface/40 p-4 sm:grid-cols-2 ${
-        items.length >= 5 ? "lg:grid-cols-5" : "lg:grid-cols-3"
+      className={`grid gap-3 ${
+        items.length >= 5
+          ? "sm:grid-cols-2 lg:grid-cols-5"
+          : "sm:grid-cols-2 lg:grid-cols-3"
       }`}
     >
       {items.map((item) => (
-        <div key={item.label}>
-          <p className="text-xs uppercase tracking-wide text-slate-500">{item.label}</p>
-          <p className="mt-1 text-sm font-semibold text-slate-100">{item.value}</p>
-        </div>
+        <SummaryCard
+          key={item.label}
+          compact
+          label={item.label}
+          value={item.value}
+          subValue={item.subValue}
+        />
       ))}
     </div>
   );
@@ -260,6 +250,7 @@ function SectionSummaryStrip({
 function OpenTradesTable({
   rows,
   emptyMessage,
+  showSplitColumn,
   onEdit,
   onClose,
   onDelete,
@@ -267,60 +258,52 @@ function OpenTradesTable({
 }: {
   rows: OptionsOpenTradeRow[];
   emptyMessage: string;
+  showSplitColumn: boolean;
   onEdit: (row: OptionsOpenTradeRow) => void;
   onClose: (row: OptionsOpenTradeRow) => void;
   onDelete: (row: OptionsOpenTradeRow) => void;
   onValueSaved: () => void;
 }) {
+  const colCount = showSplitColumn ? 13 : 12;
+
   return (
-    <div className="overflow-x-auto rounded-2xl border border-surface-border/80">
-      <table className="min-w-full text-left text-sm">
-        <thead className="bg-surface/60 text-xs uppercase text-slate-500">
+    <div className={dataTableWrapperClass}>
+      <table className={dataTableClass}>
+        <thead className={dataTableHeadClass}>
           <tr>
-            <th className="px-4 py-3">Underlying</th>
-            <th className="px-4 py-3">Strategy</th>
-            <th className="px-4 py-3">Split</th>
-            <th className="px-4 py-3">Opened</th>
-            <th className="px-4 py-3">Exp / DTE</th>
-            <th className="px-4 py-3">Target Exit</th>
-            <th className="px-4 py-3">DTE Status</th>
-            <th className="px-4 py-3">Breakeven Difference</th>
-            <th className="px-4 py-3">Strikes</th>
-            <th className="px-4 py-3">Premium</th>
-            <th className="px-4 py-3">Net Credit</th>
-            <th className="px-4 py-3">75% TP Exit</th>
-            <th className="px-4 py-3">Current Market Value</th>
-            <th className="px-4 py-3">Max Risk</th>
-            <th className="px-4 py-3">Unrealized</th>
-            <th className="px-4 py-3">Actions</th>
+            <th className={`${dataTableThLeftClass} w-[4.5rem]`}>Underlying</th>
+            <th className={`${dataTableThLeftClass} w-[5.5rem]`}>Strategy</th>
+            {showSplitColumn && (
+              <th className={`${dataTableThRightClass} w-[3rem]`}>Split</th>
+            )}
+            <th className={`${dataTableThLeftClass} w-[4.5rem]`}>Opened</th>
+            <th className={`${dataTableThLeftClass} w-[5rem]`}>Expiration</th>
+            <th className={`${dataTableThRightClass} w-[4rem]`}>Strikes</th>
+            <th className={`${dataTableThRightClass} w-[4.5rem]`}>Premium</th>
+            <th className={`${dataTableThRightClass} w-[4rem]`}>75% TP</th>
+            <th className={`${dataTableThRightClass} w-[4.5rem]`}>Current</th>
+            <th className={`${dataTableThRightClass} w-[4rem]`}>Breakeven</th>
+            <th className={`${dataTableThRightClass} w-[4.5rem]`}>Max Risk</th>
+            <th className={`${dataTableThRightClass} w-[4rem]`}>Unrealized</th>
+            <th className={`${dataTableThLeftClass} w-[5.5rem]`}>Actions</th>
           </tr>
         </thead>
-        <tbody className="divide-y divide-surface-border/60">
+        <tbody>
           {rows.length === 0 ? (
             <tr>
-              <td colSpan={16} className="px-4 py-8 text-center text-slate-500">
+              <td colSpan={colCount} className="px-2 py-6 text-center text-slate-500">
                 {emptyMessage}
               </td>
             </tr>
           ) : (
             rows.map((row) => {
               const economics = row.tradeEconomics;
-              const metrics = economics ?? row.spreadMetrics ?? row.ironCondorMetrics;
-              const hasBreakeven = hasBreakevenMetrics(
-                row.trade.strategy,
-                row.spreadMetrics,
-                row.ironCondorMetrics,
-                economics
+              const metrics =
+                economics ?? row.spreadMetrics ?? row.ironCondorMetrics;
+              const premiumStacked = buildStackedOptionPrice(
+                row.trade.openPremiumUsd,
+                row.trade.contracts
               );
-              const underlying = row.underlyingPrice;
-              const breakevenDiff = resolveBreakevenDifference(
-                row.trade.strategy,
-                underlying.priceUsd,
-                row.spreadMetrics,
-                row.ironCondorMetrics,
-                economics
-              );
-              const targetExit = formatTargetExit(row.daysToExpiration);
               const tpExit =
                 metrics != null
                   ? buildStackedOptionPrice(
@@ -330,64 +313,50 @@ function OpenTradesTable({
                   : null;
 
               return (
-                <tr key={row.trade.id} className="text-slate-300">
-                  <td className="px-4 py-3 font-medium text-white">
+                <tr key={row.trade.id} className={dataTableRowClass}>
+                  <td className={`${dataTableTdLeftClass} font-medium text-white`}>
                     {row.trade.underlying}
                   </td>
-                  <td className="px-4 py-3">{row.strategyDisplay}</td>
-                  <td className="px-4 py-3">
-                    {row.trade.userSharePercent}/{row.trade.clientSharePercent}
+                  <td className={`${dataTableTdLeftClass} text-xs`}>
+                    {row.strategyDisplay}
                   </td>
-                  <td className="px-4 py-3">{formatDate(row.trade.openDate)}</td>
-                  <td className="px-4 py-3">
-                    {formatDate(row.trade.expirationDate)} ({row.daysToExpiration}d)
+                  {showSplitColumn && (
+                    <td className={dataTableTdRightClass}>
+                      {row.trade.userSharePercent}/{row.trade.clientSharePercent}
+                    </td>
+                  )}
+                  <td className={dataTableTdLeftClass}>
+                    {formatShortDate(row.trade.openDate)}
                   </td>
-                  <td className={`px-4 py-3 ${targetExitClass(targetExit.kind)}`}>
-                    {targetExit.label}
-                  </td>
-                  <td className="px-4 py-3">
-                    <span
-                      className={`inline-block rounded-lg px-2 py-0.5 text-xs font-medium ${dteStatusBadgeClass(
-                        row.dteStatus
-                      )}`}
-                    >
-                      {dteStatusLabel(row.dteStatus)}
-                    </span>
-                  </td>
-                  <td className="px-4 py-3">
-                    <BreakevenDifferenceCell
-                      hasBreakeven={hasBreakeven}
-                      underlying={underlying}
-                      diff={breakevenDiff}
+                  <td className={dataTableTdLeftClass}>
+                    <StackedValue
+                      primary={formatShortDate(row.trade.expirationDate)}
+                      secondary={`${row.daysToExpiration} DTE`}
                     />
                   </td>
-                  <td className="px-4 py-3">{formatTradeStrikes(row.trade)}</td>
-                  <td className="px-4 py-3">{formatUsd(row.trade.openPremiumUsd)}</td>
-                  <td className="px-4 py-3">
-                    {economics?.isDebit
-                      ? economics.premiumCostUsd != null
-                        ? formatUsd(economics.premiumCostUsd)
-                        : "—"
-                      : economics?.netCreditUsd != null
-                        ? formatUsd(economics.netCreditUsd)
-                        : metrics && "netCreditUsd" in metrics
-                          ? formatUsd(metrics.netCreditUsd)
-                          : "—"}
+                  <td className={`${dataTableTdRightClass} text-xs`}>
+                    {formatTradeStrikes(row.trade)}
                   </td>
-                  <td className="px-4 py-3">
+                  <td className={dataTableTdRightClass}>
+                    <StackedPriceCell value={premiumStacked} />
+                  </td>
+                  <td className={dataTableTdRightClass}>
                     <StackedPriceCell value={tpExit} />
                   </td>
-                  <td className="px-4 py-3">
-                    <InlineEditableMarketValueCell row={row} onSaved={onValueSaved} />
+                  <td className={dataTableTdRightClass}>
+                    <InlineEditableMarketValueCell
+                      row={row}
+                      onSaved={onValueSaved}
+                    />
                   </td>
-                  <td className="px-4 py-3">
+                  <td className={dataTableTdRightClass}>
+                    <CompactBreakevenCell row={row} />
+                  </td>
+                  <td className={dataTableTdRightClass}>
                     {formatUsd(row.trade.maxRiskUsd)}
-                    {metrics && (
-                      <span className="ml-1 text-xs text-slate-500">(auto)</span>
-                    )}
                   </td>
                   <td
-                    className={`px-4 py-3 ${plColorClass(
+                    className={`${dataTableTdRightClass} ${plColorClass(
                       row.unrealizedPlUsd ?? 0,
                       row.unrealizedPlUsd == null
                     )}`}
@@ -396,16 +365,24 @@ function OpenTradesTable({
                       ? formatUsd(row.unrealizedPlUsd)
                       : "—"}
                   </td>
-                  <td className="px-4 py-3">
-                    <div className="flex flex-wrap gap-1">
+                  <td className={dataTableTdLeftClass}>
+                    <div className="flex flex-wrap gap-0.5">
                       <Button size="sm" variant="ghost" onClick={() => onEdit(row)}>
                         Edit
                       </Button>
-                      <Button size="sm" variant="secondary" onClick={() => onClose(row)}>
+                      <Button
+                        size="sm"
+                        variant="secondary"
+                        onClick={() => onClose(row)}
+                      >
                         Close
                       </Button>
-                      <Button size="sm" variant="danger" onClick={() => onDelete(row)}>
-                        Delete
+                      <Button
+                        size="sm"
+                        variant="danger"
+                        onClick={() => onDelete(row)}
+                      >
+                        Del
                       </Button>
                     </div>
                   </td>
@@ -471,18 +448,19 @@ export function OpenTradesTab({
     value != null ? formatUsd(value) : "—";
 
   return (
-    <div className="space-y-8">
+    <div className="min-w-0 space-y-8">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <Button onClick={onOpenNew}>+ Open Trade</Button>
       </div>
 
-      <section className="space-y-4">
+      <section className="min-w-0 space-y-4">
         <h2 className="text-lg font-semibold text-white">Personal Open Trades</h2>
         <SectionSummaryStrip
           items={[
             {
-              label: "Open Trades Count",
+              label: "Open Trades",
               value: String(personalSummary.openTradeCount),
+              subValue: "Personal positions",
             },
             {
               label: "Open Risk",
@@ -497,6 +475,7 @@ export function OpenTradesTab({
         <OpenTradesTable
           rows={personalRows}
           emptyMessage="No personal open trades."
+          showSplitColumn={false}
           onEdit={onEdit}
           onClose={onClose}
           onDelete={handleDelete}
@@ -504,13 +483,14 @@ export function OpenTradesTab({
         />
       </section>
 
-      <section className="space-y-4">
+      <section className="min-w-0 space-y-4">
         <h2 className="text-lg font-semibold text-white">Shared Open Trades</h2>
         <SectionSummaryStrip
           items={[
             {
-              label: "Open Trades Count",
+              label: "Open Trades",
               value: String(sharedSummary.openTradeCount),
+              subValue: "Shared positions",
             },
             {
               label: "Open Risk",
@@ -533,6 +513,7 @@ export function OpenTradesTab({
         <OpenTradesTable
           rows={sharedRows}
           emptyMessage="No shared open trades."
+          showSplitColumn
           onEdit={onEdit}
           onClose={onClose}
           onDelete={handleDelete}

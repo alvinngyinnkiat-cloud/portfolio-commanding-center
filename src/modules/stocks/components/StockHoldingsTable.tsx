@@ -12,9 +12,21 @@ import {
   calculateAllPositionHoldings,
   summarizePositionOverview,
 } from "@/core/calculations/stocks/holdings";
-import { formatSgd, formatSingaporeDateTime, formatUsd } from "@/shared/lib/format";
+import { formatSgd, formatSingaporeDateTime, formatUsd, formatPercent } from "@/shared/lib/format";
 import { coerceNumber } from "@/shared/lib/coerce-number";
 import { SummaryCard } from "@/shared/components/ui/SummaryCard";
+import { StackedValue } from "@/shared/components/ui/StackedValue";
+import { Modal } from "@/shared/components/ui/Modal";
+import {
+  dataTableHeadClass,
+  dataTableRowClass,
+  dataTableTdLeftClass,
+  dataTableTdRightClass,
+  dataTableThLeftClass,
+  dataTableThRightClass,
+  dataTableWrapperClass,
+  dataTableClass,
+} from "@/shared/components/ui/data-table";
 import { FxRateErrorBanner } from "@/shared/components/ui/FxRateErrorBanner";
 import { Button } from "@/shared/components/ui/Button";
 import { Input } from "@/shared/components/ui/Input";
@@ -22,7 +34,7 @@ import {
   resolvePriceSource,
 } from "@/core/calculations/stocks/price-normalize";
 import type { PriceDisplaySource } from "@/core/domain/types";
-import { TrendingUp, RefreshCw, PiggyBank, Briefcase, Archive, DollarSign } from "lucide-react";
+import { TrendingUp, RefreshCw, PiggyBank, Briefcase, Archive, DollarSign, Pencil } from "lucide-react";
 
 type MarketFilter = "ALL" | StockMarket;
 
@@ -40,71 +52,32 @@ function plColorClass(value: number | null | undefined, isMissing = false): stri
   return "text-slate-300";
 }
 
-function MarketValueCell({
-  holding,
-  fxRateValid,
-}: {
-  holding: CalculatedHolding;
-  fxRateValid: boolean;
-}) {
-  if (holding.currentPrice == null) {
-    return <span className="text-slate-300">—</span>;
-  }
-
-  if (holding.market === "US") {
-    return (
-      <div className="text-slate-300">
-        <p>{formatUsd(holding.marketValue)}</p>
-        {fxRateValid && holding.sgdValue != null ? (
-          <p className="mt-0.5 text-xs text-slate-500">
-            ≈ {formatSgd(holding.sgdValue)}
-          </p>
-        ) : (
-          <p className="mt-0.5 text-xs text-slate-500">FX required</p>
-        )}
-      </div>
-    );
-  }
-
-  return <span className="text-slate-300">{formatSgd(holding.marketValue)}</span>;
-}
-
-function SgdValueCell({
-  holding,
-  fxRateValid,
-}: {
-  holding: CalculatedHolding;
-  fxRateValid: boolean;
-}) {
-  if (holding.currentPrice == null) {
-    return <span className="text-slate-300">—</span>;
-  }
-
-  if (holding.market === "US") {
-    if (fxRateValid && holding.sgdValue != null) {
-      return <span className="text-slate-300">{formatSgd(holding.sgdValue)}</span>;
-    }
-    return <span className="text-slate-500">FX required</span>;
-  }
-
-  return <span className="text-slate-300">{formatSgd(holding.marketValue)}</span>;
-}
-
-
 function priceSourceClass(source: PriceDisplaySource): string {
   if (source === "Auto") return "text-emerald-400";
   if (source === "Manual") return "text-amber-300";
   return "text-slate-500";
 }
 
-function ManualPriceOverride({
+function unrealisedPercent(holding: CalculatedHolding): number | null {
+  if (holding.currentPrice == null || holding.totalCost <= 0) return null;
+  return (holding.unrealisedPL / holding.totalCost) * 100;
+}
+
+function StockPriceModal({
   holding,
+  priceRecord,
+  onClose,
   onSave,
 }: {
   holding: CalculatedHolding;
+  priceRecord?: StockPrice;
+  onClose: () => void;
   onSave: (price: number) => void;
 }) {
-  const [value, setValue] = useState("");
+  const source = resolvePriceSource(priceRecord);
+  const [value, setValue] = useState(
+    holding.currentPrice != null ? String(holding.currentPrice) : ""
+  );
   const [error, setError] = useState<string | null>(null);
 
   const handleSave = () => {
@@ -113,83 +86,152 @@ function ManualPriceOverride({
       setError("Price must be greater than zero");
       return;
     }
-    setError(null);
     onSave(parsed);
-    setValue("");
+    onClose();
   };
 
+  const sourceSecondary =
+    source === "Auto" && priceRecord?.lastPriceUpdate
+      ? `Auto • ${formatSingaporeDateTime(priceRecord.lastPriceUpdate).split(",")[0]?.trim() ?? ""}`
+      : source === "Manual" && priceRecord?.manualPriceUpdatedAt
+        ? `Manual • ${formatSingaporeDateTime(priceRecord.manualPriceUpdatedAt).split(",")[0]?.trim() ?? ""}`
+        : source;
+
   return (
-    <div className="mt-2 flex min-w-[180px] items-end gap-2">
-      <Input
-        label="Manual override"
-        type="number"
-        step="any"
-        min="0"
-        value={value}
-        onChange={(e) => setValue(e.target.value)}
-        error={error ?? undefined}
-        className="min-w-[100px]"
+    <Modal title={`Edit Price — ${holding.ticker}`} onClose={onClose}>
+      <div className="space-y-4">
+        <div className="rounded-xl border border-surface-border/60 bg-surface/40 p-3">
+          <StackedValue
+            primary={
+              holding.currentPrice != null
+                ? formatNativeValue(holding, holding.currentPrice)
+                : "—"
+            }
+            secondary={sourceSecondary}
+          />
+        </div>
+        <Input
+          label="Manual Override"
+          type="number"
+          step="any"
+          min="0"
+          placeholder="Enter price"
+          value={value}
+          onChange={(e) => {
+            setValue(e.target.value);
+            setError(null);
+          }}
+          error={error ?? undefined}
+          hint="Overrides auto price for unrealised P/L and market value."
+        />
+        <p className="text-xs text-slate-500">
+          Price Source:{" "}
+          <span className={priceSourceClass(source)}>{source}</span>
+        </p>
+        <div className="flex justify-end gap-2">
+          <Button variant="secondary" onClick={onClose}>
+            Cancel
+          </Button>
+          <Button onClick={handleSave}>Save Price</Button>
+        </div>
+      </div>
+    </Modal>
+  );
+}
+
+function CompactPriceCell({
+  holding,
+  priceRecord,
+  onEdit,
+}: {
+  holding: CalculatedHolding;
+  priceRecord?: StockPrice;
+  onEdit: () => void;
+}) {
+  const source = resolvePriceSource(priceRecord);
+  const sourceSecondary =
+    source === "Auto" && priceRecord?.lastPriceUpdate
+      ? `Auto • ${formatSingaporeDateTime(priceRecord.lastPriceUpdate).split(",")[0]?.trim() ?? ""}`
+      : source === "Manual" && priceRecord?.manualPriceUpdatedAt
+        ? `Manual • ${formatSingaporeDateTime(priceRecord.manualPriceUpdatedAt).split(",")[0]?.trim() ?? ""}`
+        : source;
+
+  return (
+    <div className="flex items-center justify-end gap-1">
+      <StackedValue
+        align="right"
+        primary={
+          holding.currentPrice != null
+            ? formatNativeValue(holding, holding.currentPrice)
+            : "—"
+        }
+        secondary={holding.currentPrice != null ? sourceSecondary : "Set price"}
+        primaryClassName={
+          holding.currentPrice != null
+            ? "font-medium text-white"
+            : "font-medium text-slate-500"
+        }
       />
-      <Button size="sm" variant="secondary" onClick={handleSave}>
-        Set
-      </Button>
+      <button
+        type="button"
+        onClick={onEdit}
+        title="Edit price"
+        className="shrink-0 rounded-lg p-1 text-slate-500 transition-colors hover:bg-surface/80 hover:text-white"
+      >
+        <Pencil size={14} />
+      </button>
     </div>
   );
 }
 
-function PriceDisplay({
+function MarketValueCell({
   holding,
-  priceRecord,
-  onManualSave,
+  fxRateValid,
 }: {
   holding: CalculatedHolding;
-  priceRecord?: StockPrice;
-  onManualSave: (price: number) => void;
+  fxRateValid: boolean;
 }) {
-  const source = resolvePriceSource(priceRecord);
-
   if (holding.currentPrice == null) {
+    return <span className="text-slate-500">—</span>;
+  }
+
+  if (holding.market === "US") {
     return (
-      <div className="min-w-[180px]">
-        <p className="text-sm text-slate-400">Price unavailable.</p>
-        <p className="mt-1 text-xs text-slate-500">
-          Price Source:{" "}
-          <span className={priceSourceClass(source)}>{source}</span>
-        </p>
-        <p className="mt-1 text-xs text-amber-400/90">
-          Enter a manual price or refresh auto prices.
-        </p>
-        <ManualPriceOverride holding={holding} onSave={onManualSave} />
-      </div>
+      <StackedValue
+        align="right"
+        primary={formatUsd(holding.marketValue)}
+        secondary={
+          fxRateValid && holding.sgdValue != null
+            ? `≈ ${formatSgd(holding.sgdValue)}`
+            : "FX required"
+        }
+      />
     );
   }
 
   return (
-    <div className="min-w-[180px]">
-      <p className="font-medium text-white">
-        {formatNativeValue(holding, holding.currentPrice)}
-      </p>
-      <p className="mt-1 text-xs text-slate-500">
-        Price Source:{" "}
-        <span className={priceSourceClass(source)}>{source}</span>
-      </p>
-      {source === "Auto" && priceRecord?.priceUnavailable && (
-        <p className="mt-1 text-xs text-amber-400">
-          Price unavailable. Using last successful update.
-        </p>
-      )}
-      {source === "Auto" && priceRecord?.lastPriceUpdate && (
-        <p className="mt-1 text-xs text-slate-500">
-          Last Updated {formatSingaporeDateTime(priceRecord.lastPriceUpdate)}
-        </p>
-      )}
-      {source === "Manual" && priceRecord?.manualPriceUpdatedAt && (
-        <p className="mt-1 text-xs text-slate-500">
-          Manual set {formatSingaporeDateTime(priceRecord.manualPriceUpdatedAt)}
-        </p>
-      )}
-      <ManualPriceOverride holding={holding} onSave={onManualSave} />
-    </div>
+    <StackedValue
+      align="right"
+      primary={formatSgd(holding.marketValue)}
+      secondary={undefined}
+    />
+  );
+}
+
+function UnrealisedPlCell({ holding }: { holding: CalculatedHolding }) {
+  const pct = unrealisedPercent(holding);
+  if (holding.currentPrice == null) {
+    return <span className="text-slate-500">—</span>;
+  }
+
+  return (
+    <StackedValue
+      align="right"
+      primary={formatNativeValue(holding, holding.unrealisedPL)}
+      secondary={pct != null ? formatPercent(pct) : undefined}
+      primaryClassName={`font-medium ${plColorClass(holding.unrealisedPL)}`}
+      secondaryClassName={`text-[11px] ${plColorClass(holding.unrealisedPL)}`}
+    />
   );
 }
 
@@ -203,30 +245,30 @@ function ClosedPositionsTable({ positions }: { positions: CalculatedHolding[] })
   }
 
   return (
-    <div className="overflow-x-auto rounded-xl border border-surface-border/60">
-      <table className="w-full text-sm">
-        <thead className="bg-surface/60">
-          <tr className="border-b border-surface-border text-left text-xs font-medium uppercase tracking-wide text-slate-500">
-            <th className="px-4 py-3">Market</th>
-            <th className="px-4 py-3">Ticker</th>
-            <th className="px-4 py-3">Name</th>
-            <th className="px-4 py-3">Realised P/L</th>
-            <th className="px-4 py-3">Dividends</th>
+    <div className={dataTableWrapperClass}>
+      <table className={dataTableClass}>
+        <thead className={dataTableHeadClass}>
+          <tr>
+            <th className={dataTableThLeftClass}>Market</th>
+            <th className={dataTableThLeftClass}>Ticker</th>
+            <th className={dataTableThRightClass}>Realised P/L</th>
+            <th className={dataTableThRightClass}>Dividends</th>
           </tr>
         </thead>
         <tbody>
           {positions.map((holding) => (
             <tr
               key={`closed-${holding.market}-${holding.ticker}`}
-              className="border-b border-surface-border/40 last:border-0 hover:bg-surface/30"
+              className={dataTableRowClass}
             >
-              <td className="px-4 py-3 text-slate-300">{holding.market}</td>
-              <td className="px-4 py-3 font-medium text-white">{holding.ticker}</td>
-              <td className="px-4 py-3 text-slate-400">{holding.assetName}</td>
-              <td className={`px-4 py-3 ${plColorClass(holding.realisedPL)}`}>
+              <td className={dataTableTdLeftClass}>{holding.market}</td>
+              <td className={`${dataTableTdLeftClass} font-medium text-white`}>
+                {holding.ticker}
+              </td>
+              <td className={`${dataTableTdRightClass} ${plColorClass(holding.realisedPL)}`}>
                 {formatNativeValue(holding, holding.realisedPL)}
               </td>
-              <td className={`px-4 py-3 ${plColorClass(holding.dividendIncome)}`}>
+              <td className={`${dataTableTdRightClass} ${plColorClass(holding.dividendIncome)}`}>
                 {formatNativeValue(holding, holding.dividendIncome)}
               </td>
             </tr>
@@ -241,6 +283,10 @@ export function StockHoldingsTable() {
   const { data, stockData, optionsData, services, refresh } = usePortfolio();
   const [marketFilter, setMarketFilter] = useState<MarketFilter>("ALL");
   const [refreshing, setRefreshing] = useState(false);
+  const [priceModal, setPriceModal] = useState<{
+    holding: CalculatedHolding;
+    priceRecord?: StockPrice;
+  } | null>(null);
 
   const fxRateValid = stockData?.fxRateValid ?? false;
   const fxRate = stockData?.fxRate ?? null;
@@ -504,30 +550,27 @@ export function StockHoldingsTable() {
             Active holdings with positive quantity.
           </p>
         </div>
-        <div className="overflow-x-auto rounded-xl border border-surface-border/60">
-          <table className="w-full text-sm">
-            <thead className="bg-surface/60">
-              <tr className="border-b border-surface-border text-left text-xs font-medium uppercase tracking-wide text-slate-500">
-                <th className="px-4 py-3">Market</th>
-                <th className="px-4 py-3">Ticker</th>
-                <th className="px-4 py-3">Name</th>
-                <th className="px-4 py-3">Qty</th>
-                <th className="px-4 py-3">Avg Cost</th>
-                <th className="px-4 py-3">Cost Basis</th>
-                <th className="px-4 py-3">Current Price</th>
-                <th className="px-4 py-3">Market Value</th>
-                <th className="px-4 py-3">Unrealised P/L</th>
-                <th className="px-4 py-3">Realised P/L</th>
-                <th className="px-4 py-3">Dividends</th>
-                <th className="px-4 py-3">SGD Value</th>
+        <div className={dataTableWrapperClass}>
+          <table className={dataTableClass}>
+            <thead className={dataTableHeadClass}>
+              <tr>
+                <th className={`${dataTableThLeftClass} w-[3rem]`}>Mkt</th>
+                <th className={`${dataTableThLeftClass} w-[4rem]`}>Ticker</th>
+                <th className={`${dataTableThRightClass} w-[5.5rem]`}>Qty / Avg</th>
+                <th className={`${dataTableThRightClass} w-[5.5rem]`}>Cost Basis</th>
+                <th className={`${dataTableThRightClass} w-[6.5rem]`}>Price</th>
+                <th className={`${dataTableThRightClass} w-[6.5rem]`}>Mkt Value</th>
+                <th className={`${dataTableThRightClass} w-[6rem]`}>Unrealised</th>
+                <th className={`${dataTableThRightClass} w-[5rem]`}>Realised</th>
+                <th className={`${dataTableThRightClass} w-[5rem]`}>Div</th>
               </tr>
             </thead>
             <tbody>
               {filtered.length === 0 ? (
                 <tr>
                   <td
-                    colSpan={12}
-                    className="px-4 py-8 text-center text-slate-500"
+                    colSpan={9}
+                    className="px-2 py-6 text-center text-slate-500"
                   >
                     <p>No open positions.</p>
                     <p className="mt-2 text-xs text-slate-600">
@@ -544,61 +587,49 @@ export function StockHoldingsTable() {
                   return (
                     <tr
                       key={`open-${holding.market}-${holding.ticker}`}
-                      className="border-b border-surface-border/40 last:border-0 hover:bg-surface/30"
+                      className={dataTableRowClass}
                     >
-                      <td className="px-4 py-3 text-slate-300">{holding.market}</td>
-                      <td className="px-4 py-3 font-medium text-white">
+                      <td className={dataTableTdLeftClass}>{holding.market}</td>
+                      <td className={`${dataTableTdLeftClass} font-medium text-white`}>
                         {holding.ticker}
                       </td>
-                      <td className="px-4 py-3 text-slate-400">
-                        {holding.assetName}
+                      <td className={dataTableTdRightClass}>
+                        <StackedValue
+                          align="right"
+                          primary={String(coerceNumber(holding.quantity))}
+                          secondary={formatNativeValue(holding, holding.averageCost)}
+                        />
                       </td>
-                      <td className="px-4 py-3 text-slate-300">
-                        {coerceNumber(holding.quantity)}
-                      </td>
-                      <td className="px-4 py-3 text-slate-300">
-                        {formatNativeValue(holding, holding.averageCost)}
-                      </td>
-                      <td className="px-4 py-3 text-slate-300">
+                      <td className={dataTableTdRightClass}>
                         {formatNativeValue(holding, holding.totalCost)}
                       </td>
-                      <td className="px-4 py-3">
-                        <PriceDisplay
+                      <td className={dataTableTdRightClass}>
+                        <CompactPriceCell
                           holding={holding}
                           priceRecord={priceRecord}
-                          onManualSave={(price) =>
-                            handleManualPriceSave(holding, price)
+                          onEdit={() =>
+                            setPriceModal({ holding, priceRecord })
                           }
                         />
                       </td>
-                      <td className="px-4 py-3">
+                      <td className={dataTableTdRightClass}>
                         <MarketValueCell
                           holding={holding}
                           fxRateValid={fxRateValid}
                         />
                       </td>
-                      <td
-                        className={`px-4 py-3 ${plColorClass(
-                          holding.unrealisedPL,
-                          holding.currentPrice == null
-                        )}`}
-                      >
-                        {holding.currentPrice != null
-                          ? formatNativeValue(holding, holding.unrealisedPL)
-                          : "—"}
+                      <td className={dataTableTdRightClass}>
+                        <UnrealisedPlCell holding={holding} />
                       </td>
                       <td
-                        className={`px-4 py-3 ${plColorClass(holding.realisedPL)}`}
+                        className={`${dataTableTdRightClass} ${plColorClass(holding.realisedPL)}`}
                       >
                         {formatNativeValue(holding, holding.realisedPL)}
                       </td>
                       <td
-                        className={`px-4 py-3 ${plColorClass(holding.dividendIncome)}`}
+                        className={`${dataTableTdRightClass} ${plColorClass(holding.dividendIncome)}`}
                       >
                         {formatNativeValue(holding, holding.dividendIncome)}
-                      </td>
-                      <td className="px-4 py-3">
-                        <SgdValueCell holding={holding} fxRateValid={fxRateValid} />
                       </td>
                     </tr>
                   );
@@ -618,6 +649,15 @@ export function StockHoldingsTable() {
         </div>
         <ClosedPositionsTable positions={closedPositions} />
       </section>
+
+      {priceModal && (
+        <StockPriceModal
+          holding={priceModal.holding}
+          priceRecord={priceModal.priceRecord}
+          onClose={() => setPriceModal(null)}
+          onSave={(price) => handleManualPriceSave(priceModal.holding, price)}
+        />
+      )}
     </div>
   );
 }

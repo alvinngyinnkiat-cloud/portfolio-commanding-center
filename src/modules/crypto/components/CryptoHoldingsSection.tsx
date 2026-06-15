@@ -15,6 +15,18 @@ import { persistCryptoTradeChanges } from "@/modules/crypto/lib/persist-crypto-c
 import { Input } from "@/shared/components/ui/Input";
 import { Select } from "@/shared/components/ui/Select";
 import { Button } from "@/shared/components/ui/Button";
+import { Modal } from "@/shared/components/ui/Modal";
+import { StackedValue } from "@/shared/components/ui/StackedValue";
+import {
+  dataTableClass,
+  dataTableHeadClass,
+  dataTableRowClass,
+  dataTableTdLeftClass,
+  dataTableTdRightClass,
+  dataTableThLeftClass,
+  dataTableThRightClass,
+  dataTableWrapperClass,
+} from "@/shared/components/ui/data-table";
 
 const emptyTradeForm = (): {
   date: string;
@@ -39,32 +51,30 @@ function plColorClass(value: number | null | undefined): string {
   return "text-slate-300";
 }
 
-function InlineCurrentValueEditor({
+function CryptoHoldingEditModal({
   row,
+  onClose,
   onSave,
-  disabled,
 }: {
   row: CryptoHoldingRow;
-  onSave: (id: string, value: string) => Promise<void>;
-  disabled?: boolean;
+  onClose: () => void;
+  onSave: (currentValueSgd: string, notes: string) => Promise<void>;
 }) {
-  const [draft, setDraft] = useState(String(row.currentValueSgd));
+  const [currentValue, setCurrentValue] = useState(String(row.currentValueSgd));
+  const [notes, setNotes] = useState(row.notes ?? "");
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    setDraft(String(row.currentValueSgd));
+    setCurrentValue(String(row.currentValueSgd));
+    setNotes(row.notes ?? "");
     setError(null);
-  }, [row.id, row.currentValueSgd]);
+  }, [row.id, row.currentValueSgd, row.notes]);
 
-  const isDirty = draft !== String(row.currentValueSgd);
-
-  const commit = async () => {
-    if (!isDirty || saving || disabled) return;
-
+  const handleSave = async () => {
     const validation = validateCryptoHoldingValueDraft({
-      currentValueSgd: draft,
-      notes: "",
+      currentValueSgd: currentValue,
+      notes,
     });
     if (!validation.valid) {
       setError(validation.errors.currentValueSgd ?? "Invalid value");
@@ -74,71 +84,58 @@ function InlineCurrentValueEditor({
     setSaving(true);
     setError(null);
     try {
-      await onSave(row.id, draft);
+      await onSave(currentValue, notes);
+      onClose();
     } finally {
       setSaving(false);
     }
   };
 
   return (
-    <div className="flex min-w-[9rem] flex-col gap-1">
-      <div className="flex items-center gap-1.5">
-        <input
+    <Modal title={`Edit Holding — ${row.assetName}`} onClose={onClose}>
+      <div className="space-y-4">
+        <Input
+          label="Current Value (SGD)"
           type="number"
           step="0.01"
           min="0"
-          value={draft}
-          disabled={disabled || saving}
+          value={currentValue}
           onChange={(e) => {
-            setDraft(e.target.value);
+            setCurrentValue(e.target.value);
             setError(null);
           }}
-          onBlur={() => {
-            void commit();
-          }}
-          onKeyDown={(e) => {
-            if (e.key === "Enter") {
-              e.preventDefault();
-              e.currentTarget.blur();
-            }
-            if (e.key === "Escape") {
-              setDraft(String(row.currentValueSgd));
-              setError(null);
-              e.currentTarget.blur();
-            }
-          }}
-          aria-label={`Current value for ${row.assetName}`}
-          className="w-full min-w-0 rounded-lg border border-surface-border bg-surface/80 px-2.5 py-1.5 text-sm text-white transition-colors focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/30 disabled:opacity-60"
+          error={error ?? undefined}
         />
-        {isDirty && (
-          <Button
-            size="sm"
-            variant="secondary"
-            className="shrink-0 px-2 py-1 text-xs"
-            disabled={saving || disabled}
-            onMouseDown={(e) => e.preventDefault()}
-            onClick={() => void commit()}
-          >
-            {saving ? "…" : "Save"}
+        <Input
+          label="Notes (optional)"
+          value={notes}
+          onChange={(e) => setNotes(e.target.value)}
+        />
+        <p className="text-xs text-slate-500">
+          Cost basis is updated via buy/sell transactions.
+        </p>
+        <div className="flex justify-end gap-2">
+          <Button variant="secondary" onClick={onClose} disabled={saving}>
+            Cancel
           </Button>
-        )}
+          <Button onClick={() => void handleSave()} disabled={saving}>
+            {saving ? "Saving…" : "Save"}
+          </Button>
+        </div>
       </div>
-      {error && <span className="text-xs text-accent-red">{error}</span>}
-    </div>
+    </Modal>
   );
 }
 
 export function CryptoHoldingsSection() {
   const { cryptoData, services, refresh } = usePortfolio();
   const [tradeForm, setTradeForm] = useState(emptyTradeForm);
-  const [notesDraft, setNotesDraft] = useState("");
-  const [editingHoldingId, setEditingHoldingId] = useState<string | null>(null);
+  const [editingRow, setEditingRow] = useState<CryptoHoldingRow | null>(null);
   const [tradeErrors, setTradeErrors] = useState<Record<string, string>>({});
   const [tradeSaveError, setTradeSaveError] = useState<string | null>(null);
   const [tradeSaving, setTradeSaving] = useState(false);
 
   const rows = cryptoData?.rows ?? [];
-  const editingRow = rows.find((row) => row.id === editingHoldingId) ?? null;
 
   const handleTradeSubmit = async () => {
     if (!services?.cryptoTrades || tradeSaving) return;
@@ -194,33 +191,14 @@ export function CryptoHoldingsSection() {
     }
   };
 
-  const saveCurrentValue = async (id: string, currentValueSgd: string) => {
-    if (!services?.cryptoHoldings) return;
+  const saveHoldingEdit = async (currentValueSgd: string, notes: string) => {
+    if (!services?.cryptoHoldings || !editingRow) return;
 
-    const row = rows.find((item) => item.id === id);
-    services.cryptoHoldings.updateValuation(id, {
+    services.cryptoHoldings.updateValuation(editingRow.id, {
       currentValueSgd,
-      notes: row?.notes ?? "",
+      notes,
     });
     await getPersistenceManager()?.drainSyncQueue();
-    refresh();
-  };
-
-  const handleEditHolding = (row: CryptoHoldingRow) => {
-    setEditingHoldingId(row.id);
-    setNotesDraft(row.notes ?? "");
-  };
-
-  const handleNotesSubmit = async () => {
-    if (!editingHoldingId || !services?.cryptoHoldings || !editingRow) return;
-
-    services.cryptoHoldings.updateValuation(editingHoldingId, {
-      currentValueSgd: String(editingRow.currentValueSgd),
-      notes: notesDraft,
-    });
-    await getPersistenceManager()?.drainSyncQueue();
-    setEditingHoldingId(null);
-    setNotesDraft("");
     refresh();
   };
 
@@ -237,17 +215,11 @@ export function CryptoHoldingsSection() {
     );
     services.cryptoTrades.replaceAll(remaining);
     services.cryptoHoldings.delete(row.id);
-    if (editingHoldingId === row.id) {
-      setEditingHoldingId(null);
-      setNotesDraft("");
+    if (editingRow?.id === row.id) {
+      setEditingRow(null);
     }
     await persistCryptoTradeChanges();
     refresh();
-  };
-
-  const handleCancelEdit = () => {
-    setEditingHoldingId(null);
-    setNotesDraft("");
   };
 
   return (
@@ -323,80 +295,60 @@ export function CryptoHoldingsSection() {
         )}
       </section>
 
-      {editingRow && (
-        <section className="space-y-4 rounded-xl border border-accent/50 bg-accent/5 p-4">
-          <h3 className="text-sm font-semibold text-accent">
-            Edit Holding — {editingRow.assetName}
-          </h3>
-          <p className="text-xs text-slate-500">
-            Update notes here. Change cost basis via buy/sell transactions; update
-            current value inline in the table.
-          </p>
-          <Input
-            label="Notes (optional)"
-            value={notesDraft}
-            onChange={(e) => setNotesDraft(e.target.value)}
-          />
-          <div className="flex flex-wrap gap-2">
-            <Button onClick={() => void handleNotesSubmit()}>Save Notes</Button>
-            <Button variant="ghost" onClick={handleCancelEdit}>
-              Cancel
-            </Button>
-          </div>
-        </section>
-      )}
-
-      <div className="overflow-x-auto rounded-xl border border-surface-border/60">
-        <table className="w-full min-w-[720px] text-sm">
-          <thead className="bg-surface/60">
-            <tr className="border-b border-surface-border text-left text-xs font-medium uppercase tracking-wide text-slate-500">
-              <th className="px-4 py-3">Asset</th>
-              <th className="px-4 py-3">Cost Basis</th>
-              <th className="px-4 py-3">Current Value</th>
-              <th className="px-4 py-3">P/L SGD</th>
-              <th className="px-4 py-3">P/L %</th>
-              <th className="px-4 py-3">Actions</th>
+      <div className={dataTableWrapperClass}>
+        <table className={dataTableClass}>
+          <thead className={dataTableHeadClass}>
+            <tr>
+              <th className={`${dataTableThLeftClass} w-[20%]`}>Coin</th>
+              <th className={`${dataTableThRightClass} w-[8%]`}>Qty</th>
+              <th className={`${dataTableThRightClass} w-[14%]`}>Current Value</th>
+              <th className={`${dataTableThRightClass} w-[14%]`}>Contribution</th>
+              <th className={`${dataTableThRightClass} w-[14%]`}>P/L</th>
+              <th className={`${dataTableThRightClass} w-[10%]`}>Alloc %</th>
+              <th className={`${dataTableThLeftClass} w-[12%]`}>Actions</th>
             </tr>
           </thead>
           <tbody>
             {rows.length === 0 ? (
               <tr>
-                <td colSpan={6} className="px-4 py-8 text-center text-slate-500">
+                <td colSpan={7} className="px-2 py-6 text-center text-slate-500">
                   <p>No crypto holdings yet.</p>
                   <p className="mt-2 text-xs text-slate-600">
-                    Record a buy transaction above, then type current value directly in
-                    the table.
+                    Record a buy transaction above, then set current value via Edit.
                   </p>
                 </td>
               </tr>
             ) : (
               rows.map((row) => (
-                <tr
-                  key={row.id}
-                  className="border-b border-surface-border/40 last:border-0 hover:bg-surface/30"
-                >
-                  <td className="px-4 py-3 font-medium text-white">{row.assetName}</td>
-                  <td className="px-4 py-3 text-slate-300">
+                <tr key={row.id} className={dataTableRowClass}>
+                  <td className={`${dataTableTdLeftClass} font-medium text-white`}>
+                    {row.assetName}
+                  </td>
+                  <td className={dataTableTdRightClass}>—</td>
+                  <td className={dataTableTdRightClass}>
+                    {formatSgd(row.currentValueSgd)}
+                  </td>
+                  <td className={dataTableTdRightClass}>
                     {formatSgd(row.contributionSgd)}
                   </td>
-                  <td className="px-4 py-3">
-                    <InlineCurrentValueEditor
-                      row={row}
-                      onSave={saveCurrentValue}
+                  <td className={dataTableTdRightClass}>
+                    <StackedValue
+                      align="right"
+                      primary={formatSgd(row.profitLossSgd)}
+                      secondary={formatPercent(row.profitLossPercent)}
+                      primaryClassName={`font-medium ${plColorClass(row.profitLossSgd)}`}
+                      secondaryClassName={`text-[11px] ${plColorClass(row.profitLossPercent)}`}
                     />
                   </td>
-                  <td className={`px-4 py-3 ${plColorClass(row.profitLossSgd)}`}>
-                    {formatSgd(row.profitLossSgd)}
+                  <td className={dataTableTdRightClass}>
+                    {formatPercent(row.portfolioPercent)}
                   </td>
-                  <td className={`px-4 py-3 ${plColorClass(row.profitLossPercent)}`}>
-                    {formatPercent(row.profitLossPercent)}
-                  </td>
-                  <td className="px-4 py-3">
-                    <div className="flex gap-2">
+                  <td className={dataTableTdLeftClass}>
+                    <div className="flex gap-1">
                       <Button
                         size="sm"
                         variant="ghost"
-                        onClick={() => handleEditHolding(row)}
+                        onClick={() => setEditingRow(row)}
                       >
                         Edit
                       </Button>
@@ -415,6 +367,14 @@ export function CryptoHoldingsSection() {
           </tbody>
         </table>
       </div>
+
+      {editingRow && (
+        <CryptoHoldingEditModal
+          row={editingRow}
+          onClose={() => setEditingRow(null)}
+          onSave={saveHoldingEdit}
+        />
+      )}
     </div>
   );
 }
