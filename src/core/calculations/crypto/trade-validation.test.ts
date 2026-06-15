@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { validateCryptoTradeDraft } from "./trade-validation";
+import { validateCryptoTradeDraft, cryptoTradeToDraft } from "./trade-validation";
 
 describe("validateCryptoTradeDraft", () => {
   const base = {
@@ -27,5 +27,29 @@ describe("validateCryptoTradeDraft", () => {
     const result = validateCryptoTradeDraft({ ...base, date: "" });
     expect(result.valid).toBe(false);
     expect(result.errors.date).toBeDefined();
+  });
+});
+
+describe("cryptoTradeToDraft", () => {
+  it("maps persisted trade fields to form draft", () => {
+    const draft = cryptoTradeToDraft({
+      id: "t1",
+      date: "2026-06-15",
+      assetName: "BTC",
+      type: "buy",
+      amountSgd: 500,
+      feesSgd: 2.5,
+      notes: "note",
+      createdAt: "2026-06-15T00:00:00.000Z",
+    });
+
+    expect(draft).toEqual({
+      date: "2026-06-15",
+      assetName: "BTC",
+      type: "buy",
+      amountSgd: "500",
+      feesSgd: "2.5",
+      notes: "note",
+    });
   });
 });

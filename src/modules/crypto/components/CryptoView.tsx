@@ -80,7 +80,7 @@ export function CryptoView() {
               <section className="min-w-0">
                 <SectionHeader
                   title="Transaction History"
-                  description="Buy and sell records with date, amount, and fees — newest first"
+                  description="Edit buy/sell records or add new transactions from the Holdings tab"
                 />
                 <CryptoTransactionsSection />
               </section>

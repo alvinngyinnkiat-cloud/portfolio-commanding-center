@@ -22,10 +22,17 @@ export class CryptoTradeService {
     draft: CryptoTradeDraft,
     id?: string
   ): CryptoTrade | null {
-    const validation = validateCryptoTradeDraft(draft, this.holdings.list());
+    const existing = this.trades.list();
+    const tradesForValidation =
+      id != null ? existing.filter((row) => row.id !== id) : existing;
+    const holdingsForValidation = rebuildHoldingsFromTrades(
+      tradesForValidation,
+      this.holdings.list()
+    );
+
+    const validation = validateCryptoTradeDraft(draft, holdingsForValidation);
     if (!validation.valid || !validation.values) return null;
 
-    const existing = this.trades.list();
     const trade: CryptoTrade = {
       id: id ?? generateId(),
       createdAt:
@@ -49,10 +56,16 @@ export class CryptoTradeService {
     return trade;
   }
 
-  delete(id: string): void {
-    const nextTrades = this.trades.list().filter((row) => row.id !== id);
-    this.syncHoldings(nextTrades);
+  delete(id: string): boolean {
+    const existing = this.trades.list();
+    if (!existing.some((row) => row.id === id)) {
+      return false;
+    }
+
+    const nextTrades = existing.filter((row) => row.id !== id);
     this.trades.delete(id);
+    this.syncHoldings(nextTrades);
+    return true;
   }
 
   replaceAll(trades: CryptoTrade[]): void {

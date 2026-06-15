@@ -1,4 +1,4 @@
-import type { CryptoHolding, CryptoTradeType } from "@/core/domain/types";
+import type { CryptoHolding, CryptoTrade, CryptoTradeType } from "@/core/domain/types";
 import { normalizeFeesSgd } from "./contribution";
 import { findHoldingCostBasis } from "./trades";
 import { parseIsoDateString } from "@/shared/lib/date";
@@ -27,6 +27,17 @@ export interface CryptoTradeValidationResult {
     amountSgd: number;
     feesSgd: number;
     notes?: string;
+  };
+}
+
+export function cryptoTradeToDraft(trade: CryptoTrade): CryptoTradeDraft {
+  return {
+    date: parseIsoDateString(trade.date) ?? "",
+    assetName: trade.assetName,
+    type: trade.type,
+    amountSgd: String(trade.amountSgd),
+    feesSgd: trade.feesSgd != null ? String(trade.feesSgd) : "",
+    notes: trade.notes ?? "",
   };
 }
 

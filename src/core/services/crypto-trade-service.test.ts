@@ -75,4 +75,53 @@ describe("CryptoTradeService", () => {
     expect(saved).toBeNull();
     expect(holdings).toHaveLength(0);
   });
+
+  it("rebuilds holdings when an existing trade amount is edited", () => {
+    const { tradeRepo, holdingRepo, trades, holdings } = createMocks();
+    const service = new CryptoTradeService(tradeRepo, holdingRepo);
+
+    service.upsertFromDraft({
+      date: "2026-06-15",
+      assetName: "BTC",
+      type: "buy",
+      amountSgd: "250",
+      feesSgd: "0",
+      notes: "",
+    });
+
+    const existing = trades[0]!;
+    const updated = service.upsertFromDraft(
+      {
+        date: "2026-06-15",
+        assetName: "BTC",
+        type: "buy",
+        amountSgd: "500",
+        feesSgd: "0",
+        notes: "",
+      },
+      existing.id
+    );
+
+    expect(updated?.amountSgd).toBe(500);
+    expect(holdings[0]?.investedSgd).toBe(500);
+  });
+
+  it("removes trade and rebuilds holdings on delete", () => {
+    const { tradeRepo, holdingRepo, trades, holdings } = createMocks();
+    const service = new CryptoTradeService(tradeRepo, holdingRepo);
+
+    service.upsertFromDraft({
+      date: "2026-06-15",
+      assetName: "BTC",
+      type: "buy",
+      amountSgd: "250",
+      feesSgd: "0",
+      notes: "",
+    });
+
+    const id = trades[0]!.id;
+    expect(service.delete(id)).toBe(true);
+    expect(trades).toHaveLength(0);
+    expect(holdings).toHaveLength(0);
+  });
 });

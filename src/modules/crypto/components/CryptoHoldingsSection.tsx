@@ -11,6 +11,7 @@ import { formatPercent, formatSgd } from "@/shared/lib/format";
 import { coerceNumber } from "@/shared/lib/coerce-number";
 import { parseIsoDateString, toLocalDateString } from "@/shared/lib/date";
 import { getPersistenceManager } from "@/core/database/supabase";
+import { persistCryptoTradeChanges } from "@/modules/crypto/lib/persist-crypto-changes";
 import { Input } from "@/shared/components/ui/Input";
 import { Select } from "@/shared/components/ui/Select";
 import { Button } from "@/shared/components/ui/Button";
@@ -168,17 +169,6 @@ export function CryptoHoldingsSection() {
     setTradeSaveError(null);
 
     try {
-      const manager = getPersistenceManager();
-      const requiresSupabase =
-        manager?.getStatus() === "supabase" ||
-        manager?.getStatus() === "supabase_migrated";
-
-      if (requiresSupabase && manager && !manager.isCryptoTradesSyncAvailable()) {
-        throw new Error(
-          "crypto_trades table is unavailable in Supabase. Run the crypto_trades block in supabase/schema.sql before adding buy/sell transactions."
-        );
-      }
-
       const trade = services.cryptoTrades.upsertFromDraft(tradeForm);
       if (!trade) {
         setTradeSaveError(
@@ -187,8 +177,7 @@ export function CryptoHoldingsSection() {
         return;
       }
 
-      await manager?.drainSyncQueue();
-      await manager?.rehydrateCryptoFromSupabase();
+      await persistCryptoTradeChanges();
 
       setTradeErrors({});
       setTradeForm(emptyTradeForm());
@@ -252,8 +241,7 @@ export function CryptoHoldingsSection() {
       setEditingHoldingId(null);
       setNotesDraft("");
     }
-    await getPersistenceManager()?.drainSyncQueue();
-    await getPersistenceManager()?.rehydrateCryptoFromSupabase();
+    await persistCryptoTradeChanges();
     refresh();
   };
 

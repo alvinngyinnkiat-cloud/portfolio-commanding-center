@@ -70,6 +70,7 @@ export function validateAllocationPercent(value: number): boolean {
 export {
   validateCryptoTradeDraft,
   validateCryptoHoldingValueDraft,
+  cryptoTradeToDraft,
   type CryptoTradeDraft,
   type CryptoHoldingValueDraft,
 } from "./trade-validation";
