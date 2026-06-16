@@ -137,4 +137,112 @@ describe("available trading cash", () => {
     expect(usFlow.netBuySpend).toBe(500);
     expect(sgFlow.netBuySpend).toBe(200);
   });
+
+  describe("Module 2 acceptance — SG available cash", () => {
+    const sgContribution = 11_568.43;
+    const priorSurplus = 714.82;
+
+    it("test 1: SG buy reduces cash by total spend", () => {
+      const transactions: StockTransaction[] = [
+        tx({
+          id: "sell-prior",
+          market: "SG",
+          transactionType: "sell",
+          grossAmount: priorSurplus,
+          netAmount: priorSurplus,
+          currency: "SGD",
+        }),
+        tx({
+          id: "sti-buy",
+          market: "SG",
+          ticker: "STI",
+          transactionType: "buy",
+          quantity: 100,
+          price: 1,
+          grossAmount: 100,
+          netAmount: -100,
+          currency: "SGD",
+        }),
+      ];
+
+      const cash = calculateSgAvailableCashSgd(sgContribution, transactions);
+      expect(cash).toBeCloseTo(12_183.25, 2);
+    });
+
+    it("test 1b: SG buy reduces cash when grossAmount is missing but qty × price exists", () => {
+      const transactions: StockTransaction[] = [
+        tx({
+          id: "sell-prior",
+          market: "SG",
+          transactionType: "sell",
+          grossAmount: priorSurplus,
+          netAmount: priorSurplus,
+          currency: "SGD",
+        }),
+        tx({
+          id: "sti-buy",
+          market: "SG",
+          ticker: "STI",
+          transactionType: "buy",
+          quantity: 100,
+          price: 1,
+          grossAmount: 0,
+          netAmount: 0,
+          currency: "SGD",
+        }),
+      ];
+
+      const cash = calculateSgAvailableCashSgd(sgContribution, transactions);
+      expect(cash).toBeCloseTo(12_183.25, 2);
+    });
+
+    it("test 2: SG sell increases cash by proceeds minus fees", () => {
+      const transactions: StockTransaction[] = [
+        tx({
+          id: "sell-1",
+          market: "SG",
+          transactionType: "sell",
+          grossAmount: 500,
+          fees: 5,
+          netAmount: 495,
+          currency: "SGD",
+        }),
+      ];
+
+      const cash = calculateSgAvailableCashSgd(sgContribution, transactions);
+      expect(cash).toBeCloseTo(sgContribution + 495, 2);
+    });
+
+    it("test 3: SG dividend increases cash", () => {
+      const transactions: StockTransaction[] = [
+        tx({
+          id: "div-1",
+          market: "SG",
+          transactionType: "dividend",
+          grossAmount: 100,
+          netAmount: 100,
+          currency: "SGD",
+        }),
+      ];
+
+      const cash = calculateSgAvailableCashSgd(sgContribution, transactions);
+      expect(cash).toBeCloseTo(sgContribution + 100, 2);
+    });
+
+    it("test 4: SG standalone fee decreases cash", () => {
+      const transactions: StockTransaction[] = [
+        tx({
+          id: "fee-1",
+          market: "SG",
+          transactionType: "fee",
+          fees: 10,
+          netAmount: -10,
+          currency: "SGD",
+        }),
+      ];
+
+      const cash = calculateSgAvailableCashSgd(sgContribution, transactions);
+      expect(cash).toBeCloseTo(sgContribution - 10, 2);
+    });
+  });
 });
