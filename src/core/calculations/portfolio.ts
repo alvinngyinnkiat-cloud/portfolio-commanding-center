@@ -64,7 +64,7 @@ export function calculatePortfolioMetrics(
   const cryptoCashSgd = inputs.cryptoAvailableTradingCashSgd;
 
   const totalCashSgd =
-    inputs.stockAvailableTradingCashSgd + inputs.cryptoAvailableTradingCashSgd;
+    usdTradingCashSgd + sgdTradingCashSgd + cryptoCashSgd;
 
   const clientPortfolio = inputs.clientPortfolioSgd;
   const clientPortfolioUsd = inputs.clientPortfolioUsd;

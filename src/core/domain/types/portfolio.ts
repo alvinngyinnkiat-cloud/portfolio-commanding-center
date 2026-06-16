@@ -77,7 +77,7 @@ export interface PortfolioMetrics {
   cryptoCashSgd: number;
   clientPortfolio: number;
   clientPortfolioUsd: number;
-  /** Total Portfolio = Total Stock Value + Total Crypto Value */
+  /** Total Portfolio = US + SG + Crypto net value (holdings + cash per module) */
   totalPortfolio: number;
   clientOwnershipPercent: number;
   /** Module 2 — capital deployed (US + SG legs from ledger) */

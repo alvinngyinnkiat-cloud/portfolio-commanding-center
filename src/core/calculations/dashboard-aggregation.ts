@@ -32,8 +32,9 @@ export function aggregateTotalContribution(
 }
 
 /**
- * Total Portfolio = Total Stock Value + Total Crypto Value.
- * Options market value is embedded in stock totals — no separate add-on.
+ * Total Portfolio =
+ *   Total US Net Value (SGD) + Total SG Net Value (SGD) + Total Crypto Net Value
+ * Each net value = module holdings + available cash for that leg.
  */
 export function aggregateTotalPortfolioValue(
   inputs: DashboardPortfolioInputs

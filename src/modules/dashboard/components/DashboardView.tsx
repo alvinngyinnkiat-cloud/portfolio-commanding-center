@@ -120,7 +120,7 @@ export function DashboardView() {
           <SummaryCard
             label="Total Portfolio"
             value={formatSgd(metrics.totalPortfolio)}
-            subValue="Total Stock Value + Crypto Value"
+            subValue="US + SG + Crypto net value (holdings + cash)"
             icon={<Wallet size={18} />}
           />
           <SummaryCard
@@ -171,58 +171,48 @@ export function DashboardView() {
         </div>
       </section>
 
-      <section>
+      <section className="space-y-4">
         <SectionHeader
-          title="Asset Breakdown"
-          description="Module-owned holdings and available cash"
+          title="Asset Breakdown & Allocation"
+          description="Module-owned holdings and available cash — excludes client equity"
         />
-        <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
           <SummaryCard
             compact
-            label="Total Stock Value"
-            value={formatSgd(metrics.totalStockValueSgd)}
-            subValue={`US Market: ${formatSgd(metrics.usMarketValueSgd)}\nSG Market: ${formatSgd(metrics.sgMarketValueSgd)}`}
+            label="US Holding Value (SGD)"
+            value={formatSgd(metrics.usStocksEtfSgd)}
             icon={<Globe size={16} />}
           />
           <SummaryCard
             compact
-            label="Stock Contribution"
-            value={formatSgd(metrics.totalStockContributionSgd)}
-            subValue={`Stock P/L: ${formatSgd(metrics.stockProfitLossSgd)}`}
-            icon={<PiggyBank size={16} />}
+            label="SG Holding Value (SGD)"
+            value={formatSgd(metrics.sgStocksSgd)}
+            icon={<Globe size={16} />}
           />
           <SummaryCard
             compact
-            label="Total Crypto Value"
+            label="Crypto Holding Value (SGD)"
             value={formatSgd(metrics.cryptoHoldingsValueSgd)}
-            subValue={`Crypto Holdings: ${formatSgd(metrics.cryptoHoldingsValueSgd)}`}
             icon={<Bitcoin size={16} />}
           />
           <SummaryCard
             compact
-            label="Total Stock Available Cash"
-            value={formatSgd(metrics.stockAvailableTradingCashSgd)}
-            subValue={`US Available Cash: ${formatSgd(metrics.usdTradingCashSgd)}\nSG Available Cash: ${formatSgd(metrics.sgdTradingCashSgd)}`}
-            icon={<Banknote size={16} />}
-          />
-          <SummaryCard
-            compact
-            label="Crypto Available Cash"
-            value={formatSgd(metrics.cryptoAvailableTradingCashSgd)}
-            subValue={`Crypto Available Cash: ${formatSgd(metrics.cryptoAvailableTradingCashSgd)}`}
+            label="Total Cash"
+            value={formatSgd(metrics.totalCashSgd)}
+            subValue={`US ${formatSgd(metrics.usdTradingCashSgd)} · SG ${formatSgd(metrics.sgdTradingCashSgd)} · Crypto ${formatSgd(metrics.cryptoCashSgd)}`}
             icon={<Banknote size={16} />}
           />
         </div>
+        <AssetAllocationChart
+          data={allocation}
+          total={assetAllocationTotal}
+        />
       </section>
 
       <section className="space-y-4">
         <SectionHeader
           title="Charts"
-          description="Allocation, daily worth, and contribution history"
-        />
-        <AssetAllocationChart
-          data={allocation}
-          total={assetAllocationTotal}
+          description="Daily worth and contribution history"
         />
         <DailyPortfolioChart snapshots={snapshots} />
         <MonthlyContributionChart

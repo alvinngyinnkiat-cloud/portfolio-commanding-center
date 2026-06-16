@@ -18,7 +18,7 @@ describe("dashboard aggregation", () => {
     expect(total).toBe(19_800);
   });
 
-  it("Total Portfolio = Total Stock Value + Total Crypto Value", () => {
+  it("Total Portfolio = US + SG + Crypto net value (holdings + cash)", () => {
     const total = aggregateTotalPortfolioValue({
       totalStockValueSgd: 33_500,
       totalCryptoValueSgd: 12_000,
