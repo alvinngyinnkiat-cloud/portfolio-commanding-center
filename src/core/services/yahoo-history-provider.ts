@@ -1,4 +1,5 @@
 import type { StockMarket } from "@/core/domain/types";
+import { formatUsMarketDateFromUnix } from "@/core/calculations/scanner/us-market-date";
 import { toYahooSymbol } from "./yahoo-finance-provider";
 
 export interface StockHistoryRequest {
@@ -70,7 +71,7 @@ function parseHistoryPayload(payload: unknown): StockHistoryCandle[] {
     ) {
       continue;
     }
-    const date = new Date(timestamps[i] * 1000).toISOString().slice(0, 10);
+    const date = formatUsMarketDateFromUnix(timestamps[i]);
     candles.push({ date, open, high, low, close });
   }
 

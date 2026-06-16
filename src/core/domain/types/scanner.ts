@@ -22,6 +22,26 @@ export type ScannerTrend = "Bullish" | "Bearish" | "Neutral";
 
 export type SoStatus = "Rolling Up" | "Strong" | "Rolling Down";
 
+export interface StochasticSoDebug {
+  sessionDate: string | null;
+  last10Highs: number[];
+  last10Lows: number[];
+  last10Closes: number[];
+  highestHigh10: number | null;
+  lowestLow10: number | null;
+  rawK: number | null;
+  smoothedK3: number | null;
+  previousSmoothedK3: number | null;
+  scannerSoUsed: number | null;
+}
+
+export interface AtrDebug {
+  sessionDate: string | null;
+  method: "RMA / Wilder";
+  last14TrueRanges: number[];
+  scannerAtrUsed: number | null;
+}
+
 
 
 export type StrategyOutput =
@@ -205,6 +225,12 @@ export interface ScannerIndicators {
   trend: ScannerTrend;
 
   trendQualityScore: number;
+
+  /** SO rebuild audit trail for TradingView reconciliation. */
+  soDebug?: StochasticSoDebug | null;
+
+  /** ATR rebuild audit trail for TradingView reconciliation. */
+  atrDebug?: AtrDebug | null;
 
 }
 

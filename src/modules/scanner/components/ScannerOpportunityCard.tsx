@@ -87,7 +87,7 @@ function LeftColumn({ result }: { result: ScannerTickerResult }) {
           label="Adjusted Mid Zone"
           value={formatAdjustedMidZone(structure, indicators.atr14)}
         />
-        <Metric label="SO Value" value={formatNum(indicators.so, 1)} />
+        <Metric label="SO Value" value={formatNum(indicators.so, 2)} />
         <Metric label="SO Status" value={indicators.soStatus} />
         <Metric label="Trend" value={indicators.trend} />
         <Metric label="Average Price" value={formatNum(indicators.avgPrice)} />
@@ -135,18 +135,57 @@ function StrategyColumn({
 
 function ExpandedDetails({ result }: { result: ScannerTickerResult }) {
   const { structure, indicators } = result;
+  const soDebug = indicators.soDebug;
+  const atrDebug = indicators.atrDebug;
 
   return (
     <div className="space-y-5 border-t border-surface-border/60 pt-5">
       <DetailSection title="SO Validation">
         <DetailGrid
           items={[
-            ["SO Settings", "Stochastic 10 / 3 (Daily Close, completed sessions)"],
-            ["Current SO", formatNum(indicators.so, 1)],
-            ["Previous SO", formatNum(indicators.soPrev, 1)],
+            ["SO Settings", "Stochastic 10 / 3 · Daily Close · completed sessions"],
+            ["Session Date", soDebug?.sessionDate ?? "—"],
+            ["Current SO", formatNum(indicators.so, 2)],
+            ["Previous SO", formatNum(indicators.soPrev, 2)],
             ["SO Status", indicators.soStatus],
+            ["Lowest Low (10)", formatNum(soDebug?.lowestLow10 ?? null, 2)],
+            ["Highest High (10)", formatNum(soDebug?.highestHigh10 ?? null, 2)],
+            ["Raw %K", formatNum(soDebug?.rawK ?? null, 2)],
+            ["Smoothed %K (3 SMA)", formatNum(soDebug?.smoothedK3 ?? null, 2)],
+            [
+              "Previous Smoothed %K",
+              formatNum(soDebug?.previousSmoothedK3 ?? null, 2),
+            ],
+            ["Scanner SO Used", formatNum(soDebug?.scannerSoUsed ?? indicators.so, 2)],
           ]}
         />
+        {soDebug && (
+          <div className="mt-4 space-y-3">
+            <SoWindowTable label="Last 10 Highs" values={soDebug.last10Highs} />
+            <SoWindowTable label="Last 10 Lows" values={soDebug.last10Lows} />
+            <SoWindowTable label="Last 10 Closes" values={soDebug.last10Closes} />
+          </div>
+        )}
+      </DetailSection>
+
+      <DetailSection title="ATR Validation">
+        <DetailGrid
+          items={[
+            ["ATR Settings", "ATR 14 · RMA / Wilder · completed daily sessions"],
+            ["Session Date", atrDebug?.sessionDate ?? "—"],
+            ["ATR Method", atrDebug?.method ?? "RMA / Wilder"],
+            ["Scanner ATR Used", formatNum(atrDebug?.scannerAtrUsed ?? indicators.atr14, 2)],
+            ["ATR14 (card)", formatNum(indicators.atr14, 2)],
+          ]}
+        />
+        {atrDebug && atrDebug.last14TrueRanges.length > 0 && (
+          <div className="mt-4">
+            <SoWindowTable
+              label="Last 14 True Range Values"
+              values={atrDebug.last14TrueRanges}
+            />
+          </div>
+        )}
       </DetailSection>
 
       <DetailSection title="Structure">
@@ -169,7 +208,7 @@ function ExpandedDetails({ result }: { result: ScannerTickerResult }) {
       <DetailSection title="Indicators">
         <DetailGrid
           items={[
-            ["ATR14", formatNum(indicators.atr14)],
+            ["ATR14", formatNum(indicators.atr14, 2)],
             ["EMA20", formatNum(indicators.ema20)],
             ["SMA50", formatNum(indicators.sma50)],
             ["SMA200", formatNum(indicators.sma200)],
@@ -352,6 +391,42 @@ function formatNum(value: number | null, digits = 2): string {
     return "—";
   }
   return value.toFixed(digits);
+}
+
+function SoWindowTable({ label, values }: { label: string; values: number[] }) {
+  if (values.length === 0) {
+    return null;
+  }
+
+  return (
+    <div>
+      <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
+        {label}
+      </p>
+      <div className="overflow-x-auto rounded-lg border border-surface-border/60">
+        <table className="min-w-full text-xs">
+          <thead className="bg-surface/50 text-slate-500">
+            <tr>
+              {values.map((_, index) => (
+                <th key={index} className="px-2 py-1.5 text-right font-medium">
+                  {index + 1}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            <tr className="text-slate-200">
+              {values.map((value, index) => (
+                <td key={index} className="px-2 py-1.5 text-right tabular-nums">
+                  {value.toFixed(2)}
+                </td>
+              ))}
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
 }
 
 function resolveAdjustedMidZone(

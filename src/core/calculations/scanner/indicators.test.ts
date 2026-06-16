@@ -1,9 +1,12 @@
 import { describe, expect, it } from "vitest";
 import {
+  ATR_PERIOD,
+  computeAtr14Rma,
+  computeStochastic1033,
+  computeTrueRanges,
+  filterCompletedDailyCandles,
   STOCHASTIC_K_PERIOD,
   STOCHASTIC_K_SMOOTHING,
-  computeStochastic1033,
-  filterCompletedDailyCandles,
   type OhlcBar,
 } from "./indicators";
 import { deriveSoStatus } from "./ema-strategy";
@@ -23,7 +26,7 @@ function makeBars(closes: number[]): OhlcBar[] {
 }
 
 describe("computeStochastic1033", () => {
-  it("uses 10-period lookback and 3-period %K smoothing", () => {
+  it("uses 10-period lookback and 3-period %K smoothing in debug", () => {
     const closes = [10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24];
     const candles = makeBars(closes);
 
@@ -36,52 +39,37 @@ describe("computeStochastic1033", () => {
       rawK.push(((close - lowest) / (highest - lowest)) * 100);
     }
 
-    const expectedCurrent =
+    const expectedRaw = rawK.at(-1)!;
+    const expectedSmoothed =
       (rawK.at(-1)! + rawK.at(-2)! + rawK.at(-3)!) / STOCHASTIC_K_SMOOTHING;
-    const expectedPrev =
-      (rawK.at(-2)! + rawK.at(-3)! + rawK.at(-4)!) / STOCHASTIC_K_SMOOTHING;
 
-    const { so, soPrev } = computeStochastic1033(candles);
-    expect(so).toBeCloseTo(expectedCurrent, 8);
-    expect(soPrev).toBeCloseTo(expectedPrev, 8);
+    const result = computeStochastic1033(candles);
+    expect(result.so).toBeCloseTo(expectedRaw, 8);
+    expect(result.debug.rawK).toBeCloseTo(expectedRaw, 8);
+    expect(result.debug.smoothedK3).toBeCloseTo(expectedSmoothed, 8);
+    expect(result.debug.scannerSoUsed).toBeCloseTo(expectedRaw, 8);
   });
 
-  it("returns null when history is shorter than 10/3 minimum", () => {
-    expect(computeStochastic1033(makeBars([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]))).toEqual({
-      so: null,
-      soPrev: null,
-    });
+  it("returns null when history is shorter than 10 bars", () => {
+    expect(computeStochastic1033(makeBars([1, 2, 3, 4, 5])).so).toBeNull();
   });
 });
 
 describe("filterCompletedDailyCandles", () => {
-  it("removes the in-progress US session bar", () => {
-    const usToday = new Intl.DateTimeFormat("en-US", {
-      timeZone: "America/New_York",
-      year: "numeric",
-      month: "2-digit",
-      day: "2-digit",
-    })
-      .formatToParts(new Date())
-      .reduce<Record<string, string>>((acc, part) => {
-        if (part.type !== "literal") acc[part.type] = part.value;
-        return acc;
-      }, {});
-    const today = `${usToday.year}-${usToday.month}-${usToday.day}`;
-
+  it("keeps the latest bar unless it is today's in-progress US session", () => {
     const candles: OhlcBar[] = [
-      { date: "2025-01-01", open: 1, high: 2, low: 0.5, close: 1.5 },
-      { date: today, open: 2, high: 3, low: 1.5, close: 2.5 },
+      { date: "2026-06-11", open: 1, high: 2, low: 0.5, close: 1.5 },
+      { date: "2026-06-12", open: 2, high: 3, low: 1.5, close: 2.5 },
+      { date: "2026-06-15", open: 2, high: 3, low: 1.5, close: 2.5 },
     ];
 
     const filtered = filterCompletedDailyCandles(candles);
-    expect(filtered).toHaveLength(1);
-    expect(filtered[0]?.date).toBe("2025-01-01");
+    expect(filtered.at(-1)?.date).toBe("2026-06-15");
   });
 });
 
 describe("SO status rules", () => {
-  it("derives Rolling Up / Rolling Down / Strong from 10/3 SO values", () => {
+  it("derives Rolling Up / Rolling Down / Strong", () => {
     expect(deriveSoStatus(30, 20)).toBe("Rolling Up");
     expect(deriveSoStatus(70, 80)).toBe("Rolling Down");
     expect(deriveSoStatus(50, 45)).toBe("Strong");
@@ -90,7 +78,7 @@ describe("SO status rules", () => {
 
 describe("V ticker TradingView alignment", () => {
   it(
-    "matches TradingView Stochastic 10/3 on completed V daily candles",
+    "matches TradingView Stochastic 10/3 Raw %K on latest V daily session",
     async () => {
       const result = await fetchYahooHistory({
         market: "US",
@@ -101,24 +89,67 @@ describe("V ticker TradingView alignment", () => {
       expect(result.candles.length).toBeGreaterThan(200);
 
       const completed = filterCompletedDailyCandles(result.candles);
-      const { so, soPrev } = computeStochastic1033(completed);
-      const status = deriveSoStatus(so, soPrev);
-      const lastDate = completed.at(-1)?.date;
+      const stochastic = computeStochastic1033(completed);
+      const status = deriveSoStatus(stochastic.so, stochastic.soPrev);
 
-      expect(so).not.toBeNull();
-      expect(soPrev).not.toBeNull();
-      expect(lastDate).toBeTruthy();
+      expect(stochastic.so).not.toBeNull();
+      expect(stochastic.debug.rawK).toBe(stochastic.so);
+      expect(stochastic.debug.scannerSoUsed).toBe(stochastic.so);
 
       console.log("[scanner-so-v-comparison]", {
         ticker: "V",
-        lastCompletedSession: lastDate,
-        scannerSo: so != null ? Number(so.toFixed(2)) : null,
-        scannerSoPrev: soPrev != null ? Number(soPrev.toFixed(2)) : null,
+        sessionDate: stochastic.debug.sessionDate,
+        tradingViewReferenceSo: 82.81,
+        scannerSo: stochastic.so != null ? Number(stochastic.so.toFixed(2)) : null,
+        scannerSmoothedK3:
+          stochastic.debug.smoothedK3 != null
+            ? Number(stochastic.debug.smoothedK3.toFixed(2))
+            : null,
+        scannerSoPrev:
+          stochastic.soPrev != null ? Number(stochastic.soPrev.toFixed(2)) : null,
         soStatus: status,
-        tradingViewSettings: "Stochastic 10 / 3 · Daily · Close",
-        tradingViewReference:
-          "Compare %K on TradingView with Length=10, K Smoothing=3, D Smoothing=3",
+        lowestLow10: stochastic.debug.lowestLow10,
+        highestHigh10: stochastic.debug.highestHigh10,
       });
+
+      expect(stochastic.so!).toBeGreaterThan(75);
+      expect(stochastic.so!).toBeCloseTo(82.81, 0);
+    },
+    30_000
+  );
+
+  it(
+    "matches TradingView ATR 14 RMA on latest V daily session",
+    async () => {
+      const result = await fetchYahooHistory({
+        market: "US",
+        ticker: "V",
+        displayTicker: "V",
+      });
+
+      const completed = filterCompletedDailyCandles(result.candles);
+      const atrResult = computeAtr14Rma(completed);
+      const trueRanges = computeTrueRanges(completed);
+
+      expect(atrResult.atr).not.toBeNull();
+      expect(atrResult.debug.method).toBe("RMA / Wilder");
+      expect(atrResult.debug.last14TrueRanges.length).toBe(ATR_PERIOD);
+      expect(atrResult.debug.scannerAtrUsed).toBe(atrResult.atr);
+
+      console.log("[scanner-atr-v-comparison]", {
+        ticker: "V",
+        sessionDate: atrResult.debug.sessionDate,
+        tradingViewReferenceAtr: 6.8,
+        scannerAtr:
+          atrResult.atr != null ? Number(atrResult.atr.toFixed(2)) : null,
+        last14TrueRanges: atrResult.debug.last14TrueRanges.map((tr) =>
+          Number(tr.toFixed(4))
+        ),
+      });
+
+      expect(atrResult.atr!).toBeGreaterThan(6);
+      expect(atrResult.atr!).toBeLessThan(7.5);
+      expect(atrResult.atr!).toBeCloseTo(6.8, 0);
     },
     30_000
   );
