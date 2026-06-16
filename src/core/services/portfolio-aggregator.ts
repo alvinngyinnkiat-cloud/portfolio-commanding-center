@@ -26,7 +26,6 @@ import {
 import { calculatePersonalCashContributionSgd } from "@/core/calculations/personal-cash/contributions";
 import { sortByDateDesc } from "@/shared/lib/sort";
 import {
-  sumRealizedOptionsPlUsd,
   buildClosedTradeRows,
   buildOpenTradeRows,
   buildOptionsClientSummary,
@@ -98,13 +97,12 @@ export class PortfolioAggregator {
       fxRate
     );
     const optionsTrades = this.optionsTradeRepo.list();
-    const realizedOptionsPlUsd = sumRealizedOptionsPlUsd(optionsTrades);
     const stockSummary = buildDashboardStockSummary(
       stockData.holdings,
       contributions,
       stockData.transactions,
       fxRate,
-      realizedOptionsPlUsd,
+      optionsTrades,
       stockData.cashFlow.fxConversions
     );
     const stockOutputs = deriveDashboardStockOutputs(stockSummary);

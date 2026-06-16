@@ -18,6 +18,7 @@ import {
   Gauge,
   Users,
   AlertTriangle,
+  BarChart3,
 } from "lucide-react";
 
 export function OptionsSummaryCards() {
@@ -77,6 +78,21 @@ export function OptionsSummaryCards() {
           value={formatUsd(summary.totalOpenRiskUsd)}
           subValue={`${summary.openTradeCount} open`}
           icon={<Shield size={18} />}
+        />
+        <SummaryCard
+          label="Net Options Market Value"
+          value={
+            summary.netOptionsMarketValueUsd != null
+              ? formatUsd(summary.netOptionsMarketValueUsd)
+              : "—"
+          }
+          subValue="Broker Style Valuation"
+          trend={
+            summary.netOptionsMarketValueUsd != null
+              ? plTrend(summary.netOptionsMarketValueUsd)
+              : "neutral"
+          }
+          icon={<BarChart3 size={18} />}
         />
         <SummaryCard
           label="Total Unrealized P/L"

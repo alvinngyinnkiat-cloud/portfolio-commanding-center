@@ -3,7 +3,6 @@
 import { useMemo, useState } from "react";
 import { usePortfolio } from "@/context/PortfolioContext";
 import type { CalculatedHolding, StockMarket, StockPrice } from "@/core/domain/types";
-import { sumRealizedOptionsPlUsd } from "@/core/calculations/options";
 import {
   buildStockPortfolioSummary,
   plTrend,
@@ -328,7 +327,7 @@ export function StockHoldingsTable() {
         contributions,
         transactions,
         fxRate,
-        sumRealizedOptionsPlUsd(optionsData?.trades ?? []),
+        optionsData?.trades ?? [],
         stockData?.cashFlow.fxConversions ?? []
       ),
     [holdings, contributions, transactions, fxRate, optionsData?.trades, stockData?.cashFlow.fxConversions]

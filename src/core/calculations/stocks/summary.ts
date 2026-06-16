@@ -4,6 +4,7 @@ import type {
   StockTrackerSummary,
   StockTransaction,
 } from "@/core/domain/types";
+import type { OptionsTrade } from "@/core/domain/types/options";
 import type { StockFxConversion } from "@/core/domain/types/stock-fx-conversion";
 import { usdToSgd } from "@/core/calculations/fx";
 import { isValidFxRate } from "@/core/calculations/fx-validation";
@@ -86,7 +87,7 @@ export function buildStockTrackerSummary(
   contributions: ContributionTransaction[],
   transactions: StockTransaction[],
   fxRate: number | null,
-  realizedOptionsPlUsd = 0,
+  optionsTrades: OptionsTrade[] = [],
   fxConversions: StockFxConversion[] = []
 ): StockTrackerSummary {
   const holdingsSummary = summarizeStockHoldings(holdings, fxRate);
@@ -102,7 +103,7 @@ export function buildStockTrackerSummary(
     fxConversions,
     stockTransactions: transactions,
     fxRate,
-    realizedOptionsPlUsd,
+    optionsTrades,
   });
   const sgAvailableTradingCashSgd = calculateSgAvailableCashSgd(
     netCash.sgNetStockCashContributedSgd,
@@ -147,7 +148,7 @@ export function buildStockPortfolioSummary(
   contributions: ContributionTransaction[],
   transactions: StockTransaction[],
   fxRate: number | null,
-  realizedOptionsPlUsd = 0,
+  optionsTrades: OptionsTrade[] = [],
   fxConversions: StockFxConversion[] = []
 ): StockPortfolioSummary {
   const fxRateValid = isValidFxRate(fxRate);
@@ -164,7 +165,7 @@ export function buildStockPortfolioSummary(
     fxConversions,
     stockTransactions: transactions,
     fxRate,
-    realizedOptionsPlUsd,
+    optionsTrades,
   });
   const sgAvailableTradingCashSgd = calculateSgAvailableCashSgd(
     netCash.sgNetStockCashContributedSgd,

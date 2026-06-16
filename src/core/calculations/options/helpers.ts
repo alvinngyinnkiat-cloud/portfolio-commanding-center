@@ -48,7 +48,7 @@ export function daysToExpiration(expirationDate: string, asOfDate?: string): num
 }
 
 export function sumRealizedOptionsPlUsd(trades: OptionsTrade[]): number {
-  /** Realized P/L from close events hits US Available Cash; client leg is reporting only. */
+  /** Performance reporting only — USD cash uses open/close cash flows via Shared USD Cash Engine. */
   let total = 0;
   for (const trade of trades) {
     total += getTradeTotalRealizedPlUsd(trade);

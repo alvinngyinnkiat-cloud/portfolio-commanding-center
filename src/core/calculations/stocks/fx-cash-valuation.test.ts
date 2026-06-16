@@ -30,7 +30,7 @@ describe("stock FX cash valuation", () => {
       contributions,
       [],
       1.28,
-      0,
+      [],
       fxConversions
     );
     const portfolio = buildStockPortfolioSummary(
@@ -38,7 +38,7 @@ describe("stock FX cash valuation", () => {
       contributions,
       [],
       1.28,
-      0,
+      [],
       fxConversions
     );
 

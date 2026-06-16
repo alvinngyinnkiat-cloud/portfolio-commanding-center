@@ -15,7 +15,6 @@ import {
   buildOptionsTrackerSummary,
   buildClosedTradeRows,
   buildOpenTradeRows,
-  sumRealizedOptionsPlUsd,
 } from "@/core/calculations/options";
 import { deriveDashboardStockValues } from "@/core/adapters/dashboard-stock-adapter";
 import { deriveDashboardCryptoOutputs } from "@/core/adapters/dashboard-crypto-adapter";
@@ -149,13 +148,12 @@ function assembleDashboardMetrics(input: {
 }) {
   const contributions = input.contributions;
   const fxConversions = input.fxConversions ?? [];
-  const realizedOptionsPlUsd = sumRealizedOptionsPlUsd(input.optionsTrades);
   const stockSummary = buildStockTrackerSummary(
     input.holdings,
     contributions,
     input.stockTransactions,
     FX,
-    realizedOptionsPlUsd,
+    input.optionsTrades,
     fxConversions
   );
   const stockValues = deriveDashboardStockValues(input.holdings, FX);
@@ -381,7 +379,7 @@ describe("dashboard integration QA — 9-step plan", () => {
     expect(metrics.totalContribution).toBe(5_000);
   });
 
-  it("Step 5: open options trade — cash unchanged, premium ×100×contracts", () => {
+  it("Step 5: open options trade — credit open increases USD cash by premium minus fees", () => {
     const contributions = [
       contribution({
         id: "dep-us",
@@ -415,9 +413,9 @@ describe("dashboard integration QA — 9-step plan", () => {
 
     expect(trades[0].openPremiumUsd).toBe(240);
     expect(after.stockSummary.usAvailableTradingCashUsd).toBe(
-      before.stockSummary.usAvailableTradingCashUsd
+      before.stockSummary.usAvailableTradingCashUsd + 240
     );
-    expect(after.metrics.totalCashSgd).toBe(before.metrics.totalCashSgd);
+    expect(after.metrics.totalCashSgd).toBeGreaterThan(before.metrics.totalCashSgd);
     expect(after.optionsSummary.userUnrealizedPlUsd).toBeNull();
     expect(after.metrics.optionsValueSgd).toBe(0);
   });
@@ -458,7 +456,7 @@ describe("dashboard integration QA — 9-step plan", () => {
     );
   });
 
-  it("Step 7: close options trade — full realised P/L to US cash", () => {
+  it("Step 7: close options trade — net broker cash equals realised P/L", () => {
     const contributions = [
       contribution({
         id: "dep-us",
@@ -496,9 +494,8 @@ describe("dashboard integration QA — 9-step plan", () => {
       optionsTrades: closedTrades,
     });
 
-    expect(closedMetrics.stockSummary.usAvailableTradingCashUsd).toBe(
-      openMetrics.stockSummary.usAvailableTradingCashUsd + 200
-    );
+    expect(closedMetrics.stockSummary.usAvailableTradingCashUsd).toBe(200);
+    expect(openMetrics.stockSummary.usAvailableTradingCashUsd).toBe(240);
     expect(closedMetrics.metrics.optionsValueSgd).toBe(0);
     expect(closedMetrics.metrics.totalPL).toBe(
       closedMetrics.metrics.totalPortfolioValue -
@@ -523,8 +520,10 @@ describe("dashboard integration QA — 9-step plan", () => {
         tradeType: "shared",
         userSharePercent: 60,
         clientSharePercent: 40,
+        openPremiumUsd: 100,
         closeDate: "2025-06-10",
         closePremiumUsd: 0,
+        closeFeesUsd: 0,
         realizedPlUsd: 100,
       }),
     ];

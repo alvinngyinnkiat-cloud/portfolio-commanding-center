@@ -159,7 +159,7 @@ describe("buildStockPortfolioSummary", () => {
       contributions,
       transactions,
       1.35,
-      0,
+      [],
       fxConversions
     );
 
@@ -267,7 +267,7 @@ describe("buildStockPortfolioSummary", () => {
       contributions,
       transactions,
       1.28,
-      0,
+      [],
       fxConversions
     );
 
@@ -318,7 +318,7 @@ describe("buildStockTrackerSummary", () => {
       contributions,
       transactions,
       1.35,
-      0,
+      [],
       fxConversions
     );
 

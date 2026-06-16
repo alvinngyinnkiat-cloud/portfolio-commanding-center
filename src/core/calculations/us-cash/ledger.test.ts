@@ -1,10 +1,12 @@
 import { describe, expect, it } from "vitest";
-import type { StockTransaction } from "@/core/domain/types";
+import type { OptionsTrade } from "@/core/domain/types/options";
+import type { ContributionTransaction, StockTransaction } from "@/core/domain/types";
 import type { StockFxConversion } from "@/core/domain/types/stock-fx-conversion";
 import {
   buildUsAvailableCashResult,
   calculateUsAvailableCashUsd,
 } from "./ledger";
+import { buildUsCashTrace } from "./trace";
 
 function tx(
   overrides: Partial<StockTransaction> & Pick<StockTransaction, "transactionType">
@@ -114,16 +116,34 @@ describe("calculateUsAvailableCashUsd", () => {
     expect(available).toBe(8_000);
   });
 
-  it("adds realized options P/L when provided", () => {
+  it("includes option open and close cash flows from trades", () => {
+    const openCredit: OptionsTrade = {
+      id: "open-credit",
+      status: "open",
+      tradeType: "personal",
+      userSharePercent: 100,
+      clientSharePercent: 0,
+      strategy: "sellPut",
+      underlying: "SPY",
+      expirationDate: "2026-12-18",
+      contracts: 1,
+      openDate: "2025-06-01",
+      openPremiumUsd: 100,
+      openFeesUsd: 3,
+      maxRiskUsd: 500,
+      createdAt: "2025-06-01T00:00:00.000Z",
+      updatedAt: "2025-06-01T00:00:00.000Z",
+    };
+
     const available = calculateUsAvailableCashUsd({
       contributions: [],
       fxConversions: [fxToUsd(10_000, 13_500)],
       stockTransactions: [],
       fxRate: 1.35,
-      realizedOptionsPlUsd: 345,
+      optionsTrades: [openCredit],
     });
 
-    expect(available).toBe(10_345);
+    expect(available).toBe(10_097);
   });
 
   it("scopes stock flows to US market only", () => {
@@ -201,5 +221,40 @@ describe("calculateUsAvailableCashUsd", () => {
     });
 
     expect(available).toBeCloseTo(568.18, 2);
+  });
+
+  it("buildUsCashTrace lists broker reconciliation components", () => {
+    const openCredit: OptionsTrade = {
+      id: "open-credit",
+      status: "open",
+      tradeType: "personal",
+      userSharePercent: 100,
+      clientSharePercent: 0,
+      strategy: "sellPut",
+      underlying: "SPY",
+      expirationDate: "2026-12-18",
+      contracts: 1,
+      openDate: "2025-06-01",
+      openPremiumUsd: 100,
+      openFeesUsd: 3,
+      maxRiskUsd: 500,
+      createdAt: "2025-06-01T00:00:00.000Z",
+      updatedAt: "2025-06-01T00:00:00.000Z",
+    };
+
+    const result = buildUsAvailableCashResult({
+      contributions: [],
+      fxConversions: [fxToUsd(1_000, 1_350)],
+      stockTransactions: [],
+      fxRate: 1.35,
+      optionsTrades: [openCredit],
+    });
+    const trace = buildUsCashTrace(result);
+
+    expect(trace.at(-1)?.amountUsd).toBe(result.usAvailableCashUsd);
+    expect(result.usAvailableCashUsd).toBe(1_097);
+    expect(trace.find((line) => line.label.includes("Option open"))?.amountUsd).toBe(
+      97
+    );
   });
 });

@@ -5,6 +5,7 @@ import type {
   StockTrackerSummary,
   StockTransaction,
 } from "@/core/domain/types";
+import type { OptionsTrade } from "@/core/domain/types/options";
 import type { StockFxConversion } from "@/core/domain/types/stock-fx-conversion";
 import { summarizeStockHoldings } from "@/core/calculations/stocks/summary";
 import { buildStockTrackerSummary } from "@/core/calculations/stocks/summary";
@@ -54,7 +55,7 @@ export function buildDashboardStockSummary(
   contributions: ContributionTransaction[],
   transactions: StockTransaction[],
   fxRate: number | null,
-  realizedOptionsPlUsd = 0,
+  optionsTrades: OptionsTrade[] = [],
   fxConversions: StockFxConversion[] = []
 ): StockTrackerSummary {
   return buildStockTrackerSummary(
@@ -62,7 +63,7 @@ export function buildDashboardStockSummary(
     contributions,
     transactions,
     fxRate,
-    realizedOptionsPlUsd,
+    optionsTrades,
     fxConversions
   );
 }

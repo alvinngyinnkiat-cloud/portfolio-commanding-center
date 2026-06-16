@@ -3,7 +3,6 @@
 import { useMemo } from "react";
 import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from "recharts";
 import { usePortfolio } from "@/context/PortfolioContext";
-import { sumRealizedOptionsPlUsd } from "@/core/calculations/options";
 import { buildStockMarketAllocation } from "@/core/calculations/stocks/allocation";
 import { buildStockPortfolioSummary } from "@/core/calculations/stocks/summary";
 import { formatPercent, formatSgd } from "@/shared/lib/format";
@@ -91,7 +90,7 @@ export function StockMarketAllocationSection() {
       data.contributions,
       stockData.transactions,
       stockData.fxRate,
-      sumRealizedOptionsPlUsd(optionsData?.trades ?? []),
+      optionsData?.trades ?? [],
       stockData.cashFlow.fxConversions
     );
 

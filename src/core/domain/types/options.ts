@@ -224,6 +224,8 @@ export interface OptionsTrackerSummary {
   capacityStatus: OptionsCapacityStatus;
   tradesRequiringActionCount: number;
   openRiskRequiringActionUsd: number;
+  /** Broker-style sum of open option market values (USD). Null when no marks. */
+  netOptionsMarketValueUsd: number | null;
 }
 
 export interface OptionsCapitalReadiness {

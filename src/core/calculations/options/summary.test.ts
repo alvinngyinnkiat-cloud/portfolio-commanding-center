@@ -59,6 +59,7 @@ describe("buildOptionsTrackerSummary ownership unrealized P/L", () => {
     expect(summary.userUnrealizedPlUsd).toBe(170);
     expect(summary.clientUnrealizedPlUsd).toBe(80);
     expect(summary.markedOpenCount).toBe(2);
+    expect(summary.netOptionsMarketValueUsd).toBe(-250);
   });
 
   it("returns null unrealized legs when no open trades are marked", () => {

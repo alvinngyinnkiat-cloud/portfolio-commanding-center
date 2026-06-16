@@ -39,7 +39,6 @@ import {
   formatOptionsStrategy,
   buildVerticalSpreadMetricsFromTrade,
   buildIronCondorMetricsFromTrade,
-  sumRealizedOptionsPlUsd,
 } from "./helpers";
 import { calculateCloseCostUsd } from "./realized-pl";
 import {
@@ -59,6 +58,7 @@ import {
   todayOptionsTradeDate,
 } from "./trade-dates";
 import { buildTradeEconomicsFromTrade } from "./trade-economics";
+import { calculateNetOptionsMarketValueUsd } from "./net-options-market-value";
 import {
   compareOpenTradesByOpenDate,
   deriveDteStatus,
@@ -177,19 +177,18 @@ function buildUsCashSnapshot(input: {
   optionsTrades: OptionsTrade[];
   fxRate: number | null;
 }) {
-  const realizedOptionsPlUsd = sumRealizedOptionsPlUsd(input.optionsTrades);
   const usAvailableCashUsd = calculateUsAvailableCashUsd({
     contributions: input.contributions,
     fxConversions: input.fxConversions ?? [],
     stockTransactions: input.stockTransactions,
     fxRate: input.fxRate,
-    realizedOptionsPlUsd,
+    optionsTrades: input.optionsTrades,
   });
   const fxValid = isValidFxRate(input.fxRate) && input.fxRate != null;
   const usAvailableCashSgd = fxValid
     ? usdToSgd(usAvailableCashUsd, input.fxRate!)
     : 0;
-  return { usAvailableCashUsd, usAvailableCashSgd, realizedOptionsPlUsd };
+  return { usAvailableCashUsd, usAvailableCashSgd };
 }
 
 export function buildOptionsCapitalReadiness(input: {
@@ -236,6 +235,10 @@ export function buildOptionsTrackerSummary(input: {
       daysToExpiration: daysToExpiration(trade.expirationDate, today),
       maxRiskUsd: scaleMaxRiskForRemaining(trade),
     }))
+  );
+
+  const netOptionsMarketValueUsd = calculateNetOptionsMarketValueUsd(
+    input.optionsTrades
   );
 
   let totalUnrealized: number | null = 0;
@@ -312,6 +315,7 @@ export function buildOptionsTrackerSummary(input: {
     capacityStatus: readiness.capacityStatus,
     tradesRequiringActionCount: actionRequired.tradesRequiringActionCount,
     openRiskRequiringActionUsd: actionRequired.openRiskRequiringActionUsd,
+    netOptionsMarketValueUsd,
   };
 }
 

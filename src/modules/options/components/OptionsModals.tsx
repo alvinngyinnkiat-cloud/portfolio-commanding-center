@@ -433,7 +433,7 @@ export function OpenTradeModal({
       fxConversions: stockData?.cashFlow.fxConversions ?? [],
       stockTransactions: stockData.transactions,
       fxRate: optionsData.fxRate,
-      realizedOptionsPlUsd: optionsData.summary.totalRealizedPlUsd,
+      optionsTrades: optionsData.trades,
     });
     const openRisk = sumOpenRiskUsd(optionsData.trades);
     let addRisk = 0;

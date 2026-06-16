@@ -2,7 +2,6 @@
 
 import { useMemo } from "react";
 import { usePortfolio } from "@/context/PortfolioContext";
-import { sumRealizedOptionsPlUsd } from "@/core/calculations/options";
 import {
   buildStockPortfolioSummary,
   plTrend,
@@ -28,7 +27,7 @@ export function StockOverviewSection() {
         contributions,
         transactions,
         fxRate,
-        sumRealizedOptionsPlUsd(optionsData?.trades ?? []),
+        optionsData?.trades ?? [],
         stockData?.cashFlow.fxConversions ?? []
       ),
     [

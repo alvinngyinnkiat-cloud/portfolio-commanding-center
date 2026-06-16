@@ -1,5 +1,6 @@
 import { calculateUsNetStockCashContributedUsd } from "@/core/calculations/stocks/contributions";
 import { summarizeMarketTradingCashFlow } from "@/core/calculations/stocks/trading-cash";
+import { summarizeOptionsCashFlowUsd } from "./options-cash-flow";
 import type {
   UsAvailableCashResult,
   UsCashLedgerInput,
@@ -8,13 +9,14 @@ import type {
 /**
  * Shared US Available Cash — single source of truth for Module 2 and Module 5.
  *
- * US Available Cash (USD) =
+ * USD Cash =
  *   net USD from FX conversion transactions
  *   − US buy cash effect (buy amount + fees)
  *   + US sell cash effect (sell proceeds − fees)
  *   + dividends
  *   − standalone fees
- *   + full realized options P/L (closed trades — shared trades use full amount)
+ *   + option open cash flows (premium received/paid at open)
+ *   + option close cash flows (normal debit/credit and manual P/L reconciliation)
  */
 export function buildUsAvailableCashResult(
   input: UsCashLedgerInput
@@ -22,11 +24,12 @@ export function buildUsAvailableCashResult(
   const {
     fxConversions = [],
     stockTransactions,
-    realizedOptionsPlUsd = 0,
+    optionsTrades = [],
   } = input;
 
   const usNetStockCashUsd = calculateUsNetStockCashContributedUsd(fxConversions);
   const flow = summarizeMarketTradingCashFlow(stockTransactions, "US");
+  const optionsCash = summarizeOptionsCashFlowUsd(optionsTrades);
 
   const breakdown = {
     usNetStockCashUsd,
@@ -34,7 +37,11 @@ export function buildUsAvailableCashResult(
     stockSellProceedsUsd: flow.sellProceeds,
     stockDividendsUsd: flow.dividends,
     standaloneFeesUsd: flow.fees,
-    realizedOptionsPlUsd,
+    optionOpenCashFlowUsd: optionsCash.optionOpenCashFlowUsd,
+    optionNormalCloseCashFlowUsd: optionsCash.optionNormalCloseCashFlowUsd,
+    optionManualCloseCashFlowUsd: optionsCash.optionManualCloseCashFlowUsd,
+    optionCloseCashFlowUsd: optionsCash.optionCloseCashFlowUsd,
+    netOptionsCashFlowUsd: optionsCash.netOptionsCashFlowUsd,
   };
 
   const usAvailableCashUsd =
@@ -43,7 +50,7 @@ export function buildUsAvailableCashResult(
     breakdown.stockSellProceedsUsd +
     breakdown.stockDividendsUsd -
     breakdown.standaloneFeesUsd +
-    breakdown.realizedOptionsPlUsd;
+    breakdown.netOptionsCashFlowUsd;
 
   return { usAvailableCashUsd, breakdown };
 }

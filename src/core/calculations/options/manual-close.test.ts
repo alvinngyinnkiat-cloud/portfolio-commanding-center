@@ -96,7 +96,7 @@ describe("manual realized P/L close method", () => {
     expect(legs.clientLegUsd).toBe(-535.77);
   });
 
-  it("Test 3: US Available Cash decreases by full manual realized P/L", () => {
+  it("Test 3: US Available Cash reflects open premium plus manual close reconciliation", () => {
     const trades = [manualClosedTrade()];
     expect(sumRealizedOptionsPlUsd(trades)).toBe(-1190.59);
 
@@ -105,7 +105,7 @@ describe("manual realized P/L close method", () => {
       fxConversions: [],
       stockTransactions: [],
       fxRate: 1.35,
-      realizedOptionsPlUsd: sumRealizedOptionsPlUsd(trades),
+      optionsTrades: trades,
     });
     expect(cash).toBe(-1190.59);
   });
