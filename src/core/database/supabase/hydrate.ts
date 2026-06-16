@@ -10,6 +10,7 @@ import { DEFAULT_SCANNER_WATCHLIST } from "@/core/calculations/scanner/watchlist
 import { normalizeDashboardSettings } from "@/core/database/local/normalize-settings";
 import { normalizeDailySnapshot } from "@/core/calculations/snapshots";
 import { normalizeStockPrice } from "@/core/calculations/stocks/price-normalize";
+import { normalizeStockTransactions } from "@/core/calculations/stocks/transaction-normalize";
 import { normalizeOptionsSettings } from "@/core/domain/defaults-options";
 import { normalizeOptionsTradesForStorage } from "@/core/calculations/options/trade-dates";
 import type { WatchlistEntry } from "@/core/calculations/scanner/watchlist";
@@ -160,7 +161,9 @@ export async function hydrateCacheFromSupabase(
   cache.goals = goalsRes.data?.map((row) => row.data) ?? [];
   cache.snapshots =
     snapshotsRes.data?.map((row) => normalizeDailySnapshot(row.data)) ?? [];
-  cache.stockTransactions = stockRes.data?.map((row) => row.data) ?? [];
+  cache.stockTransactions = normalizeStockTransactions(
+    stockRes.data?.map((row) => row.data) ?? []
+  );
   cache.cryptoHoldings = normalizeCryptoHoldings(
     cryptoRes.data?.map((row) => row.data) ?? []
   );

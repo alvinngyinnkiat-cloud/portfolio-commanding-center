@@ -13,6 +13,7 @@ import {
   positionKey,
   sortStockTransactions,
 } from "./normalize";
+import { normalizeStockTransaction } from "./transaction-normalize";
 import { resolveEffectivePrice } from "./price-normalize";
 
 export function createEmptyLedger(
@@ -101,7 +102,10 @@ export function buildPositionLedgers(
 ): Map<string, PositionLedgerState> {
   const ledgers = new Map<string, PositionLedgerState>();
 
-  for (const transaction of sortStockTransactions(transactions)) {
+  for (const raw of sortStockTransactions(transactions)) {
+    const transaction = normalizeStockTransaction(raw);
+    if (!transaction) continue;
+
     const ticker = normalizeTicker(transaction.ticker);
     const key = positionKey(transaction.market, ticker);
     const existing =
@@ -192,6 +196,12 @@ export function calculateAllPositionHoldings(
   const priceLookup = buildPriceLookup(prices);
 
   return [...ledgers.values()]
+    .filter(
+      (ledger): ledger is PositionLedgerState =>
+        typeof ledger === "object" &&
+        ledger != null &&
+        Number.isFinite(ledger.quantity)
+    )
     .map((ledger) => {
       const key = positionKey(ledger.market, ledger.ticker);
       const currentPrice = priceLookup.get(key) ?? null;

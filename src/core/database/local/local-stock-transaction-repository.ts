@@ -1,5 +1,6 @@
 import type { StockTransaction } from "@/core/domain/types";
 import type { StockTransactionRepository } from "../repositories/stock-transaction-repository";
+import { normalizeStockTransactions } from "@/core/calculations/stocks/transaction-normalize";
 import { STORAGE_KEYS } from "./storage-keys";
 import { readJson, writeJson } from "./local-storage";
 
@@ -7,7 +8,9 @@ const EMPTY_TRANSACTIONS: StockTransaction[] = [];
 
 export class LocalStockTransactionRepository implements StockTransactionRepository {
   list(): StockTransaction[] {
-    return readJson(STORAGE_KEYS.stockTransactions, EMPTY_TRANSACTIONS);
+    return normalizeStockTransactions(
+      readJson(STORAGE_KEYS.stockTransactions, EMPTY_TRANSACTIONS)
+    );
   }
 
   upsert(transaction: StockTransaction): void {

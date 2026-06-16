@@ -10,6 +10,7 @@ import { DEFAULT_SCANNER_WATCHLIST } from "@/core/calculations/scanner/watchlist
 import { normalizeDashboardSettings } from "@/core/database/local/normalize-settings";
 import { normalizeDailySnapshot } from "@/core/calculations/snapshots";
 import { normalizeStockPrice } from "@/core/calculations/stocks/price-normalize";
+import { normalizeStockTransactions } from "@/core/calculations/stocks/transaction-normalize";
 import { normalizeOptionsSettings } from "@/core/domain/defaults-options";
 import { normalizeOptionsTradesForStorage } from "@/core/calculations/options/trade-dates";
 import type { WatchlistEntry } from "@/core/calculations/scanner/watchlist";
@@ -55,7 +56,9 @@ export function exportLocalStorageCache(): PersistenceCache {
   cache.snapshots = readJson(STORAGE_KEYS.snapshots, DEFAULT_SNAPSHOTS).map(
     (row) => normalizeDailySnapshot(row)
   );
-  cache.stockTransactions = readJson(STORAGE_KEYS.stockTransactions, []);
+  cache.stockTransactions = normalizeStockTransactions(
+    readJson(STORAGE_KEYS.stockTransactions, [])
+  );
   cache.stockInstruments = readJson(STORAGE_KEYS.stockInstruments, []);
   cache.stockPrices = readJson(STORAGE_KEYS.stockPrices, []).map((row) =>
     normalizeStockPrice(row)

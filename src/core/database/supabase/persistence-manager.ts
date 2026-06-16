@@ -35,6 +35,7 @@ import { migrateLegacyCryptoHoldingsToTrades } from "@/core/calculations/crypto/
 import { rebuildHoldingsFromTrades, normalizeCryptoAssetName } from "@/core/calculations/crypto/trades";
 import { normalizeCryptoHoldings } from "@/core/calculations/crypto/normalize";
 import { normalizeCryptoTrades } from "@/core/calculations/crypto/trade-normalize";
+import { normalizeStockTransactions } from "@/core/calculations/stocks/transaction-normalize";
 import { coerceNumber } from "@/shared/lib/coerce-number";
 import { STORAGE_KEYS } from "../local/storage-keys";
 import { readJson, writeJson } from "../local/local-storage";
@@ -55,6 +56,7 @@ export class PersistenceManager {
   private syncing = false;
   private syncQueue: Array<() => Promise<void>> = [];
   private cryptoTradesSyncAvailable = true;
+  private allowEmptyStockTransactionsSync = false;
 
   static async initialize(): Promise<PersistenceManager> {
     const manager = new PersistenceManager();
@@ -126,11 +128,13 @@ export class PersistenceManager {
       }
 
       this.cache = await hydrateCacheFromSupabase(this.client);
+      this.persistStockTransactionsLocalBackup();
       if (this.status === "supabase_migrated") {
         this.cache.migratedFromLocal = true;
       }
 
       await this.refreshOptionalTableAvailability();
+      this.mergeLocalStockTransactionsIfSupabaseEmpty();
       this.mergeLocalCryptoTradesIfSupabaseEmpty();
       this.markCryptoLegacyMigratedIfTradesPresent();
       await this.applyStockCashFlowMigrationIfNeeded();
@@ -270,6 +274,7 @@ export class PersistenceManager {
     try {
       this.cache = await hydrateCacheFromSupabase(this.client);
       await this.refreshOptionalTableAvailability();
+      this.mergeLocalStockTransactionsIfSupabaseEmpty();
       this.mergeLocalCryptoTradesIfSupabaseEmpty();
       this.markCryptoLegacyMigratedIfTradesPresent();
       await this.applyStockCashFlowMigrationIfNeeded();
@@ -280,6 +285,12 @@ export class PersistenceManager {
       logPersistenceError("server bootstrap failed", error);
       throw error;
     }
+  }
+
+  /** Mirror stock transactions to localStorage so refresh survives stale cloud cache. */
+  persistStockTransactionsLocalBackup(): void {
+    if (typeof window === "undefined") return;
+    writeJson(STORAGE_KEYS.stockTransactions, this.cache.stockTransactions);
   }
 
   /** Mirror crypto trades to localStorage so refresh survives when cloud sync is delayed. */
@@ -413,6 +424,28 @@ export class PersistenceManager {
     return result.trades;
   }
 
+  private mergeLocalStockTransactionsIfSupabaseEmpty(): void {
+    if (typeof window === "undefined") return;
+    if (this.cache.stockTransactions.length > 0) return;
+
+    const local = normalizeStockTransactions(
+      readJson<unknown[]>(STORAGE_KEYS.stockTransactions, [])
+    );
+    if (local.length === 0) return;
+
+    this.cache.stockTransactions = local;
+    this.persistStockTransactionsLocalBackup();
+    this.setOptionalTableWarning(
+      "Restored stock transactions from local backup because cloud cache was empty."
+    );
+
+    if (this.client) {
+      this.enqueueSync(() =>
+        syncStockTransactions(this.client!, this.cache.stockTransactions)
+      );
+    }
+  }
+
   private mergeLocalCryptoTradesIfSupabaseEmpty(): void {
     if (typeof window === "undefined") return;
     if (this.cache.cryptoTrades.length > 0) return;
@@ -490,12 +523,18 @@ export class PersistenceManager {
     );
   }
 
-  queueStockTransactionsSync(): void {
-    this.enqueueSync(() =>
-      this.client
-        ? syncStockTransactions(this.client, this.cache.stockTransactions)
-        : Promise.resolve()
-    );
+  queueStockTransactionsSync(allowEmpty = false): void {
+    if (allowEmpty) {
+      this.allowEmptyStockTransactionsSync = true;
+    }
+    this.enqueueSync(async () => {
+      if (!this.client) return;
+      const syncEmpty = this.allowEmptyStockTransactionsSync;
+      this.allowEmptyStockTransactionsSync = false;
+      await syncStockTransactions(this.client, this.cache.stockTransactions, {
+        allowEmpty: syncEmpty,
+      });
+    });
   }
 
   queueCryptoHoldingsSync(): void {

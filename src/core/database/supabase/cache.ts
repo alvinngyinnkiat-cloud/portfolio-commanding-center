@@ -33,6 +33,7 @@ import { normalizeDailySnapshot } from "@/core/calculations/snapshots";
 import { normalizeOptionsSettings } from "@/core/domain/defaults-options";
 import { normalizeScannerScanRun } from "@/core/calculations/scanner/normalize-scan-result";
 import { normalizeStockPrice } from "@/core/calculations/stocks/price-normalize";
+import { normalizeStockTransactions } from "@/core/calculations/stocks/transaction-normalize";
 
 export interface ScannerResultsStore {
   latest: ScannerScanRun | null;
@@ -106,6 +107,7 @@ export function normalizeCache(cache: PersistenceCache): PersistenceCache {
     dashboardSettings: normalizeDashboardSettings(cache.dashboardSettings),
     snapshots: cache.snapshots.map((row) => normalizeDailySnapshot(row)),
     stockPrices: cache.stockPrices.map((row) => normalizeStockPrice(row)),
+    stockTransactions: normalizeStockTransactions(cache.stockTransactions),
     scannerResults: {
       latest: cache.scannerResults.latest
         ? normalizeScannerScanRun(cache.scannerResults.latest)

@@ -12,6 +12,7 @@ import type { ContributionRepository } from "@/core/database/repositories/contri
 import type { StockFxConversionRepository } from "@/core/database/repositories/stock-fx-conversion-repository";
 import { calculateHoldings } from "@/core/calculations/stocks/holdings";
 import { normalizeStockPrices } from "@/core/calculations/stocks/price-normalize";
+import { normalizeStockTransactions } from "@/core/calculations/stocks/transaction-normalize";
 import { normalizeTicker } from "@/core/calculations/stocks/normalize";
 import { isValidFxRate } from "@/core/calculations/fx-validation";
 import { toLocalDateString } from "@/shared/lib/date";
@@ -46,7 +47,7 @@ export class StockTrackerService {
   ) {}
 
   getData(): StockTrackerData {
-    const transactions = this.transactionRepo.list();
+    const transactions = normalizeStockTransactions(this.transactionRepo.list());
     const prices = normalizeStockPrices(this.priceRepo.list());
     const fxRate = this.settingsRepo.get().usdSgdFxRate;
     const fxRateValid = isValidFxRate(fxRate);
@@ -57,11 +58,19 @@ export class StockTrackerService {
         .filter((row) => row.category === "stock")
     );
 
-    const holdings = calculateHoldings(
-      transactions,
-      prices,
-      fxRateValid ? fxRate : null
-    );
+    let holdings: CalculatedHolding[] = [];
+    try {
+      holdings = calculateHoldings(
+        transactions,
+        prices,
+        fxRateValid ? fxRate : null
+      );
+    } catch (error) {
+      console.error(
+        "[StockTrackerService] holdings rebuild failed — transactions preserved",
+        error
+      );
+    }
 
     return {
       transactions: [...transactions].sort(compareDateDescWithCreatedAt),

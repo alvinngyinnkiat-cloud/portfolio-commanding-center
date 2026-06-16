@@ -47,9 +47,10 @@ export async function syncSnapshots(
 
 export async function syncStockTransactions(
   client: SupabaseClient,
-  rows: PersistenceCache["stockTransactions"]
+  rows: PersistenceCache["stockTransactions"],
+  options?: { allowEmpty?: boolean }
 ): Promise<void> {
-  await replaceTable(client, "stock_transactions", "id", rows);
+  await replaceTable(client, "stock_transactions", "id", rows, options?.allowEmpty);
 }
 
 export async function syncCryptoHoldings(
@@ -113,8 +114,13 @@ async function replaceTable<T extends { id?: string; date?: string }>(
     | "options_trades"
     | "stock_fx_conversions",
   key: "id" | "date",
-  rows: T[]
+  rows: T[],
+  allowEmpty = false
 ): Promise<void> {
+  if (rows.length === 0 && !allowEmpty) {
+    return;
+  }
+
   const deleteRes = await client.from(table).delete().neq(key, "");
   if (deleteRes.error) throw deleteRes.error;
 

@@ -7,6 +7,7 @@ import {
   type StockValidationResult,
   validateStockTransactionUpsert,
 } from "@/core/calculations/stocks/validation";
+import { normalizeStockTransactions } from "@/core/calculations/stocks/transaction-normalize";
 import { generateId } from "@/core/database/local/local-storage";
 import { compareDateDescWithCreatedAt } from "@/shared/lib/sort";
 
@@ -21,13 +22,13 @@ export class StockTransactionService {
   ) {}
 
   list(): StockTransaction[] {
-    return this.transactionRepo
-      .list()
-      .sort(compareDateDescWithCreatedAt);
+    return normalizeStockTransactions(this.transactionRepo.list()).sort(
+      compareDateDescWithCreatedAt
+    );
   }
 
   upsert(draft: StockTransactionDraft): StockUpsertResult {
-    const existing = this.transactionRepo.list();
+    const existing = this.list();
     const id = draft.id ?? generateId();
     const existingRow = existing.find((tx) => tx.id === id);
     const createdAt = existingRow?.createdAt ?? new Date().toISOString();

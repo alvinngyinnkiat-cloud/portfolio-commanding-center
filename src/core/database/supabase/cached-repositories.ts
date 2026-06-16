@@ -178,17 +178,19 @@ class CachedStockTransactionRepository implements StockTransactionRepository {
     const idx = list.findIndex((row) => row.id === transaction.id);
     if (idx >= 0) list[idx] = transaction;
     else list.push(transaction);
+    this.manager.persistStockTransactionsLocalBackup();
     this.manager.queueStockTransactionsSync();
   }
   delete(id: string) {
     this.manager.getCache().stockTransactions = this.manager
       .getCache()
       .stockTransactions.filter((row) => row.id !== id);
-    this.manager.queueStockTransactionsSync();
+    const allowEmpty = this.manager.getCache().stockTransactions.length === 0;
+    this.manager.queueStockTransactionsSync(allowEmpty);
   }
   replaceAll(transactions: Parameters<StockTransactionRepository["replaceAll"]>[0]) {
     this.manager.getCache().stockTransactions = [...transactions];
-    this.manager.queueStockTransactionsSync();
+    this.manager.queueStockTransactionsSync(transactions.length === 0);
   }
 }
 

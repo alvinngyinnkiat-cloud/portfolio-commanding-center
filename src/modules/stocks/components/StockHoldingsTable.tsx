@@ -295,10 +295,14 @@ export function StockHoldingsTable() {
   const contributions = data?.contributions ?? [];
   const prices = stockData?.prices ?? [];
 
-  const allPositions = useMemo(
-    () => calculateAllPositionHoldings(transactions, prices, fxRate),
-    [transactions, prices, fxRate]
-  );
+  const allPositions = useMemo(() => {
+    try {
+      return calculateAllPositionHoldings(transactions, prices, fxRate);
+    } catch (error) {
+      console.error("[StockHoldingsTable] position rebuild failed", error);
+      return [];
+    }
+  }, [transactions, prices, fxRate]);
 
   const marketPositions = useMemo(() => {
     if (marketFilter === "ALL") return allPositions;
