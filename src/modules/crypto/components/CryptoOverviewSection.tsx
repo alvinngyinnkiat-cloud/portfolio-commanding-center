@@ -6,7 +6,7 @@ import type { CryptoHoldingRow } from "@/core/domain/types";
 import { formatPercent, formatSgd } from "@/shared/lib/format";
 import { coerceNumber } from "@/shared/lib/coerce-number";
 import { SummaryCard } from "@/shared/components/ui/SummaryCard";
-import { Wallet, Coins, PiggyBank, TrendingUp, Receipt } from "lucide-react";
+import { AlertTriangle, Wallet, Coins, PiggyBank, TrendingUp, Receipt } from "lucide-react";
 
 function plTrend(value: number): "positive" | "negative" | "neutral" {
   if (value > 0) return "positive";
@@ -170,47 +170,65 @@ export function CryptoOverviewSection() {
 
   if (!summary) return null;
 
+  const cryptoCash = coerceNumber(summary.availableTradingCashSgd);
+  const buySpendWithFees =
+    summary.cryptoContributionSgd - summary.availableTradingCashSgd;
+
   return (
     <div className="min-w-0 space-y-4">
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         <SummaryCard
-          label="Crypto Value"
+          label="Total Crypto Net Value"
           value={formatSgd(summary.totalValueSgd)}
           highlight
           icon={<Wallet size={18} />}
-          subValue={`Holdings ${formatSgd(summary.cryptoHoldingsValueSgd)} + Cash ${formatSgd(summary.availableTradingCashSgd)}`}
+          subValue={`Total Holdings ${formatSgd(summary.cryptoHoldingsValueSgd)} + Crypto Cash ${formatSgd(cryptoCash)}`}
         />
         <SummaryCard
-          label="Crypto P/L"
+          label="Total Holdings"
+          value={formatSgd(summary.cryptoHoldingsValueSgd)}
+          icon={<Coins size={18} />}
+          subValue={`${summary.holdingCount} holding${summary.holdingCount === 1 ? "" : "s"} · current value SGD`}
+        />
+        <SummaryCard
+          label="Crypto Cash"
+          value={formatSgd(cryptoCash)}
+          icon={<PiggyBank size={18} />}
+          trend={cryptoCash >= 0 ? "neutral" : "negative"}
+          subValue={`Contribution ${formatSgd(summary.cryptoContributionSgd)} − buys & fees ${formatSgd(buySpendWithFees)}`}
+        />
+        <SummaryCard
+          label="Profit & Loss"
           value={formatSgd(summary.cryptoProfitLossSgd)}
           trend={plTrend(summary.cryptoProfitLossSgd)}
           icon={<TrendingUp size={18} />}
           subValue={formatPercent(summary.cryptoProfitLossPercent)}
         />
         <SummaryCard
-          label="Crypto Contribution"
+          label="Contribution"
           value={formatSgd(summary.cryptoContributionSgd)}
           icon={<Coins size={18} />}
-          subValue="Deposits − withdrawals · personal capital injected"
+          subValue="Deposits − withdrawals · net capital injected"
         />
         <SummaryCard
-          label="Available Trading Cash"
-          value={formatSgd(summary.availableTradingCashSgd)}
-          icon={<PiggyBank size={18} />}
-          trend={
-            coerceNumber(summary.availableTradingCashSgd) >= 0
-              ? "neutral"
-              : "negative"
-          }
-          subValue={`Contribution ${formatSgd(summary.cryptoContributionSgd)} − buy/sell totals ${formatSgd(summary.cryptoContributionSgd - summary.availableTradingCashSgd)}`}
-        />
-        <SummaryCard
-          label="Total Fees Paid"
+          label="Fees Paid"
           value={formatSgd(summary.totalFeesPaidSgd)}
           icon={<Receipt size={18} />}
-          subValue={`This month ${formatSgd(summary.feesThisMonthSgd)} · This year ${formatSgd(summary.feesThisYearSgd)}`}
+          subValue={`This month ${formatSgd(summary.feesThisMonthSgd)} · This year ${formatSgd(summary.feesThisYearSgd)} · informational only`}
         />
       </div>
+
+      {cryptoCash < 0 && (
+        <div
+          className="flex items-start gap-3 rounded-xl border border-amber-500/40 bg-amber-500/10 px-4 py-3 text-sm text-amber-200"
+          role="alert"
+        >
+          <AlertTriangle size={18} className="mt-0.5 shrink-0 text-amber-400" />
+          <p>
+            Crypto Cash is negative. Check deposits, withdrawals, buys, or fees.
+          </p>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
         <HoldingsRankingCard

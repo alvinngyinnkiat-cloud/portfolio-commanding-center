@@ -13,10 +13,21 @@ export function calculateHoldingContribution(holding: CryptoHolding): number {
   return coerceNumber(holding.investedSgd);
 }
 
-/** Capital deployed into holdings (buy totals). Fees excluded from cash math. */
+/** Capital deployed into holdings (buy totals only). */
 export function calculateCryptoCapitalDeployed(holdings: CryptoHolding[]): number {
   return holdings.reduce(
     (sum, holding) => sum + calculateHoldingContribution(holding),
+    0
+  );
+}
+
+/** Buy spend including associated fees — used for Crypto Cash when no trade ledger. */
+export function calculateCryptoBuySpendWithFees(holdings: CryptoHolding[]): number {
+  return holdings.reduce(
+    (sum, holding) =>
+      sum +
+      calculateHoldingContribution(holding) +
+      normalizeFeesSgd(holding.feesSgd),
     0
   );
 }

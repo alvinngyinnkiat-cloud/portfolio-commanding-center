@@ -6,6 +6,7 @@ import type {
   StockTransactionType,
 } from "@/core/domain/types";
 import { marketToCurrency, normalizeTicker } from "./normalize";
+import { resolveTransactionGrossAmount } from "./transaction-amounts";
 
 const VALID_TYPES: StockTransactionType[] = ["buy", "sell", "dividend", "fee"];
 
@@ -132,15 +133,15 @@ export function normalizeStockTransaction(raw: unknown): StockTransaction | null
   const instrumentType = normalizeInstrumentType(row.instrumentType);
   const quantity = resolveQuantity(row);
   const price = parseNumericField(row.price);
-  const grossAmount = parseNumericField(row.grossAmount);
+  let grossAmount = parseNumericField(row.grossAmount);
   const fees = parseNumericField(row.fees);
-  const netAmount = parseNumericField(row.netAmount);
+  let netAmount = parseNumericField(row.netAmount);
   const assetName =
     typeof row.assetName === "string" && row.assetName.trim()
       ? row.assetName.trim()
       : `${ticker} (${instrumentType === "etf" ? "ETF" : "Stock"})`;
 
-  return {
+  const draft: StockTransaction = {
     id,
     date,
     market,
@@ -160,6 +161,23 @@ export function normalizeStockTransaction(raw: unknown): StockTransaction | null
         ? row.createdAt.trim()
         : `${date}T00:00:00.000Z`,
   };
+
+  if (draft.grossAmount <= 0) {
+    draft.grossAmount = resolveTransactionGrossAmount(draft);
+  }
+
+  if (
+    draft.netAmount === 0 &&
+    (transactionType === "buy" || transactionType === "sell") &&
+    draft.grossAmount > 0
+  ) {
+    draft.netAmount =
+      transactionType === "buy"
+        ? -(draft.grossAmount + fees)
+        : draft.grossAmount - fees;
+  }
+
+  return draft;
 }
 
 export function normalizeStockTransactions(raw: unknown[]): StockTransaction[] {

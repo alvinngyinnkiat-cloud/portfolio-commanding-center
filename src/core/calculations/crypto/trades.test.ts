@@ -27,7 +27,7 @@ describe("calculateAvailableTradingCashFromTrades", () => {
       },
     ];
 
-    expect(calculateAvailableTradingCashFromTrades(5000, trades)).toBe(3500);
+    expect(calculateAvailableTradingCashFromTrades(5000, trades)).toBe(3475);
   });
 });
 

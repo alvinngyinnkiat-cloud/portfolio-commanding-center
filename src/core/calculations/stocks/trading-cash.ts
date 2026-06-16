@@ -1,4 +1,9 @@
 import type { StockMarket, StockTransaction } from "@/core/domain/types";
+import {
+  resolveDividendCashAmount,
+  resolveStandaloneFeeAmount,
+  resolveTransactionGrossAmount,
+} from "./transaction-amounts";
 
 /** Cash-flow aggregates from stock ledger transactions — inputs for Shared US Cash Engine. */
 export interface MarketTradingCashFlow {
@@ -14,17 +19,17 @@ export interface MarketTradingCashSummary {
 }
 
 function buyCashEffect(transaction: StockTransaction): number {
-  /** US Buy Cash Effect = -(buy amount + fees) — stored as positive spend. */
-  return transaction.grossAmount + transaction.fees;
+  /** Buy cash effect = buy amount + fees — stored as positive spend. */
+  return resolveTransactionGrossAmount(transaction) + transaction.fees;
 }
 
 function sellCashEffect(transaction: StockTransaction): number {
-  /** US Sell Cash Effect = +(sell proceeds − fees). Never use holdings realisedPL. */
-  return transaction.grossAmount - transaction.fees;
+  /** Sell cash effect = sell proceeds − fees. Never use holdings realisedPL. */
+  return resolveTransactionGrossAmount(transaction) - transaction.fees;
 }
 
 function standaloneFee(transaction: StockTransaction): number {
-  return Math.abs(transaction.netAmount) || transaction.fees;
+  return resolveStandaloneFeeAmount(transaction);
 }
 
 /** Sum buy spend, sell proceeds (gross − fees), dividends, and standalone fees for one market. */
@@ -50,7 +55,7 @@ export function summarizeMarketTradingCashFlow(
         flow.sellProceeds += sellCashEffect(tx);
         break;
       case "dividend":
-        flow.dividends += tx.netAmount;
+        flow.dividends += resolveDividendCashAmount(tx);
         break;
       case "fee":
         flow.fees += standaloneFee(tx);

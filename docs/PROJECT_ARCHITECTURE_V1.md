@@ -132,12 +132,12 @@ If `usdSgdFxRate` is invalid, the Dashboard suppresses metrics and allocation. O
 
 ## 3. Crypto Tracker Architecture (Module 3)
 
-**Version:** 1.1  
+**Version:** 1.2  
 **Status:** FROZEN
 
 ### Purpose
 
-Track crypto cash contributed, invested amounts, and manually entered current values. No API price feeds, no quantity tracking, no auto-refresh.
+Track net capital injected into crypto (deposits − withdrawals), buy/sell trade ledger, manually entered current values, and capital-flow summary metrics. No API price feeds, no quantity tracking, no auto-refresh.
 
 ### Key files
 
@@ -145,14 +145,17 @@ Track crypto cash contributed, invested amounts, and manually entered current va
 |------|------|
 | `src/app/crypto/page.tsx` | Route entry |
 | `src/modules/crypto/components/CryptoView.tsx` | Page shell |
-| `src/modules/crypto/components/CryptoHoldingsTable.tsx` | Summary cards, deployment guide, table, CRUD form |
+| `src/modules/crypto/components/CryptoOverviewSection.tsx` | Six summary cards (2×3 grid) |
+| `src/modules/crypto/components/CryptoHoldingsSection.tsx` | Deployment guide, table, CRUD |
 | `src/core/services/crypto-tracker-service.ts` | Orchestration |
 | `src/core/services/crypto-holding-service.ts` | Holding CRUD |
 | `src/core/services/crypto-allocation-service.ts` | Allocation % persistence |
-| `src/core/calculations/crypto/summary.ts` | Total Value, P/L, cash |
+| `src/core/calculations/crypto/summary.ts` | Total Crypto Net Value, P/L, Crypto Cash |
+| `src/core/calculations/crypto/trades.ts` | Trade ledger cash flow |
 | `src/core/calculations/crypto/holdings.ts` | Rank, category, portfolio % |
 | `src/core/calculations/crypto/allocation.ts` | Cash deployment buckets |
-| `src/core/calculations/crypto/contributions.ts` | Net crypto cash contributed |
+| `src/core/calculations/crypto/contributions.ts` | Contribution (deposits − withdrawals) |
+| `src/core/calculations/crypto/fees.ts` | Fees Paid totals |
 | `src/core/calculations/crypto/validation.ts` | Form validation |
 | `src/core/adapters/dashboard-crypto-adapter.ts` | Module 3 → Dashboard outputs |
 | `src/core/domain/types/crypto.ts` | Domain types |
@@ -163,7 +166,11 @@ Track crypto cash contributed, invested amounts, and manually entered current va
 
 ```typescript
 CryptoHolding {
-  id, assetName, investedSgd, currentValueSgd, notes?
+  id, assetName, investedSgd, currentValueSgd, feesSgd?, notes?
+}
+
+CryptoTrade {
+  id, date, assetName, type: "buy" | "sell", amountSgd, feesSgd?, notes?
 }
 
 CryptoAllocationSettings {
@@ -180,13 +187,20 @@ CryptoAllocationSettings {
 - `CryptoTrackerSummary` — totals and counts
 - `DashboardCryptoOutputs` — adapter payload for Dashboard
 
-### Summary card formulas
+### Summary card formulas (v1.2)
 
 | Card | Formula |
 |------|---------|
+| **Contribution** | Crypto Deposits − Crypto Withdrawals (net capital injected; excludes market gains/losses/rewards) |
 | **Total Holdings** | Sum of `currentValueSgd` |
-| **Crypto Cash** | Total Crypto Cash Contributed − Total Invested SGD |
-| **Total Value** | Total Holdings + Crypto Cash |
+| **Crypto Cash** | Contribution − (Total Buy Transactions + Associated Fees); when a trade ledger exists, sell proceeds net of fees add back |
+| **Total Crypto Net Value** | Total Holdings + Crypto Cash |
+| **Profit & Loss** | Total Crypto Net Value − Contribution |
+| **Fees Paid** | Sum of all crypto trade fees (informational only; already reflected in Crypto Cash) |
+
+**Overview layout:** Row 1 — Total Crypto Net Value · Total Holdings · Crypto Cash. Row 2 — Profit & Loss · Contribution · Fees Paid.
+
+**Warning:** If Crypto Cash &lt; 0, show: *"Crypto Cash is negative. Check deposits, withdrawals, buys, or fees."*
 
 ### Holding table
 
@@ -207,15 +221,20 @@ CryptoAllocationSettings {
 | Key | Content |
 |-----|---------|
 | `portfolio:crypto_holdings` | `CryptoHolding[]` |
+| `portfolio:crypto_trades` | `CryptoTrade[]` |
 | `portfolio:crypto_allocation_settings` | `CryptoAllocationSettings` |
 
 ### Dashboard integration
 
 `deriveDashboardCryptoOutputs()` maps summary to:
 
-- `cryptoTotalValueSgd` → Dashboard Crypto Value
-- `cryptoHoldingsValueSgd`, `cryptoContributionSgd`, `cryptoProfitLossSgd`, `availableTradingCashSgd` → Dashboard metrics (v1.1)
+- `cryptoTotalValueSgd` → Dashboard Total Crypto Net Value
+- `cryptoContributionSgd` → Dashboard Contribution
+- `cryptoProfitLossSgd` → Dashboard Profit & Loss
+- `cryptoHoldingsValueSgd`, `availableTradingCashSgd` → Dashboard metrics (unchanged field names)
 - `numberOfHoldings` → Dashboard holdings count display
+
+Dashboard layout is unchanged; it continues to read Total Crypto Net Value, Contribution, and P/L from Module 3.
 
 ---
 

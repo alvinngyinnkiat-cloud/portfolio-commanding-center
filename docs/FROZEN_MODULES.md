@@ -81,27 +81,36 @@ The Dashboard never recalculates stock or crypto capital-model totals. It consum
 ## 2. Crypto Tracker (Module 3)
 
 **Route:** `/crypto`  
-**Version:** 1.1  
+**Version:** 1.2  
 **Status:** FROZEN
 
 ### Purpose
 
-Track how much cash has been contributed to crypto, how much is invested, current holding values (manual input), available crypto cash, overall portfolio value, and asset allocation guidance. This is not a trading journal, tax tracker, or price feed.
+Track net personal capital committed to crypto (deposits − withdrawals), current holding values (manual input), remaining crypto cash after purchases and fees, total crypto net value, overall P/L versus capital injected, and asset allocation guidance. This is not a trading journal, tax tracker, or price feed.
 
 ### Source of truth
 
 | Data | Source |
 |------|--------|
 | Holdings | `CryptoHolding[]` in `portfolio:crypto_holdings` |
-| Per-holding invested amount | `CryptoHolding.investedSgd` (user input) |
+| Per-holding invested amount | `CryptoHolding.investedSgd` (from trades or user input) |
 | Per-holding current value | `CryptoHolding.currentValueSgd` (manual input) |
+| Trades | `CryptoTrade[]` in `portfolio:crypto_trades` |
 | Allocation percentages | `CryptoAllocationSettings` in `portfolio:crypto_allocation_settings` |
-| Total crypto cash contributed | Net crypto-category contribution transactions (deposits − withdrawals) |
-| Total Holdings | Sum of `currentValueSgd` (derived) |
-| Total Invested SGD | Sum of `investedSgd` (derived) |
-| Crypto Cash | Contributed − Invested (derived) |
-| Total Value | Total Holdings + Crypto Cash (derived) |
-| Rank, category, P/L, portfolio % | Derived at read time — never stored |
+| **Contribution** | Net crypto-category contribution transactions (deposits − withdrawals) |
+| **Total Holdings** | Sum of `currentValueSgd` (derived) |
+| **Crypto Cash** | Contribution − (buy transactions + fees); sell proceeds net of fees add back (derived) |
+| **Total Crypto Net Value** | Total Holdings + Crypto Cash (derived) |
+| **Profit & Loss** | Total Crypto Net Value − Contribution (derived) |
+| **Fees Paid** | Sum of all crypto trade fees (informational only; already reflected in Crypto Cash) |
+| Rank, category, holding P/L, portfolio % | Derived at read time — never stored |
+
+### Summary cards (Overview tab)
+
+**Row 1:** Total Crypto Net Value · Total Holdings · Crypto Cash  
+**Row 2:** Profit & Loss · Contribution · Fees Paid
+
+Warning when Crypto Cash &lt; 0: *"Crypto Cash is negative. Check deposits, withdrawals, buys, or fees."*
 
 ### Allowed changes
 
@@ -114,17 +123,20 @@ Track how much cash has been contributed to crypto, how much is invested, curren
 
 - API price feeds or auto-refresh of coin prices
 - Coin quantity tracking
-- Average cost, FIFO, or realised/unrealised P/L separation
-- Converting to a transaction ledger model
+- Average cost, FIFO, or realised/unrealised P/L separation at account level
 - Tax tracking features
-- Removing or restructuring the three summary cards (Total Value, Total Holdings, Crypto Cash)
+- Removing or restructuring the six summary cards on the Overview tab
 - Removing the Cash Deployment Guide or its editable allocation percentages
 - Removing holdings table columns (Rank, Category, Asset, Invested, Current Value, P/L, Portfolio %)
 - Removing create, edit, or delete holding functionality
 - Changing core formulas:
-  - Total Value = Total Holdings + Crypto Cash
-  - Crypto Cash = Contributed − Invested
-  - Portfolio % denominator = Total Holdings (not Total Value)
+  - Contribution = Crypto Deposits − Crypto Withdrawals (excludes market gains/losses/rewards)
+  - Total Holdings = Sum of `currentValueSgd`
+  - Crypto Cash = Contribution − (Total Buy Transactions + Associated Fees) [trade ledger when present]
+  - Total Crypto Net Value = Total Holdings + Crypto Cash
+  - Profit & Loss = Total Crypto Net Value − Contribution
+  - Fees Paid = Sum of all crypto fees (informational; do not double-count in P/L)
+  - Portfolio % denominator = Total Holdings (not Total Crypto Net Value)
 - Storing derived holdings rows or summary totals as authoritative data
 - Moving crypto management UI into the Dashboard
 

@@ -1,6 +1,6 @@
 import type { CryptoHolding, CryptoTrackerSummary, CryptoTrade } from "@/core/domain/types";
 import { coerceNumber } from "@/shared/lib/coerce-number";
-import { calculateCryptoCapitalDeployed } from "./contribution";
+import { calculateCryptoBuySpendWithFees } from "./contribution";
 import {
   calculateCryptoFeesForMonth,
   calculateCryptoFeesForYear,
@@ -13,11 +13,12 @@ export function calculateCryptoHoldingsValue(holdings: CryptoHolding[]): number 
   return holdings.reduce((sum, h) => sum + coerceNumber(h.currentValueSgd), 0);
 }
 
+/** Crypto Cash = Contribution − (buy totals + associated fees). */
 export function calculateAvailableTradingCash(
-  totalCryptoCashContributed: number,
-  cryptoCapitalDeployedSgd: number
+  cryptoContributionSgd: number,
+  cryptoBuySpendWithFeesSgd: number
 ): number {
-  return totalCryptoCashContributed - cryptoCapitalDeployedSgd;
+  return cryptoContributionSgd - cryptoBuySpendWithFeesSgd;
 }
 
 export function calculateTotalValueSgd(
@@ -55,7 +56,7 @@ export function buildCryptoTrackerSummary(
       ? calculateAvailableTradingCashFromTrades(safeCashContributed, cryptoTrades)
       : calculateAvailableTradingCash(
           safeCashContributed,
-          calculateCryptoCapitalDeployed(holdings)
+          calculateCryptoBuySpendWithFees(holdings)
         );
   const totalValueSgd = calculateTotalValueSgd(
     cryptoHoldingsValueSgd,
