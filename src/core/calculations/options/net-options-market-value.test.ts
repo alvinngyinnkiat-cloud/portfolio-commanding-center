@@ -100,4 +100,33 @@ describe("calculateNetOptionsMarketValueUsd", () => {
       calculateNetOptionsMarketValueUsd([openTrade({ id: "unmarked" })])
     ).toBeNull();
   });
+
+  it("excludes closed trades from net market value", () => {
+    const trades: OptionsTrade[] = [
+      openTrade({
+        id: "open-short",
+        strategy: "sellPut",
+        contracts: 1,
+        currentValueUsd: 50,
+      }),
+      openTrade({
+        id: "closed-short",
+        status: "closed",
+        closeDate: "2026-01-15",
+        strategy: "bearCall",
+        contracts: 1,
+        currentValueUsd: 100,
+        realizedPlUsd: 50,
+      }),
+      openTrade({
+        id: "open-long",
+        strategy: "buyCall",
+        contracts: 2,
+        currentValueUsd: 240,
+      }),
+    ];
+
+    expect(calculateOpenOptionMarketValueUsd(trades[1])).toBeNull();
+    expect(calculateNetOptionsMarketValueUsd(trades)).toBe(190);
+  });
 });
