@@ -16,6 +16,7 @@ import { formatSgd, formatSingaporeDateTime, formatUsd, formatPercent } from "@/
 import { coerceNumber } from "@/shared/lib/coerce-number";
 import { SummaryCard } from "@/shared/components/ui/SummaryCard";
 import { UsMarketValueBreakdownCards } from "./UsMarketValueBreakdownCards";
+import { SgMarketValueBreakdownCards } from "./SgMarketValueBreakdownCards";
 import { StackedValue } from "@/shared/components/ui/StackedValue";
 import { Modal } from "@/shared/components/ui/Modal";
 import {
@@ -483,27 +484,21 @@ export function StockHoldingsTable() {
       )}
 
       {marketFilter === "SG" && (
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          <SummaryCard
-            label="SG Total Value"
-            value={formatSgd(summary.sgTotalValueSgd)}
-          />
-          <SummaryCard
-            label="SG Available Cash"
-            value={formatSgd(summary.sgAvailableTradingCashSgd)}
-            trend="neutral"
-          />
-          <SummaryCard
-            label="SG Market P/L"
-            value={formatSgd(summary.sgMarketPLSgd)}
-            trend={plTrend(summary.sgMarketPLSgd)}
-          />
-          <SummaryCard
-            label="SG Stock Contribution"
-            value={formatSgd(summary.sgStockContributionSgd)}
-            trend="neutral"
-            icon={<PiggyBank size={18} />}
-          />
+        <div className="space-y-4">
+          <SgMarketValueBreakdownCards summary={summary} />
+          <div className="grid gap-4 sm:grid-cols-2">
+            <SummaryCard
+              label="SG Market P/L"
+              value={formatSgd(summary.sgMarketPLSgd)}
+              trend={plTrend(summary.sgMarketPLSgd)}
+            />
+            <SummaryCard
+              label="SG Stock Contribution"
+              value={formatSgd(summary.sgStockContributionSgd)}
+              trend="neutral"
+              icon={<PiggyBank size={18} />}
+            />
+          </div>
         </div>
       )}
 

@@ -10,6 +10,7 @@ import { formatSgd } from "@/shared/lib/format";
 import { SummaryCard } from "@/shared/components/ui/SummaryCard";
 import { FxRateErrorBanner } from "@/shared/components/ui/FxRateErrorBanner";
 import { UsMarketValueBreakdownCards } from "./UsMarketValueBreakdownCards";
+import { SgMarketValueBreakdownCards } from "./SgMarketValueBreakdownCards";
 import { TrendingUp, Wallet, PiggyBank } from "lucide-react";
 
 export function StockOverviewSection() {
@@ -74,17 +75,7 @@ export function StockOverviewSection() {
 
       <UsMarketValueBreakdownCards summary={summary} />
 
-      <div className="grid gap-4 sm:grid-cols-2">
-        <SummaryCard
-          label="SG Total Value"
-          value={formatSgd(summary.sgTotalValueSgd)}
-        />
-        <SummaryCard
-          label="SG Available Cash"
-          value={formatSgd(summary.sgAvailableTradingCashSgd)}
-          trend="neutral"
-        />
-      </div>
+      <SgMarketValueBreakdownCards summary={summary} />
     </div>
   );
 }
