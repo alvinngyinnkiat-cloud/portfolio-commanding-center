@@ -192,7 +192,20 @@ export function calculateAllPositionHoldings(
   prices: StockPrice[],
   fxRate: number | null
 ): CalculatedHolding[] {
-  const ledgers = buildPositionLedgers(transactions);
+  let ledgers: Map<string, PositionLedgerState>;
+  try {
+    ledgers = buildPositionLedgers(transactions);
+  } catch (error) {
+    if (error instanceof SellExceedsHoldingsError) {
+      console.warn(
+        "[holdings] chronological ledger replay failed — positions may be incomplete",
+        error.message
+      );
+      return [];
+    }
+    throw error;
+  }
+
   const priceLookup = buildPriceLookup(prices);
 
   return [...ledgers.values()]
@@ -212,6 +225,29 @@ export function calculateAllPositionHoldings(
       if (marketCmp !== 0) return marketCmp;
       return a.ticker.localeCompare(b.ticker);
     });
+}
+
+export function filterPositionsByMarket(
+  positions: CalculatedHolding[],
+  market: "ALL" | CalculatedHolding["market"]
+): CalculatedHolding[] {
+  if (market === "ALL") return positions;
+  return positions.filter((position) => {
+    if (position.market === market) return true;
+    if (market === "US" && position.currency === "USD") return true;
+    if (market === "SG" && position.currency === "SGD") return true;
+    return false;
+  });
+}
+
+export function splitOpenAndClosedPositions(positions: CalculatedHolding[]): {
+  open: CalculatedHolding[];
+  closed: CalculatedHolding[];
+} {
+  return {
+    open: positions.filter((position) => position.quantity > 0),
+    closed: positions.filter((position) => position.quantity <= 0),
+  };
 }
 
 export interface PositionOverviewSummary {

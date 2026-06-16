@@ -7,6 +7,8 @@ import {
   calculateHoldings,
   calculatePositionLedger,
   createEmptyLedger,
+  filterPositionsByMarket,
+  splitOpenAndClosedPositions,
   summarizePositionOverview,
 } from "./holdings";
 import { SellExceedsHoldingsError } from "./errors";
@@ -427,6 +429,63 @@ describe("stock holdings engine", () => {
     expect(positions).toHaveLength(1);
     expect(positions[0]?.quantity).toBe(0);
     expect(positions[0]?.realisedPL).toBe(100);
+  });
+});
+
+describe("position display filters", () => {
+  const openHolding = {
+    market: "US" as const,
+    ticker: "NVDA",
+    assetName: "NVIDIA",
+    currency: "USD" as const,
+    quantity: 10,
+    averageCost: 100,
+    totalCost: 1000,
+    currentPrice: null,
+    marketValue: 0,
+    unrealisedPL: 0,
+    realisedPL: 0,
+    dividendIncome: 0,
+    sgdValue: null,
+  };
+  const closedHolding = {
+    ...openHolding,
+    ticker: "AAPL",
+    quantity: 0,
+    totalCost: 0,
+    realisedPL: 120,
+    dividendIncome: 5,
+  };
+
+  it("splits open and closed positions by quantity", () => {
+    const { open, closed } = splitOpenAndClosedPositions([
+      openHolding,
+      closedHolding,
+    ]);
+    expect(open).toHaveLength(1);
+    expect(open[0]?.ticker).toBe("NVDA");
+    expect(closed).toHaveLength(1);
+    expect(closed[0]?.ticker).toBe("AAPL");
+  });
+
+  it("filters by market and currency fallback", () => {
+    const usByCurrency = { ...openHolding, market: "US" as const, currency: "USD" as const };
+    const sgHolding = {
+      ...openHolding,
+      market: "SG" as const,
+      ticker: "D05",
+      currency: "SGD" as const,
+    };
+
+    expect(filterPositionsByMarket([usByCurrency, sgHolding], "ALL")).toHaveLength(2);
+    expect(filterPositionsByMarket([usByCurrency, sgHolding], "US")).toHaveLength(1);
+    expect(filterPositionsByMarket([usByCurrency, sgHolding], "SG")).toHaveLength(1);
+  });
+
+  it("includes positions without current price in open list", () => {
+    const { open } = splitOpenAndClosedPositions([openHolding]);
+    expect(open[0]?.currentPrice).toBeNull();
+    expect(open[0]?.quantity).toBe(10);
   });
 });
 

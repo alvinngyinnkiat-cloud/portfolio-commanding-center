@@ -9,7 +9,8 @@ import {
   plTrend,
 } from "@/core/calculations/stocks/summary";
 import {
-  calculateAllPositionHoldings,
+  filterPositionsByMarket,
+  splitOpenAndClosedPositions,
   summarizePositionOverview,
 } from "@/core/calculations/stocks/holdings";
 import { formatSgd, formatSingaporeDateTime, formatUsd, formatPercent } from "@/shared/lib/format";
@@ -163,7 +164,7 @@ function CompactPriceCell({
         primary={
           holding.currentPrice != null
             ? formatNativeValue(holding, holding.currentPrice)
-            : "—"
+            : "Missing"
         }
         secondary={holding.currentPrice != null ? sourceSecondary : "Set price"}
         primaryClassName={
@@ -192,7 +193,7 @@ function MarketValueCell({
   fxRateValid: boolean;
 }) {
   if (holding.currentPrice == null) {
-    return <span className="text-slate-500">—</span>;
+    return <span className="text-slate-500">Missing</span>;
   }
 
   if (holding.market === "US") {
@@ -291,31 +292,17 @@ export function StockHoldingsTable() {
   const fxRateValid = stockData?.fxRateValid ?? false;
   const fxRate = stockData?.fxRate ?? null;
   const holdings = stockData?.holdings ?? [];
+  const allPositions = stockData?.allPositions ?? holdings;
   const transactions = stockData?.transactions ?? [];
   const contributions = data?.contributions ?? [];
-  const prices = stockData?.prices ?? [];
 
-  const allPositions = useMemo(() => {
-    try {
-      return calculateAllPositionHoldings(transactions, prices, fxRate);
-    } catch (error) {
-      console.error("[StockHoldingsTable] position rebuild failed", error);
-      return [];
-    }
-  }, [transactions, prices, fxRate]);
-
-  const marketPositions = useMemo(() => {
-    if (marketFilter === "ALL") return allPositions;
-    return allPositions.filter((position) => position.market === marketFilter);
-  }, [allPositions, marketFilter]);
-
-  const openPositions = useMemo(
-    () => marketPositions.filter((position) => position.quantity > 0),
-    [marketPositions]
+  const marketPositions = useMemo(
+    () => filterPositionsByMarket(allPositions, marketFilter),
+    [allPositions, marketFilter]
   );
 
-  const closedPositions = useMemo(
-    () => marketPositions.filter((position) => position.quantity <= 0),
+  const { open: openPositions, closed: closedPositions } = useMemo(
+    () => splitOpenAndClosedPositions(marketPositions),
     [marketPositions]
   );
 

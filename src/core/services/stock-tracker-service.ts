@@ -10,7 +10,7 @@ import type { StockPriceRepository } from "@/core/database/repositories/stock-pr
 import type { DashboardSettingsRepository } from "@/core/database/repositories/dashboard-settings-repository";
 import type { ContributionRepository } from "@/core/database/repositories/contribution-repository";
 import type { StockFxConversionRepository } from "@/core/database/repositories/stock-fx-conversion-repository";
-import { calculateHoldings } from "@/core/calculations/stocks/holdings";
+import { calculateAllPositionHoldings } from "@/core/calculations/stocks/holdings";
 import { normalizeStockPrices } from "@/core/calculations/stocks/price-normalize";
 import { normalizeStockTransactions } from "@/core/calculations/stocks/transaction-normalize";
 import { normalizeTicker } from "@/core/calculations/stocks/normalize";
@@ -30,6 +30,9 @@ export interface StockCashFlowData {
 
 export interface StockTrackerData {
   transactions: StockTransaction[];
+  /** Every ticker position — open and closed — derived once from the ledger. */
+  allPositions: CalculatedHolding[];
+  /** Open positions (quantity > 0) — same source as portfolio summary cards. */
   holdings: CalculatedHolding[];
   prices: StockPrice[];
   fxRate: number | null;
@@ -58,22 +61,27 @@ export class StockTrackerService {
         .filter((row) => row.category === "stock")
     );
 
-    let holdings: CalculatedHolding[] = [];
+    const effectiveFxRate = fxRateValid ? fxRate : null;
+
+    let allPositions: CalculatedHolding[] = [];
     try {
-      holdings = calculateHoldings(
+      allPositions = calculateAllPositionHoldings(
         transactions,
         prices,
-        fxRateValid ? fxRate : null
+        effectiveFxRate
       );
     } catch (error) {
       console.error(
-        "[StockTrackerService] holdings rebuild failed — transactions preserved",
+        "[StockTrackerService] position rebuild failed — transactions preserved",
         error
       );
     }
 
+    const holdings = allPositions.filter((position) => position.quantity > 0);
+
     return {
       transactions: [...transactions].sort(compareDateDescWithCreatedAt),
+      allPositions,
       holdings,
       prices,
       fxRate,
