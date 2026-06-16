@@ -21,7 +21,6 @@ import {
 import { deriveDashboardCryptoOutputs } from "@/core/adapters/dashboard-crypto-adapter";
 import {
   deriveDashboardClientPortfolio,
-  deriveDashboardOptionsValue,
 } from "@/core/adapters/dashboard-client-adapter";
 import { calculatePersonalCashContributionSgd } from "@/core/calculations/personal-cash/contributions";
 import { sortByDateDesc } from "@/shared/lib/sort";
@@ -29,7 +28,6 @@ import {
   buildClosedTradeRows,
   buildOpenTradeRows,
   buildOptionsClientSummary,
-  buildOptionsTrackerSummary,
 } from "@/core/calculations/options";
 import type {
   OptionsSettingsRepository,
@@ -114,13 +112,6 @@ export class PortfolioAggregator {
       buildOpenTradeRows(optionsTrades),
       buildClosedTradeRows(optionsTrades)
     );
-    const optionsSummary = buildOptionsTrackerSummary({
-      contributions,
-      fxConversions: stockData.cashFlow.fxConversions,
-      stockTransactions: stockData.transactions,
-      optionsTrades,
-      fxRate,
-    });
     const clientPortfolio = deriveDashboardClientPortfolio(
       settings,
       fxRate,
@@ -168,10 +159,7 @@ export class PortfolioAggregator {
       cryptoAvailableTradingCashSgd: cryptoOutputs.availableTradingCashSgd,
       personalCashContributionSgd:
         calculatePersonalCashContributionSgd(contributions),
-      optionsValueSgd: deriveDashboardOptionsValue(
-        optionsSummary.userUnrealizedPlUsd,
-        fxRate
-      ),
+      optionsValueSgd: 0,
     };
   }
 

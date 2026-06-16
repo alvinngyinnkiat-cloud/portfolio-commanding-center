@@ -58,7 +58,7 @@ export interface PortfolioInputs {
   cryptoAvailableTradingCashSgd: number;
   /** Personal cash capital injected */
   personalCashContributionSgd: number;
-  /** Future Options Tracker */
+  /** @deprecated Options unrealised P/L is not added separately — embedded in stock value */
   optionsValueSgd: number;
 }
 
@@ -77,7 +77,7 @@ export interface PortfolioMetrics {
   cryptoCashSgd: number;
   clientPortfolio: number;
   clientPortfolioUsd: number;
-  /** Total Portfolio = Own Portfolio + Client Starting Capital + Client Unrealised P/L */
+  /** Total Portfolio = Total Stock Value + Total Crypto Value */
   totalPortfolio: number;
   clientOwnershipPercent: number;
   /** Module 2 — capital deployed (US + SG legs from ledger) */
@@ -100,11 +100,11 @@ export interface PortfolioMetrics {
   cryptoAvailableTradingCashSgd: number;
   /** Personal cash capital injected */
   personalCashContributionSgd: number;
-  /** Future Options Tracker */
+  /** @deprecated Options unrealised P/L is not added separately — embedded in stock value */
   optionsValueSgd: number;
   /** Stock Contribution + Crypto Contribution */
   totalContribution: number;
-  /** Own Portfolio = Stock + Crypto + Personal Options Unrealised P/L */
+  /** Own Portfolio = Total Portfolio − Client Equity */
   totalPortfolioValue: number;
   /** Stock P/L + Crypto P/L */
   totalPL: number;

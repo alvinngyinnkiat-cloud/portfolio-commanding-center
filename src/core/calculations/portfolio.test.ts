@@ -38,6 +38,8 @@ describe("calculatePortfolioMetrics capital model", () => {
       optionsValueSgd: 0,
     });
 
+    expect(metrics.totalPortfolio).toBe(45_500);
+    expect(metrics.ownPortfolio).toBe(45_500);
     expect(metrics.totalPortfolioValue).toBe(45_500);
     expect(metrics.totalContribution).toBe(23_000);
     expect(metrics.totalPL).toBe(22_500);
@@ -54,7 +56,7 @@ describe("calculatePortfolioMetrics capital model", () => {
     expect(metrics.usdOverdeploymentUsd).toBe(2_000);
   });
 
-  it("includes personal options unrealised in own portfolio", () => {
+  it("Own Portfolio = Total Portfolio − Client Equity", () => {
     const metrics = calculatePortfolioMetrics({
       ...emptyModuleContributionInputs(),
       usStocksEtfUsd: 0,
@@ -66,18 +68,23 @@ describe("calculatePortfolioMetrics capital model", () => {
       cryptoCashSgd: 0,
       usAvailableTradingCashUsd: 0,
       sgAvailableTradingCashSgd: 0,
-      clientPortfolioUsd: 0,
-      clientPortfolioSgd: 0,
+      clientPortfolioUsd: 200,
+      clientPortfolioSgd: 270,
       clientStartingCapitalUsd: 0,
       clientStartingCapitalSgd: 0,
       clientRealizedPlUsd: 0,
       clientUnrealizedPlSgd: 0,
       fxRate: 1.35,
       contributions: [],
+      totalStockValueSgd: 10_000,
+      totalCryptoValueSgd: 5_000,
       optionsValueSgd: 270,
     });
 
-    expect(metrics.totalPortfolioValue).toBe(270);
+    expect(metrics.totalPortfolio).toBe(15_000);
+    expect(metrics.ownPortfolio).toBe(14_730);
+    expect(metrics.totalPortfolioValue).toBe(14_730);
+    expect(metrics.optionsValueSgd).toBe(0);
   });
 
   it("nets client realised from total portfolio", () => {
@@ -115,9 +122,10 @@ describe("calculatePortfolioMetrics capital model", () => {
       optionsValueSgd: 0,
     });
 
-    expect(metrics.totalPortfolioValue).toBe(23_500);
-    expect(metrics.totalPortfolio).toBe(29_035);
+    expect(metrics.totalPortfolio).toBe(23_500);
+    expect(metrics.ownPortfolio).toBeCloseTo(16_210, 2);
+    expect(metrics.totalPortfolioValue).toBeCloseTo(16_210, 2);
     expect(metrics.clientPortfolio).toBe(7_290);
-    expect(metrics.clientOwnershipPercent).toBeCloseTo(23.99, 1);
+    expect(metrics.clientOwnershipPercent).toBeCloseTo(31.02, 1);
   });
 });

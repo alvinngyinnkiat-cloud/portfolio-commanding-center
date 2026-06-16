@@ -11,8 +11,6 @@ export interface DashboardContributionInputs {
 export interface DashboardPortfolioInputs {
   totalStockValueSgd: number;
   totalCryptoValueSgd: number;
-  /** Personal options unrealised P/L (SGD) — not already in stock/crypto totals */
-  optionsValueSgd?: number;
 }
 
 export interface DashboardPLInputs {
@@ -34,22 +32,16 @@ export function aggregateTotalContribution(
 }
 
 /**
- * Own Portfolio = Total Stock Value + Total Crypto Value + Personal Options Unrealised P/L.
+ * Total Portfolio = Total Stock Value + Total Crypto Value.
+ * Options market value is embedded in stock totals — no separate add-on.
  */
 export function aggregateTotalPortfolioValue(
   inputs: DashboardPortfolioInputs
 ): number {
-  return (
-    inputs.totalStockValueSgd +
-    inputs.totalCryptoValueSgd +
-    (inputs.optionsValueSgd ?? 0)
-  );
+  return inputs.totalStockValueSgd + inputs.totalCryptoValueSgd;
 }
 
-/**
- * Total Portfolio = Own Portfolio + Client Starting Capital + Client Unrealised P/L.
- * Excludes client realised P/L already embedded in US Available Cash.
- */
+/** @deprecated Client capital was previously folded into total portfolio — use stock + crypto only. */
 export function aggregateTotalPortfolioWithClient(
   inputs: DashboardTotalPortfolioInputs
 ): number {

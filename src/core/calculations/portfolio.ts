@@ -7,7 +7,6 @@ import { usdToSgd } from "./fx";
 import {
   aggregateTotalContribution,
   aggregateTotalPortfolioValue,
-  aggregateTotalPortfolioWithClient,
   aggregatePLPercent,
 } from "./dashboard-aggregation";
 import { calculateUsdOverdeployment } from "./contribution-cash";
@@ -72,30 +71,26 @@ export function calculatePortfolioMetrics(
   const personalCashSgd = totalCashSgd;
   const clientCashSgd = 0;
 
-  const totalPortfolioValue = aggregateTotalPortfolioValue({
+  const totalPortfolio = aggregateTotalPortfolioValue({
     totalStockValueSgd: inputs.totalStockValueSgd,
     totalCryptoValueSgd: inputs.totalCryptoValueSgd,
-    optionsValueSgd: inputs.optionsValueSgd,
   });
+
+  const clientEquity = clientPortfolio;
+  const ownPortfolio = totalPortfolio - clientEquity;
 
   const totalContribution = aggregateTotalContribution({
     totalStockContributionSgd: inputs.totalStockContributionSgd,
     cryptoContributionSgd: inputs.cryptoContributionSgd,
   });
 
+  const totalPortfolioValue = ownPortfolio;
   const totalPL = totalPortfolioValue - totalContribution;
   const totalPLPercent = aggregatePLPercent(totalPL, totalContribution);
 
-  const totalPortfolio = aggregateTotalPortfolioWithClient({
-    ownPortfolioSgd: totalPortfolioValue,
-    clientStartingCapitalSgd: inputs.clientStartingCapitalSgd,
-    clientUnrealizedPlSgd: inputs.clientUnrealizedPlSgd,
-  });
-
-  const clientRealizedPlSgd = usdToSgd(inputs.clientRealizedPlUsd, inputs.fxRate);
   const clientOwnershipPercent = calculateClientOwnershipPercent(
-    clientPortfolio,
-    totalPortfolio + clientRealizedPlSgd
+    clientEquity,
+    totalPortfolio
   );
 
   const usdOverdeploymentUsd = calculateUsdOverdeployment(
@@ -135,14 +130,14 @@ export function calculatePortfolioMetrics(
     cryptoProfitLossSgd: inputs.cryptoProfitLossSgd,
     cryptoAvailableTradingCashSgd: inputs.cryptoAvailableTradingCashSgd,
     personalCashContributionSgd: inputs.personalCashContributionSgd,
-    optionsValueSgd: inputs.optionsValueSgd,
+    optionsValueSgd: 0,
     totalContribution,
     totalPortfolioValue,
     totalPL,
     totalPLPercent,
     ownPL: totalPL,
     ownPLPercent: totalPLPercent,
-    ownPortfolio: totalPortfolioValue,
+    ownPortfolio,
     usdOverdeploymentUsd,
   };
 }

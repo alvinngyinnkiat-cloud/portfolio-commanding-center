@@ -18,14 +18,13 @@ describe("dashboard aggregation", () => {
     expect(total).toBe(19_800);
   });
 
-  it("Own Portfolio = Stock + Crypto + Personal Options Unrealised P/L", () => {
+  it("Total Portfolio = Total Stock Value + Total Crypto Value", () => {
     const total = aggregateTotalPortfolioValue({
       totalStockValueSgd: 33_500,
       totalCryptoValueSgd: 12_000,
-      optionsValueSgd: 270,
     });
 
-    expect(total).toBe(45_770);
+    expect(total).toBe(45_500);
   });
 
   it("Total Portfolio excludes client realised already in US cash", () => {

@@ -16,7 +16,7 @@ export function deriveDashboardClientPortfolio(
   };
 }
 
-/** Personal options unrealised P/L for Own Portfolio (user leg only). */
+/** @deprecated Personal options unrealised P/L is no longer added to dashboard totals. */
 export function deriveDashboardOptionsValue(
   userUnrealizedPlUsd: number | null,
   fxRate: number

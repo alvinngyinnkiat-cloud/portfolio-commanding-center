@@ -12,7 +12,6 @@ import { buildCryptoTrackerSummary } from "@/core/calculations/crypto/summary";
 import { calculateTotalCryptoCashContributed } from "@/core/calculations/crypto/contributions";
 import {
   buildOptionsClientSummary,
-  buildOptionsTrackerSummary,
   buildClosedTradeRows,
   buildOpenTradeRows,
 } from "@/core/calculations/options";
@@ -20,7 +19,6 @@ import { deriveDashboardStockValues } from "@/core/adapters/dashboard-stock-adap
 import { deriveDashboardCryptoOutputs } from "@/core/adapters/dashboard-crypto-adapter";
 import {
   deriveDashboardClientPortfolio,
-  deriveDashboardOptionsValue,
 } from "@/core/adapters/dashboard-client-adapter";
 import { calculatePortfolioMetrics } from "@/core/calculations/portfolio";
 import { usdToSgd } from "@/core/calculations/fx";
@@ -171,13 +169,6 @@ function assembleDashboardMetrics(input: {
     openRows,
     closedRows
   );
-  const optionsSummary = buildOptionsTrackerSummary({
-    contributions,
-    fxConversions,
-    stockTransactions: input.stockTransactions,
-    optionsTrades: input.optionsTrades,
-    fxRate: FX,
-  });
   const clientPortfolio = deriveDashboardClientPortfolio(
     {
       usdSgdFxRate: FX,
@@ -228,13 +219,10 @@ function assembleDashboardMetrics(input: {
     cryptoAvailableTradingCashSgd: cryptoOutputs.availableTradingCashSgd,
     personalCashContributionSgd:
       calculatePersonalCashContributionSgd(contributions),
-    optionsValueSgd: deriveDashboardOptionsValue(
-      optionsSummary.userUnrealizedPlUsd,
-      FX
-    ),
+    optionsValueSgd: 0,
   });
 
-  return { metrics, stockSummary, cryptoSummary, clientSummary, optionsSummary };
+  return { metrics, stockSummary, cryptoSummary, clientSummary };
 }
 
 describe("dashboard integration QA — 9-step plan", () => {
@@ -263,9 +251,10 @@ describe("dashboard integration QA — 9-step plan", () => {
       optionsTrades: [],
     });
 
-    expect(metrics.totalPortfolioValue).toBe(0);
+    expect(metrics.totalPortfolio).toBe(0);
     expect(metrics.clientPortfolio).toBe(usdToSgd(10_000, FX));
-    expect(metrics.totalPortfolio).toBe(usdToSgd(10_000, FX));
+    expect(metrics.ownPortfolio).toBe(-usdToSgd(10_000, FX));
+    expect(metrics.totalPortfolioValue).toBe(-usdToSgd(10_000, FX));
   });
 
   it("Step 2: US deposit and US stock buy", () => {
@@ -291,7 +280,7 @@ describe("dashboard integration QA — 9-step plan", () => {
       holding({ market: "US", marketValue: 5_200, sgdValue: 7_020 }),
     ];
 
-    const { metrics, stockSummary, cryptoSummary, optionsSummary } =
+    const { metrics, stockSummary, cryptoSummary } =
       assembleDashboardMetrics({
         holdings,
         stockTransactions,
@@ -305,9 +294,7 @@ describe("dashboard integration QA — 9-step plan", () => {
     expect(stockSummary.stockContributionSgd).toBe(13_500);
     expect(metrics.totalStockValueSgd).toBeGreaterThan(0);
     expect(cryptoSummary.totalValueSgd).toBe(0);
-    expect(optionsSummary.usAvailableCashUsd).toBe(
-      stockSummary.usAvailableTradingCashUsd
-    );
+    expect(stockSummary.usAvailableTradingCashUsd).toBeGreaterThan(0);
   });
 
   it("Step 3: SG stock buy leaves US cash unaffected", () => {
@@ -416,11 +403,11 @@ describe("dashboard integration QA — 9-step plan", () => {
       before.stockSummary.usAvailableTradingCashUsd + 240
     );
     expect(after.metrics.totalCashSgd).toBeGreaterThan(before.metrics.totalCashSgd);
-    expect(after.optionsSummary.userUnrealizedPlUsd).toBeNull();
     expect(after.metrics.optionsValueSgd).toBe(0);
+    expect(after.metrics.totalPortfolio).toBeGreaterThan(before.metrics.totalPortfolio);
   });
 
-  it("Step 6: option mark update changes unrealised only", () => {
+  it("Step 6: option mark update does not change total portfolio ownership totals", () => {
     const contributions = [
       contribution({
         id: "dep-us",
@@ -448,9 +435,10 @@ describe("dashboard integration QA — 9-step plan", () => {
       optionsTrades: [marked],
     });
 
-    expect(after.metrics.optionsValueSgd).toBeLessThan(
-      before.metrics.optionsValueSgd
-    );
+    expect(after.metrics.optionsValueSgd).toBe(0);
+    expect(before.metrics.optionsValueSgd).toBe(0);
+    expect(after.metrics.totalPortfolio).toBe(before.metrics.totalPortfolio);
+    expect(after.metrics.ownPortfolio).toBe(before.metrics.ownPortfolio);
     expect(after.stockSummary.usAvailableTradingCashUsd).toBe(
       before.stockSummary.usAvailableTradingCashUsd
     );
@@ -540,11 +528,14 @@ describe("dashboard integration QA — 9-step plan", () => {
     expect(stockSummary.usAvailableTradingCashUsd).toBeCloseTo(10_100, 0);
     expect(clientSummary.clientRealizedPlUsd).toBe(40);
     expect(metrics.clientPortfolio).toBe(usdToSgd(10_040, FX));
-    expect(metrics.totalPortfolio).toBe(
-      metrics.totalPortfolioValue + usdToSgd(10_000, FX)
+    expect(metrics.totalPortfolio).toBe(metrics.totalStockValueSgd);
+    expect(metrics.ownPortfolio).toBeCloseTo(
+      metrics.totalPortfolio - metrics.clientPortfolio,
+      2
     );
-    expect(metrics.totalPortfolio).toBeLessThan(
-      metrics.totalPortfolioValue + metrics.clientPortfolio
+    expect(metrics.clientOwnershipPercent).toBeCloseTo(
+      (metrics.clientPortfolio / metrics.totalPortfolio) * 100,
+      1
     );
   });
 
@@ -602,24 +593,19 @@ describe("dashboard integration QA — 9-step plan", () => {
       optionsTrades,
     });
 
-    const expectedOwn =
-      metrics.totalStockValueSgd +
-      metrics.totalCryptoValueSgd +
-      metrics.optionsValueSgd;
     const expectedTotal =
-      expectedOwn +
-      usdToSgd(clientSummary.startingCapitalUsd, FX) +
-      (clientSummary.clientUnrealizedPlUsd != null
-        ? usdToSgd(clientSummary.clientUnrealizedPlUsd, FX)
-        : 0);
+      metrics.totalStockValueSgd + metrics.totalCryptoValueSgd;
+    const expectedOwn = expectedTotal - metrics.clientPortfolio;
     const expectedContribution =
       metrics.totalStockContributionSgd + metrics.cryptoContributionSgd;
 
-    expect(metrics.totalPortfolioValue).toBeCloseTo(expectedOwn, 2);
     expect(metrics.totalPortfolio).toBeCloseTo(expectedTotal, 2);
+    expect(metrics.ownPortfolio).toBeCloseTo(expectedOwn, 2);
+    expect(metrics.totalPortfolioValue).toBeCloseTo(expectedOwn, 2);
+    expect(metrics.optionsValueSgd).toBe(0);
     expect(metrics.totalContribution).toBe(expectedContribution);
     expect(metrics.totalPL).toBeCloseTo(
-      metrics.totalPortfolioValue - metrics.totalContribution,
+      metrics.ownPortfolio - metrics.totalContribution,
       2
     );
     expect(metrics.personalCashSgd).toBe(metrics.totalCashSgd);

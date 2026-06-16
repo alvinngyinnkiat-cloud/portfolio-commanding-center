@@ -107,32 +107,32 @@ export function DashboardView() {
       <section>
         <SectionHeader
           title="Portfolio Ownership"
-          description="Own Portfolio from Stock + Crypto + Personal Options Unrealised P/L"
+          description="Own Portfolio = Total Portfolio − Client Equity"
         />
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
           <SummaryCard
             label="Own Portfolio"
-            value={formatSgd(metrics.totalPortfolioValue)}
-            subValue="Stock Total + Crypto Total + Personal Options Unrealised P/L"
+            value={formatSgd(metrics.ownPortfolio)}
+            subValue="Total Portfolio − Client Equity"
             highlight
             icon={<Wallet size={18} />}
           />
           <SummaryCard
             label="Total Portfolio"
             value={formatSgd(metrics.totalPortfolio)}
-            subValue="Own Portfolio + Client Starting Capital + Client Unrealised P/L"
+            subValue="Total Stock Value + Crypto Value"
             icon={<Wallet size={18} />}
           />
           <SummaryCard
             label="Client Equity"
             value={formatSgd(metrics.clientPortfolio)}
-            subValue={`Reporting only · ${formatUsd(metrics.clientPortfolioUsd)}`}
+            subValue={`Module 5 · ${formatUsd(metrics.clientPortfolioUsd)}`}
             icon={<Users size={18} />}
           />
           <SummaryCard
             label="Client Ownership %"
             value={formatPercent(metrics.clientOwnershipPercent)}
-            subValue="Client Equity ÷ (Own Portfolio + Client Equity)"
+            subValue="Client Equity ÷ Total Portfolio × 100"
             icon={<PieChart size={18} />}
           />
         </div>
