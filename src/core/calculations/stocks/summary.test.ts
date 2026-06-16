@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { CalculatedHolding, StockTransaction } from "@/core/domain/types";
+import type { OptionsTrade } from "@/core/domain/types/options";
 import type { StockFxConversion } from "@/core/domain/types/stock-fx-conversion";
 import {
   buildStockPortfolioSummary,
@@ -176,6 +177,8 @@ describe("buildStockPortfolioSummary", () => {
       full.usMarketValueUsd + full.usAvailableTradingCashUsd,
       2
     );
+    expect(full.totalUsNetValueUsd).toBeCloseTo(full.usTotalValueUsd, 2);
+    expect(full.netOptionsMarketValueUsd).toBeNull();
     expect(full.allMarketPLSgd).toBeCloseTo(
       full.allMarketTotalValueSgd - full.totalStockContributionSgd,
       2
@@ -276,6 +279,69 @@ describe("buildStockPortfolioSummary", () => {
     expect(portfolio.totalStockContributionSgd).toBe(1_000);
     expect(portfolio.usAvailableTradingCashUsd).toBeCloseTo(57.94, 2);
     expect(portfolio.sgAvailableTradingCashSgd).toBe(0);
+  });
+
+  it("total US net value includes broker-style net options market value", () => {
+    const holdings: CalculatedHolding[] = [
+      holding({ market: "US", marketValue: 10_000, sgdValue: 13_500 }),
+    ];
+    const optionsTrades: OptionsTrade[] = [
+      {
+        id: "opt-a",
+        status: "open",
+        tradeType: "personal",
+        userSharePercent: 100,
+        clientSharePercent: 0,
+        strategy: "sellPut",
+        underlying: "SPY",
+        expirationDate: "2026-12-18",
+        contracts: 1,
+        openDate: "2026-01-01",
+        openPremiumUsd: 100,
+        openFeesUsd: 0,
+        maxRiskUsd: 500,
+        currentValueUsd: 120,
+        createdAt: "2026-01-01T00:00:00.000Z",
+        updatedAt: "2026-01-01T00:00:00.000Z",
+      },
+      {
+        id: "opt-b",
+        status: "open",
+        tradeType: "personal",
+        userSharePercent: 100,
+        clientSharePercent: 0,
+        strategy: "bearCall",
+        underlying: "QQQ",
+        expirationDate: "2026-12-18",
+        contracts: 1,
+        openDate: "2026-01-01",
+        openPremiumUsd: 80,
+        openFeesUsd: 0,
+        maxRiskUsd: 500,
+        currentValueUsd: 80,
+        createdAt: "2026-01-01T00:00:00.000Z",
+        updatedAt: "2026-01-01T00:00:00.000Z",
+      },
+    ];
+
+    const portfolio = buildStockPortfolioSummary(
+      holdings,
+      [],
+      [],
+      1.35,
+      optionsTrades
+    );
+
+    expect(portfolio.netOptionsMarketValueUsd).toBe(-200);
+    expect(portfolio.netOptionsMarketValueSgd).toBeCloseTo(-270, 2);
+    expect(portfolio.usAvailableTradingCashUsd).toBe(180);
+    expect(portfolio.totalUsNetValueUsd).toBeCloseTo(9_980, 2);
+    expect(portfolio.totalUsNetValueSgd).toBeCloseTo(
+      portfolio.usMarketValueSgd +
+        portfolio.usAvailableTradingCashSgd +
+        (portfolio.netOptionsMarketValueSgd ?? 0),
+      2
+    );
   });
 });
 

@@ -6,9 +6,10 @@ import {
   buildStockPortfolioSummary,
   plTrend,
 } from "@/core/calculations/stocks/summary";
-import { formatSgd, formatUsd } from "@/shared/lib/format";
+import { formatSgd } from "@/shared/lib/format";
 import { SummaryCard } from "@/shared/components/ui/SummaryCard";
 import { FxRateErrorBanner } from "@/shared/components/ui/FxRateErrorBanner";
+import { UsMarketValueBreakdownCards } from "./UsMarketValueBreakdownCards";
 import { TrendingUp, Wallet, PiggyBank } from "lucide-react";
 
 export function StockOverviewSection() {
@@ -71,19 +72,7 @@ export function StockOverviewSection() {
         />
       </div>
 
-      <div className="grid gap-4 sm:grid-cols-2">
-        <SummaryCard
-          label="US Total Value"
-          value={formatSgd(summary.usTotalValueSgd)}
-          subValue={formatUsd(summary.usTotalValueUsd)}
-        />
-        <SummaryCard
-          label="US Available Cash"
-          value={formatSgd(summary.usAvailableTradingCashSgd)}
-          subValue={formatUsd(summary.usAvailableTradingCashUsd)}
-          trend="neutral"
-        />
-      </div>
+      <UsMarketValueBreakdownCards summary={summary} />
 
       <div className="grid gap-4 sm:grid-cols-2">
         <SummaryCard

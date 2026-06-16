@@ -12,6 +12,7 @@ import { summarizeStockContributionFromDeposits } from "@/core/calculations/stoc
 import { summarizeNetStockCashBreakdown } from "@/core/calculations/stocks/contributions";
 import { calculateSgAvailableCashSgd } from "@/core/calculations/stocks/trading-cash";
 import { calculateUsAvailableCashUsd } from "@/core/calculations/us-cash";
+import { calculateNetOptionsMarketValueUsd } from "@/core/calculations/options/net-options-market-value";
 
 /** UI aggregation — sums derived holding fields; does not alter ledger math. */
 export interface StockHoldingsSummary {
@@ -32,6 +33,12 @@ export interface StockPortfolioSummary extends StockHoldingsSummary {
   sgAvailableTradingCashSgd: number;
   usTotalValueUsd: number;
   usTotalValueSgd: number;
+  /** Broker-style open options market value from Module 5 — null when unmarked. */
+  netOptionsMarketValueUsd: number | null;
+  netOptionsMarketValueSgd: number | null;
+  /** US holdings + US cash + net options market value (SGD). */
+  totalUsNetValueUsd: number;
+  totalUsNetValueSgd: number;
   sgTotalValueSgd: number;
   allMarketTotalValueSgd: number;
   usMarketPLUsd: number;
@@ -177,12 +184,24 @@ export function buildStockPortfolioSummary(
       ? usdToSgd(usAvailableTradingCashUsd, fxRate)
       : 0;
 
+  const netOptionsMarketValueUsd = calculateNetOptionsMarketValueUsd(optionsTrades);
+  const netOptionsMarketValueSgd =
+    netOptionsMarketValueUsd != null && fxRateValid && fxRate != null
+      ? usdToSgd(netOptionsMarketValueUsd, fxRate)
+      : null;
+
   const usTotalValueUsd =
     holdingsSummary.usMarketValueUsd + usAvailableTradingCashUsd;
+  const totalUsNetValueUsd =
+    usTotalValueUsd + (netOptionsMarketValueUsd ?? 0);
   const usTotalValueSgd =
     fxRateValid && fxRate != null
       ? usdToSgd(usTotalValueUsd, fxRate)
       : holdingsSummary.usMarketValueSgd;
+  const totalUsNetValueSgd =
+    holdingsSummary.usMarketValueSgd +
+    usAvailableTradingCashSgd +
+    (netOptionsMarketValueSgd ?? 0);
   const sgTotalValueSgd =
     holdingsSummary.sgMarketValueSgd + sgAvailableTradingCashSgd;
   const allMarketTotalValueSgd = usTotalValueSgd + sgTotalValueSgd;
@@ -207,6 +226,10 @@ export function buildStockPortfolioSummary(
     sgAvailableTradingCashSgd,
     usTotalValueUsd,
     usTotalValueSgd,
+    netOptionsMarketValueUsd,
+    netOptionsMarketValueSgd,
+    totalUsNetValueUsd,
+    totalUsNetValueSgd,
     sgTotalValueSgd,
     allMarketTotalValueSgd,
     usMarketPLUsd,

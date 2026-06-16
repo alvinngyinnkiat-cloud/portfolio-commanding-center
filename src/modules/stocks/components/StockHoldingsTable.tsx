@@ -15,6 +15,7 @@ import {
 import { formatSgd, formatSingaporeDateTime, formatUsd, formatPercent } from "@/shared/lib/format";
 import { coerceNumber } from "@/shared/lib/coerce-number";
 import { SummaryCard } from "@/shared/components/ui/SummaryCard";
+import { UsMarketValueBreakdownCards } from "./UsMarketValueBreakdownCards";
 import { StackedValue } from "@/shared/components/ui/StackedValue";
 import { Modal } from "@/shared/components/ui/Modal";
 import {
@@ -461,31 +462,23 @@ export function StockHoldingsTable() {
       </div>
 
       {marketFilter === "US" && (
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          <SummaryCard
-            label="US Total Value"
-            value={formatSgd(summary.usTotalValueSgd)}
-            subValue={formatUsd(summary.usTotalValueUsd)}
-          />
-          <SummaryCard
-            label="US Available Cash"
-            value={formatSgd(summary.usAvailableTradingCashSgd)}
-            subValue={formatUsd(summary.usAvailableTradingCashUsd)}
-            trend="neutral"
-          />
-          <SummaryCard
-            label="US Market P/L"
-            value={formatSgd(summary.usMarketPLSgd)}
-            trend={plTrend(summary.usMarketPLSgd)}
-            subValue={formatUsd(summary.usMarketPLUsd)}
-          />
-          <SummaryCard
-            label="US Stock Contribution"
-            value={formatSgd(summary.usStockContributionSgd)}
-            subValue={formatUsd(summary.usStockContributionUsd)}
-            trend="neutral"
-            icon={<PiggyBank size={18} />}
-          />
+        <div className="space-y-4">
+          <UsMarketValueBreakdownCards summary={summary} />
+          <div className="grid gap-4 sm:grid-cols-2">
+            <SummaryCard
+              label="US Market P/L"
+              value={formatSgd(summary.usMarketPLSgd)}
+              trend={plTrend(summary.usMarketPLSgd)}
+              subValue={formatUsd(summary.usMarketPLUsd)}
+            />
+            <SummaryCard
+              label="US Stock Contribution"
+              value={formatSgd(summary.usStockContributionSgd)}
+              subValue={formatUsd(summary.usStockContributionUsd)}
+              trend="neutral"
+              icon={<PiggyBank size={18} />}
+            />
+          </div>
         </div>
       )}
 
