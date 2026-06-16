@@ -99,10 +99,10 @@ Track net personal capital committed to crypto (deposits − withdrawals), curre
 | Allocation percentages | `CryptoAllocationSettings` in `portfolio:crypto_allocation_settings` |
 | **Contribution** | Net crypto-category contribution transactions (deposits − withdrawals) |
 | **Total Holdings** | Sum of `currentValueSgd` (derived) |
-| **Crypto Cash** | Contribution − (buy transactions + fees); sell proceeds net of fees add back (derived) |
+| **Crypto Cash** | Contribution − buy transactions; sell proceeds add back (derived). Fees excluded. |
 | **Total Crypto Net Value** | Total Holdings + Crypto Cash (derived) |
 | **Profit & Loss** | Total Crypto Net Value − Contribution (derived) |
-| **Fees Paid** | Sum of all crypto trade fees (informational only; already reflected in Crypto Cash) |
+| **Fees Paid** | Sum of all crypto trade fees (display only — not in Crypto Cash or P/L) |
 | Rank, category, holding P/L, portfolio % | Derived at read time — never stored |
 
 ### Summary cards (Overview tab)
@@ -132,10 +132,10 @@ Warning when Crypto Cash &lt; 0: *"Crypto Cash is negative. Check deposits, with
 - Changing core formulas:
   - Contribution = Crypto Deposits − Crypto Withdrawals (excludes market gains/losses/rewards)
   - Total Holdings = Sum of `currentValueSgd`
-  - Crypto Cash = Contribution − (Total Buy Transactions + Associated Fees) [trade ledger when present]
+  - Crypto Cash = Contribution − Total Buy Transactions (fees excluded; sell proceeds add back when ledger present)
   - Total Crypto Net Value = Total Holdings + Crypto Cash
   - Profit & Loss = Total Crypto Net Value − Contribution
-  - Fees Paid = Sum of all crypto fees (informational; do not double-count in P/L)
+  - Fees Paid = Sum of all crypto fees (display only; not in Crypto Cash or P/L)
   - Portfolio % denominator = Total Holdings (not Total Crypto Net Value)
 - Storing derived holdings rows or summary totals as authoritative data
 - Moving crypto management UI into the Dashboard

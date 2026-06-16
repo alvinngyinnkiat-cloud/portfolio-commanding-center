@@ -171,7 +171,7 @@ export function CryptoOverviewSection() {
   if (!summary) return null;
 
   const cryptoCash = coerceNumber(summary.availableTradingCashSgd);
-  const buySpendWithFees =
+  const totalBuySpend =
     summary.cryptoContributionSgd - summary.availableTradingCashSgd;
 
   return (
@@ -195,7 +195,7 @@ export function CryptoOverviewSection() {
           value={formatSgd(cryptoCash)}
           icon={<PiggyBank size={18} />}
           trend={cryptoCash >= 0 ? "neutral" : "negative"}
-          subValue={`Contribution ${formatSgd(summary.cryptoContributionSgd)} − buys & fees ${formatSgd(buySpendWithFees)}`}
+          subValue={`Contribution ${formatSgd(summary.cryptoContributionSgd)} − buy transactions ${formatSgd(totalBuySpend)}`}
         />
         <SummaryCard
           label="Profit & Loss"
@@ -225,7 +225,7 @@ export function CryptoOverviewSection() {
         >
           <AlertTriangle size={18} className="mt-0.5 shrink-0 text-amber-400" />
           <p>
-            Crypto Cash is negative. Check deposits, withdrawals, buys, or fees.
+            Crypto Cash is negative. Check deposits, withdrawals, or buys.
           </p>
         </div>
       )}

@@ -193,10 +193,10 @@ CryptoAllocationSettings {
 |------|---------|
 | **Contribution** | Crypto Deposits − Crypto Withdrawals (net capital injected; excludes market gains/losses/rewards) |
 | **Total Holdings** | Sum of `currentValueSgd` |
-| **Crypto Cash** | Contribution − (Total Buy Transactions + Associated Fees); when a trade ledger exists, sell proceeds net of fees add back |
+| **Crypto Cash** | Contribution − Total Buy Transactions; sell proceeds add back when ledger present. Fees excluded. |
 | **Total Crypto Net Value** | Total Holdings + Crypto Cash |
 | **Profit & Loss** | Total Crypto Net Value − Contribution |
-| **Fees Paid** | Sum of all crypto trade fees (informational only; already reflected in Crypto Cash) |
+| **Fees Paid** | Sum of all crypto trade fees (display only — not in Crypto Cash or P/L) |
 
 **Overview layout:** Row 1 — Total Crypto Net Value · Total Holdings · Crypto Cash. Row 2 — Profit & Loss · Contribution · Fees Paid.
 

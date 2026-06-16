@@ -22,7 +22,7 @@ describe("buildCryptoTrackerSummary", () => {
     expect(summary.holdingCount).toBe(3);
   });
 
-  it("reduces crypto cash by buy totals and associated fees", () => {
+  it("reduces crypto cash by buy totals only — fees are display-only", () => {
     const withFees: CryptoHolding[] = [
       {
         id: "1",
@@ -35,8 +35,9 @@ describe("buildCryptoTrackerSummary", () => {
     const summary = buildCryptoTrackerSummary(withFees, 1000);
 
     expect(summary.cryptoContributionSgd).toBe(1000);
-    expect(summary.availableTradingCashSgd).toBe(490);
-    expect(summary.cryptoProfitLossSgd).toBe(110);
+    expect(summary.availableTradingCashSgd).toBe(500);
+    expect(summary.totalFeesPaidSgd).toBe(0);
+    expect(summary.cryptoProfitLossSgd).toBe(120);
   });
 
   it("handles zero holdings", () => {
@@ -83,10 +84,10 @@ describe("buildCryptoTrackerSummary", () => {
     const summary = buildCryptoTrackerSummary(holdings, 5000, trades);
 
     expect(summary.cryptoContributionSgd).toBe(5000);
-    expect(summary.availableTradingCashSgd).toBe(1980);
+    expect(summary.availableTradingCashSgd).toBe(2000);
   });
 
-  it("reports total fees separately from portfolio math", () => {
+  it("reports total fees separately without affecting crypto cash", () => {
     const trades: CryptoTrade[] = [
       {
         id: "t1",
@@ -100,10 +101,10 @@ describe("buildCryptoTrackerSummary", () => {
     const summary = buildCryptoTrackerSummary(holdings, 5000, trades);
 
     expect(summary.totalFeesPaidSgd).toBe(20);
-    expect(summary.availableTradingCashSgd).toBe(1980);
+    expect(summary.availableTradingCashSgd).toBe(2000);
   });
 
-  it("validation example: negative crypto cash when buys and fees exceed contribution", () => {
+  it("crypto cash ignores fees when buys are below contribution", () => {
     const trades: CryptoTrade[] = [
       {
         id: "t1",
@@ -117,7 +118,7 @@ describe("buildCryptoTrackerSummary", () => {
     const summary = buildCryptoTrackerSummary([], 11_500, trades);
 
     expect(summary.cryptoContributionSgd).toBe(11_500);
-    expect(summary.availableTradingCashSgd).toBeCloseTo(-75, 2);
+    expect(summary.availableTradingCashSgd).toBeCloseTo(8.02, 2);
     expect(summary.totalFeesPaidSgd).toBeCloseTo(83.02, 2);
   });
 
@@ -204,7 +205,7 @@ describe("buildCryptoTrackerSummary", () => {
     );
     expect(summary.cryptoContributionSgd).toBe(contribution);
     expect(summary.availableTradingCashSgd).toBeCloseTo(
-      contribution - buyTotal - feesTotal,
+      contribution - buyTotal,
       2
     );
     expect(summary.totalFeesPaidSgd).toBeCloseTo(feesTotal, 2);

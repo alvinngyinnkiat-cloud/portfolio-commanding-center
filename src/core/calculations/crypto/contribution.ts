@@ -21,13 +21,3 @@ export function calculateCryptoCapitalDeployed(holdings: CryptoHolding[]): numbe
   );
 }
 
-/** Buy spend including associated fees — used for Crypto Cash when no trade ledger. */
-export function calculateCryptoBuySpendWithFees(holdings: CryptoHolding[]): number {
-  return holdings.reduce(
-    (sum, holding) =>
-      sum +
-      calculateHoldingContribution(holding) +
-      normalizeFeesSgd(holding.feesSgd),
-    0
-  );
-}

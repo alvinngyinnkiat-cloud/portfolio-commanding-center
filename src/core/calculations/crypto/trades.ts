@@ -10,18 +10,17 @@ export function normalizeCryptoAssetName(assetName: string): string {
   return assetName.trim().toUpperCase();
 }
 
-/** Crypto Cash = Contribution − (buy amounts + buy fees) + (sell proceeds − sell fees). */
+/** Crypto Cash = Contribution − buy amounts + sell proceeds (fees are display-only). */
 export function calculateAvailableTradingCashFromTrades(
   totalCryptoCashContributed: number,
   trades: CryptoTrade[]
 ): number {
   let cash = coerceNumber(totalCryptoCashContributed);
   for (const trade of trades) {
-    const fees = normalizeFeesSgd(trade.feesSgd);
     if (trade.type === "buy") {
-      cash -= trade.amountSgd + fees;
+      cash -= trade.amountSgd;
     } else {
-      cash += trade.amountSgd - fees;
+      cash += trade.amountSgd;
     }
   }
   return cash;
