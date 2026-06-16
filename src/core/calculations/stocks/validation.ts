@@ -440,7 +440,7 @@ export function validateTransactionLedger(
   if (currencyError) return currencyError;
 
   try {
-    buildPositionLedgers(filtered);
+    buildPositionLedgers(filtered, { allowNetFallback: false });
     return { valid: true, errors: {} };
   } catch (error) {
     if (error instanceof SellExceedsHoldingsError) {

@@ -1,17 +1,19 @@
 import { describe, expect, it } from "vitest";
 import type { StockPrice, StockTransaction } from "@/core/domain/types";
+import { normalizeStockTransactions } from "./transaction-normalize";
 import {
   applyTransactionToLedger,
   buildPositionLedgers,
   calculateAllPositionHoldings,
   calculateHoldings,
   calculatePositionLedger,
+  computeTickerNetQuantities,
   createEmptyLedger,
   filterPositionsByMarket,
+  rebuildHoldingsFromTransactions,
   splitOpenAndClosedPositions,
   summarizePositionOverview,
 } from "./holdings";
-import { SellExceedsHoldingsError } from "./errors";
 
 function tx(
   overrides: Partial<StockTransaction> & Pick<StockTransaction, "transactionType">
@@ -275,7 +277,7 @@ describe("stock holdings engine", () => {
     expect(holdings[0].currency).toBe("SGD");
   });
 
-  it("9. cannot sell more shares than owned", () => {
+  it("9. falls back to net quantity when chronological sell exceeds holdings", () => {
     const transactions = [
       tx({
         id: "buy-1",
@@ -300,9 +302,8 @@ describe("stock holdings engine", () => {
       }),
     ];
 
-    expect(() => buildPositionLedgers(transactions)).toThrow(
-      SellExceedsHoldingsError
-    );
+    const ledgers = buildPositionLedgers(transactions);
+    expect(ledgers.get("US:AAPL")?.quantity).toBe(0);
   });
 
   it("10. holdings are derived from transactions, not manual current values", () => {
@@ -429,6 +430,150 @@ describe("stock holdings engine", () => {
     expect(positions).toHaveLength(1);
     expect(positions[0]?.quantity).toBe(0);
     expect(positions[0]?.realisedPL).toBe(100);
+  });
+  it("rebuilds open holdings from string quantity JSON rows", () => {
+    const transactions = normalizeStockTransactions([
+      {
+        id: "buy-1",
+        date: "2025-01-01",
+        market: "US",
+        ticker: "NVDA",
+        assetName: "NVIDIA",
+        transactionType: "Buy",
+        quantity: "82",
+        price: "100",
+        grossAmount: "8200",
+        fees: "0",
+        netAmount: "-8200",
+        currency: "USD",
+        createdAt: "2025-01-01T00:00:00.000Z",
+      },
+    ]);
+
+    const net = computeTickerNetQuantities(transactions);
+    expect(net.get("US:NVDA")).toEqual({ buyQty: 82, sellQty: 0, netQty: 82 });
+
+    const positions = calculateAllPositionHoldings(transactions, [], 1.35);
+    expect(positions).toHaveLength(1);
+    expect(positions[0]?.quantity).toBe(82);
+  });
+
+  it("rebuilds open positions for NVDA VOO SCHD MAGS buy transactions", () => {
+    const transactions = normalizeStockTransactions([
+      {
+        id: "nvda",
+        date: "2025-01-01",
+        market: "US",
+        ticker: "NVDA",
+        type: "buy",
+        shares: 10,
+        price: 100,
+        grossAmount: 1000,
+        fees: 0,
+        netAmount: -1000,
+        currency: "USD",
+        createdAt: "2025-01-01T00:00:00.000Z",
+      },
+      {
+        id: "voo",
+        date: "2025-01-02",
+        market: "US",
+        ticker: "VOO",
+        transactionType: "buy",
+        qty: 5,
+        price: 500,
+        grossAmount: 2500,
+        fees: 0,
+        netAmount: -2500,
+        currency: "USD",
+        createdAt: "2025-01-02T00:00:00.000Z",
+      },
+      {
+        id: "schd",
+        date: "2025-01-03",
+        market: "US",
+        ticker: "SCHD",
+        transactionType: "buy",
+        quantity: 20,
+        price: 25,
+        grossAmount: 500,
+        fees: 0,
+        netAmount: -500,
+        currency: "USD",
+        createdAt: "2025-01-03T00:00:00.000Z",
+      },
+      {
+        id: "mags",
+        date: "2025-01-04",
+        market: "US",
+        ticker: "MAGS",
+        transactionType: "buy",
+        quantity: 8,
+        price: 50,
+        grossAmount: 400,
+        fees: 0,
+        netAmount: -400,
+        currency: "USD",
+        createdAt: "2025-01-04T00:00:00.000Z",
+      },
+    ]);
+
+    const positions = rebuildHoldingsFromTransactions(transactions, [], 1.35);
+    const { open, closed } = splitOpenAndClosedPositions(positions);
+
+    expect(open).toHaveLength(4);
+    expect(closed).toHaveLength(0);
+    expect(open.map((position) => position.ticker).sort()).toEqual([
+      "MAGS",
+      "NVDA",
+      "SCHD",
+      "VOO",
+    ]);
+    expect(open.find((position) => position.ticker === "NVDA")?.quantity).toBe(10);
+    expect(open.find((position) => position.ticker === "VOO")?.quantity).toBe(5);
+  });
+
+  it("keeps other tickers when one ticker replay fails", () => {
+    const transactions = [
+      tx({
+        id: "buy-nvda",
+        ticker: "NVDA",
+        transactionType: "buy",
+        quantity: 10,
+        price: 100,
+        grossAmount: 1000,
+        fees: 0,
+        netAmount: -1000,
+      }),
+      tx({
+        id: "sell-nvda",
+        date: "2025-02-01",
+        ticker: "NVDA",
+        transactionType: "sell",
+        quantity: 12,
+        price: 120,
+        grossAmount: 1440,
+        fees: 0,
+        netAmount: 1440,
+        createdAt: "2025-02-01T00:00:00.000Z",
+      }),
+      tx({
+        id: "buy-voo",
+        ticker: "VOO",
+        transactionType: "buy",
+        quantity: 5,
+        price: 500,
+        grossAmount: 2500,
+        fees: 0,
+        netAmount: -2500,
+        createdAt: "2025-01-02T00:00:00.000Z",
+      }),
+    ];
+
+    const positions = calculateAllPositionHoldings(transactions, [], 1.35);
+    expect(positions.some((position) => position.ticker === "VOO" && position.quantity === 5)).toBe(
+      true
+    );
   });
 });
 

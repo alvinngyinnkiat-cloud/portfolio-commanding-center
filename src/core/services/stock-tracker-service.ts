@@ -10,7 +10,7 @@ import type { StockPriceRepository } from "@/core/database/repositories/stock-pr
 import type { DashboardSettingsRepository } from "@/core/database/repositories/dashboard-settings-repository";
 import type { ContributionRepository } from "@/core/database/repositories/contribution-repository";
 import type { StockFxConversionRepository } from "@/core/database/repositories/stock-fx-conversion-repository";
-import { calculateAllPositionHoldings } from "@/core/calculations/stocks/holdings";
+import { rebuildHoldingsFromTransactions } from "@/core/calculations/stocks/holdings";
 import { normalizeStockPrices } from "@/core/calculations/stocks/price-normalize";
 import { normalizeStockTransactions } from "@/core/calculations/stocks/transaction-normalize";
 import { normalizeTicker } from "@/core/calculations/stocks/normalize";
@@ -65,7 +65,7 @@ export class StockTrackerService {
 
     let allPositions: CalculatedHolding[] = [];
     try {
-      allPositions = calculateAllPositionHoldings(
+      allPositions = rebuildHoldingsFromTransactions(
         transactions,
         prices,
         effectiveFxRate
@@ -73,7 +73,20 @@ export class StockTrackerService {
     } catch (error) {
       console.error(
         "[StockTrackerService] position rebuild failed — transactions preserved",
-        error
+        {
+          transactionCount: transactions.length,
+          error,
+        }
+      );
+    }
+
+    if (
+      typeof console !== "undefined" &&
+      transactions.length > 0 &&
+      allPositions.length === 0
+    ) {
+      console.warn(
+        "[StockTrackerService] transactions loaded but no positions rebuilt — check [holdings-rebuild] logs"
       );
     }
 

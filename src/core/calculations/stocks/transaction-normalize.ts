@@ -5,17 +5,39 @@ import type {
   StockTransaction,
   StockTransactionType,
 } from "@/core/domain/types";
-import { coerceNumber } from "@/shared/lib/coerce-number";
 import { marketToCurrency, normalizeTicker } from "./normalize";
 
 const VALID_TYPES: StockTransactionType[] = ["buy", "sell", "dividend", "fee"];
 
-function normalizeMarket(raw: unknown): StockMarket | null {
-  if (typeof raw !== "string") return null;
-  const normalized = raw.trim().toUpperCase();
-  if (normalized === "US" || normalized === "SG") {
-    return normalized;
+/** Parse numbers persisted as JSON strings (legacy exports / form drafts). */
+function parseNumericField(raw: unknown, fallback = 0): number {
+  if (typeof raw === "number" && Number.isFinite(raw)) {
+    return raw;
   }
+  if (typeof raw === "string") {
+    const trimmed = raw.trim();
+    if (!trimmed) return fallback;
+    const parsed = parseFloat(trimmed);
+    if (Number.isFinite(parsed)) return parsed;
+  }
+  return fallback;
+}
+
+function normalizeMarket(
+  raw: unknown,
+  currency?: unknown
+): StockMarket | null {
+  if (typeof raw === "string") {
+    const normalized = raw.trim().toUpperCase();
+    if (normalized === "US" || normalized === "USD") {
+      return "US";
+    }
+    if (normalized === "SG" || normalized === "SGD") {
+      return "SG";
+    }
+  }
+  if (currency === "USD") return "US";
+  if (currency === "SGD") return "SG";
   return null;
 }
 
@@ -55,19 +77,50 @@ function normalizeCurrency(
   return marketToCurrency(market);
 }
 
+function normalizeId(raw: unknown): string | null {
+  if (typeof raw === "string" && raw.trim()) {
+    return raw.trim();
+  }
+  if (typeof raw === "number" && Number.isFinite(raw)) {
+    return String(raw);
+  }
+  return null;
+}
+
+function resolveTransactionType(row: Record<string, unknown>): StockTransactionType | null {
+  const candidates = [row.transactionType, row.type, row.side];
+  for (const candidate of candidates) {
+    const normalized = normalizeTransactionType(candidate);
+    if (normalized) return normalized;
+  }
+  return null;
+}
+
+/** Legacy exports may store share count under qty / shares instead of quantity. */
+function resolveQuantity(row: Record<string, unknown>): number {
+  for (const key of ["quantity", "qty", "shares"] as const) {
+    const parsed = parseNumericField(row[key], Number.NaN);
+    if (Number.isFinite(parsed)) {
+      return parsed;
+    }
+  }
+  return 0;
+}
+
 /** Coerce persisted stock ledger rows into canonical shape for holdings rebuild. */
 export function normalizeStockTransaction(raw: unknown): StockTransaction | null {
   if (!raw || typeof raw !== "object") {
     return null;
   }
 
-  const row = raw as Partial<StockTransaction>;
-  if (typeof row.id !== "string" || !row.id.trim()) {
+  const row = raw as Record<string, unknown>;
+  const id = normalizeId(row.id);
+  if (!id) {
     return null;
   }
 
-  const market = normalizeMarket(row.market);
-  const transactionType = normalizeTransactionType(row.transactionType);
+  const market = normalizeMarket(row.market, row.currency);
+  const transactionType = resolveTransactionType(row);
   const date = normalizeDate(row.date);
   const ticker = normalizeTicker(typeof row.ticker === "string" ? row.ticker : "");
 
@@ -77,18 +130,18 @@ export function normalizeStockTransaction(raw: unknown): StockTransaction | null
 
   const currency = normalizeCurrency(market, row.currency);
   const instrumentType = normalizeInstrumentType(row.instrumentType);
-  const quantity = coerceNumber(row.quantity);
-  const price = coerceNumber(row.price);
-  const grossAmount = coerceNumber(row.grossAmount);
-  const fees = coerceNumber(row.fees);
-  const netAmount = coerceNumber(row.netAmount);
+  const quantity = resolveQuantity(row);
+  const price = parseNumericField(row.price);
+  const grossAmount = parseNumericField(row.grossAmount);
+  const fees = parseNumericField(row.fees);
+  const netAmount = parseNumericField(row.netAmount);
   const assetName =
     typeof row.assetName === "string" && row.assetName.trim()
       ? row.assetName.trim()
       : `${ticker} (${instrumentType === "etf" ? "ETF" : "Stock"})`;
 
   return {
-    id: row.id.trim(),
+    id,
     date,
     market,
     ticker,

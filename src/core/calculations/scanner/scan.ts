@@ -5,7 +5,7 @@ import type {
   MainSystemDisplay,
   ScannerTickerResult,
 } from "@/core/domain/types/scanner";
-import { computeIndicators } from "./indicators";
+import { computeIndicators, filterCompletedDailyCandles } from "./indicators";
 import { computeStructure } from "./structure";
 import {
   scoreBearCall,
@@ -58,13 +58,15 @@ export function scanTicker(input: ScanTickerInput): ScannerTickerResult {
     );
   }
 
-  const dailyBars = dailyCandles.map((bar) => ({
-    date: bar.date,
-    open: bar.open,
-    high: bar.high,
-    low: bar.low,
-    close: bar.close,
-  }));
+  const dailyBars = filterCompletedDailyCandles(
+    dailyCandles.map((bar) => ({
+      date: bar.date,
+      open: bar.open,
+      high: bar.high,
+      low: bar.low,
+      close: bar.close,
+    }))
+  );
   const weeklyBars = weeklyCandles.map((bar) => ({
     date: bar.date,
     open: bar.open,

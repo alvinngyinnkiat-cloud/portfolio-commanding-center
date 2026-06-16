@@ -6,6 +6,37 @@ export interface OhlcBar {
   close: number;
 }
 
+/** TradingView Stochastic settings — %K length / %K smoothing. */
+export const STOCHASTIC_K_PERIOD = 10;
+export const STOCHASTIC_K_SMOOTHING = 3;
+
+function getUsMarketDateString(date: Date = new Date()): string {
+  const formatter = new Intl.DateTimeFormat("en-US", {
+    timeZone: "America/New_York",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  });
+  const parts = formatter.formatToParts(date);
+  const get = (type: Intl.DateTimeFormatPartTypes) =>
+    parts.find((part) => part.type === type)?.value ?? "00";
+  return `${get("year")}-${get("month")}-${get("day")}`;
+}
+
+/** Daily session bars only — drops the in-progress US session candle. */
+export function filterCompletedDailyCandles(candles: OhlcBar[]): OhlcBar[] {
+  if (candles.length === 0) {
+    return candles;
+  }
+  const sorted = [...candles].sort((a, b) => a.date.localeCompare(b.date));
+  const last = sorted[sorted.length - 1];
+  const usToday = getUsMarketDateString();
+  if (last.date >= usToday) {
+    return sorted.slice(0, -1);
+  }
+  return sorted;
+}
+
 export function sma(values: number[], period: number): number | null {
   if (values.length < period) {
     return null;
@@ -55,16 +86,28 @@ export function computeAtr14(candles: OhlcBar[]): number | null {
   return atr;
 }
 
-export function computeStochastic1433(
+/**
+ * TradingView Stochastic Oscillator 10 / 3 on daily OHLC.
+ *
+ * raw %K = 100 × (Close − Lowest Low₁₀) / (Highest High₁₀ − Lowest Low₁₀)
+ * SO (%K) = 3-period SMA of raw %K
+ *
+ * Uses daily high/low range and daily close. Pass completed daily candles only.
+ */
+export function computeStochastic1033(
   candles: OhlcBar[]
 ): { so: number | null; soPrev: number | null } {
-  if (candles.length < 17) {
+  const period = STOCHASTIC_K_PERIOD;
+  const smoothing = STOCHASTIC_K_SMOOTHING;
+  const minCandles = period + smoothing + 2;
+
+  if (candles.length < minCandles) {
     return { so: null, soPrev: null };
   }
 
   const rawK: number[] = [];
-  for (let i = 14; i < candles.length; i += 1) {
-    const window = candles.slice(i - 13, i + 1);
+  for (let i = period - 1; i < candles.length; i += 1) {
+    const window = candles.slice(i - period + 1, i + 1);
     const highest = Math.max(...window.map((bar) => bar.high));
     const lowest = Math.min(...window.map((bar) => bar.low));
     const close = candles[i].close;
@@ -76,8 +119,9 @@ export function computeStochastic1433(
   }
 
   const smoothK: number[] = [];
-  for (let i = 2; i < rawK.length; i += 1) {
-    smoothK.push((rawK[i] + rawK[i - 1] + rawK[i - 2]) / 3);
+  for (let i = smoothing - 1; i < rawK.length; i += 1) {
+    const slice = rawK.slice(i - smoothing + 1, i + 1);
+    smoothK.push(slice.reduce((sum, value) => sum + value, 0) / smoothing);
   }
 
   if (smoothK.length === 0) {
@@ -88,6 +132,14 @@ export function computeStochastic1433(
     so: smoothK[smoothK.length - 1],
     soPrev: smoothK.length >= 2 ? smoothK[smoothK.length - 2] : null,
   };
+}
+
+/** @deprecated Use {@link computeStochastic1033} — retained for legacy imports. */
+export function computeStochastic1433(candles: OhlcBar[]): {
+  so: number | null;
+  soPrev: number | null;
+} {
+  return computeStochastic1033(candles);
 }
 
 export function deriveTrend(
@@ -179,9 +231,10 @@ export function computeIndicators(
   trendQualityBullPut: number;
   trendQualityBearCall: number;
 } {
-  const closes = candles.map((bar) => bar.close);
-  const last = candles[candles.length - 1];
-  const { so, soPrev } = computeStochastic1433(candles);
+  const completedDaily = filterCompletedDailyCandles(candles);
+  const closes = completedDaily.map((bar) => bar.close);
+  const last = completedDaily[completedDaily.length - 1];
+  const { so, soPrev } = computeStochastic1033(completedDaily);
   const ema20 = ema(closes, 20);
   const sma50Val = sma(closes, 50);
   const sma200Val = sma(closes, 200);
@@ -191,7 +244,7 @@ export function computeIndicators(
     ema20,
     sma50: sma50Val,
     sma200: sma200Val,
-    atr14: computeAtr14(candles),
+    atr14: computeAtr14(completedDaily),
     so,
     soPrev,
     high: last?.high ?? null,

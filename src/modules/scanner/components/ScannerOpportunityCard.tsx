@@ -141,6 +141,7 @@ function ExpandedDetails({ result }: { result: ScannerTickerResult }) {
       <DetailSection title="SO Validation">
         <DetailGrid
           items={[
+            ["SO Settings", "Stochastic 10 / 3 (Daily Close, completed sessions)"],
             ["Current SO", formatNum(indicators.so, 1)],
             ["Previous SO", formatNum(indicators.soPrev, 1)],
             ["SO Status", indicators.soStatus],

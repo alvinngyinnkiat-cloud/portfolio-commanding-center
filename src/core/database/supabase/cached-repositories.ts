@@ -9,6 +9,7 @@ import { normalizeTicker } from "@/core/calculations/stocks/normalize";
 import { normalizeDashboardSettings } from "@/core/database/local/normalize-settings";
 import { normalizeDailySnapshot } from "@/core/calculations/snapshots";
 import { normalizeStockPrice } from "@/core/calculations/stocks/price-normalize";
+import { normalizeStockTransactions } from "@/core/calculations/stocks/transaction-normalize";
 import { normalizeOptionsSettings } from "@/core/domain/defaults-options";
 import { normalizeOptionsTradeForStorage, normalizeOptionsTradesForStorage } from "@/core/calculations/options/trade-dates";
 import { normalizeScannerScanRun } from "@/core/calculations/scanner/normalize-scan-result";
@@ -171,7 +172,9 @@ class CachedStockFxConversionRepository implements StockFxConversionRepository {
 class CachedStockTransactionRepository implements StockTransactionRepository {
   constructor(private readonly manager: PersistenceManager) {}
   list() {
-    return [...this.manager.getCache().stockTransactions];
+    return normalizeStockTransactions([
+      ...this.manager.getCache().stockTransactions,
+    ]);
   }
   upsert(transaction: Parameters<StockTransactionRepository["upsert"]>[0]) {
     const list = this.manager.getCache().stockTransactions;
