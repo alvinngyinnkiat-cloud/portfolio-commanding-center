@@ -342,6 +342,53 @@ describe("buildStockPortfolioSummary", () => {
         (portfolio.netOptionsMarketValueSgd ?? 0),
       2
     );
+    expect(portfolio.allMarketTotalValueSgd).toBeCloseTo(
+      portfolio.totalUsNetValueSgd + portfolio.sgTotalValueSgd,
+      2
+    );
+  });
+
+  it("total stock value equals US net plus SG net when options reduce US net", () => {
+    const holdings: CalculatedHolding[] = [
+      holding({ market: "US", marketValue: 10_000, sgdValue: 13_500 }),
+      holding({ market: "SG", marketValue: 5_000, sgdValue: 5_000 }),
+    ];
+    const optionsTrades: OptionsTrade[] = [
+      {
+        id: "opt-short",
+        status: "open",
+        tradeType: "personal",
+        userSharePercent: 100,
+        clientSharePercent: 0,
+        strategy: "sellPut",
+        underlying: "SPY",
+        expirationDate: "2026-12-18",
+        contracts: 1,
+        openDate: "2026-01-01",
+        openPremiumUsd: 100,
+        openFeesUsd: 0,
+        maxRiskUsd: 500,
+        currentValueUsd: 120,
+        createdAt: "2026-01-01T00:00:00.000Z",
+        updatedAt: "2026-01-01T00:00:00.000Z",
+      },
+    ];
+
+    const portfolio = buildStockPortfolioSummary(
+      holdings,
+      [],
+      [],
+      1.35,
+      optionsTrades
+    );
+
+    expect(portfolio.allMarketTotalValueSgd).toBeCloseTo(
+      portfolio.totalUsNetValueSgd + portfolio.sgTotalValueSgd,
+      2
+    );
+    expect(portfolio.allMarketTotalValueSgd).toBeLessThan(
+      portfolio.usTotalValueSgd + portfolio.sgTotalValueSgd
+    );
   });
 });
 

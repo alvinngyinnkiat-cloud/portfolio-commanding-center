@@ -58,7 +58,10 @@ export function StockOverviewSection() {
           value={formatSgd(summary.allMarketTotalValueSgd)}
           highlight
           icon={<Wallet size={18} />}
-          subValue={`Holdings ${formatSgd(summary.totalStockHoldingsSgd)}`}
+          subValue={[
+            `US Net: ${formatSgd(summary.totalUsNetValueSgd)}`,
+            `SG Net: ${formatSgd(summary.sgTotalValueSgd)}`,
+          ].join("\n")}
         />
         <SummaryCard
           label="Stock P/L"

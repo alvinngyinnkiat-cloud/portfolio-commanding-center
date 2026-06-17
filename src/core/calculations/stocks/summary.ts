@@ -87,10 +87,10 @@ export function calculateStockProfitLossSgd(
 }
 
 export function calculateTotalStockValueSgd(
-  stockHoldingsValueSgd: number,
-  availableTradingCashSgd: number
+  totalUsNetValueSgd: number,
+  sgTotalValueSgd: number
 ): number {
-  return stockHoldingsValueSgd + availableTradingCashSgd;
+  return totalUsNetValueSgd + sgTotalValueSgd;
 }
 
 /** Module 2 capital model — aggregate summary for adapter and services. */
@@ -131,13 +131,26 @@ export function buildStockTrackerSummary(
     isValidFxRate(fxRate) && fxRate != null
       ? usdToSgd(usAvailableTradingCashUsd, fxRate)
       : 0;
+  const netOptionsMarketValueUsd = calculateNetOptionsMarketValueUsd(optionsTrades);
+  const netOptionsMarketValueSgd =
+    netOptionsMarketValueUsd != null && isValidFxRate(fxRate) && fxRate != null
+      ? usdToSgd(netOptionsMarketValueUsd, fxRate)
+      : null;
+  const totalUsNetValueSgd =
+    holdingsSummary.usMarketValueSgd +
+    usAvailableTradingCashSgd +
+    (netOptionsMarketValueSgd ?? 0);
+  const sgTotalValueSgd =
+    holdingsSummary.sgMarketValueSgd + sgAvailableTradingCashSgd;
   const usMarketValueSgd =
     holdingsSummary.usMarketValueSgd + usAvailableTradingCashSgd;
-  const sgMarketValueSgd =
-    holdingsSummary.sgMarketValueSgd + sgAvailableTradingCashSgd;
+  const sgMarketValueSgd = sgTotalValueSgd;
   const availableTradingCashSgd =
     usAvailableTradingCashSgd + sgAvailableTradingCashSgd;
-  const totalStockValueSgd = usMarketValueSgd + sgMarketValueSgd;
+  const totalStockValueSgd = calculateTotalStockValueSgd(
+    totalUsNetValueSgd,
+    sgTotalValueSgd
+  );
   const stockProfitLossSgd = calculateStockProfitLossSgd(
     totalStockValueSgd,
     contribution.totalStockContributionSgd
@@ -226,7 +239,10 @@ export function buildStockPortfolioSummary(
     (netOptionsMarketValueSgd ?? 0);
   const sgTotalValueSgd =
     holdingsSummary.sgMarketValueSgd + sgAvailableTradingCashSgd;
-  const allMarketTotalValueSgd = usTotalValueSgd + sgTotalValueSgd;
+  const allMarketTotalValueSgd = calculateTotalStockValueSgd(
+    totalUsNetValueSgd,
+    sgTotalValueSgd
+  );
 
   const usMarketPLUsd =
     usTotalValueUsd - contribution.usStockContributionUsd;
