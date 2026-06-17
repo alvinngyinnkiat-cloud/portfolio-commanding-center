@@ -403,7 +403,23 @@ export function StockCashFlowSection() {
             label="FX Cost Basis (SGD)"
             value={formatSgd(fxPerformance?.fxCostBasisSgd ?? 0)}
             icon={<ArrowLeftRight size={18} />}
-            subValue="Remaining SGD cost of converted USD"
+            subValue="Total SGD used for SGD → USD conversions"
+          />
+          <SummaryCard
+            label="Total USD Converted"
+            value={formatUsd(fxPerformance?.totalUsdConverted ?? 0)}
+            icon={<ArrowLeftRight size={18} />}
+            subValue="From FX conversion records only"
+          />
+          <SummaryCard
+            label="Current SGD Value of Converted USD"
+            value={
+              fxRateValid && fxPerformance
+                ? formatSgd(fxPerformance.convertedUsdValueSgd)
+                : "FX required"
+            }
+            icon={<ArrowLeftRight size={18} />}
+            subValue="Total USD Converted × current FX rate"
           />
           <SummaryCard
             label="FX Gain/Loss"

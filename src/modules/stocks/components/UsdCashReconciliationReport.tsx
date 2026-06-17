@@ -158,9 +158,13 @@ export function UsdCashReconciliationReport({
             label="FX Cost Basis"
             value={report.fxPerformance.fxCostBasisSgd}
           />
+          <ReportRow
+            label="Total USD Converted"
+            value={report.fxPerformance.totalUsdConverted}
+          />
           <SgdReportRow
-            label="Current USD Value"
-            value={report.fxPerformance.currentUsdValueSgd}
+            label="Current SGD Value of Converted USD"
+            value={report.fxPerformance.convertedUsdValueSgd}
           />
           <SgdReportRow
             label="FX Gain/Loss"

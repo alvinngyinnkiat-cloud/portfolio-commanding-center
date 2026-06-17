@@ -46,7 +46,10 @@ export function buildUsCashReconciliationReport(
     stockStandaloneFeesUsd: flow.fees,
     options,
     currentUsdCash: result.usAvailableCashUsd,
-    fxPerformance: buildFxPerformanceMetrics(input),
+    fxPerformance: buildFxPerformanceMetrics(
+      input.fxConversions ?? [],
+      input.fxRate
+    ),
   };
 }
 
