@@ -1,13 +1,16 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { usePortfolio } from "@/context/PortfolioContext";
 import {
   buildUsCashDiagnosticsReport,
   buildUsCashReconciliationFormula,
+  compareBrokerCashToCollateral,
 } from "@/core/calculations/us-cash";
 import { formatDate, formatUsd } from "@/shared/lib/format";
-import { AlertTriangle } from "lucide-react";
+import { Input } from "@/shared/components/ui/Input";
+import { SummaryCard } from "@/shared/components/ui/SummaryCard";
+import { AlertTriangle, Layers, Shield, TrendingUp, Wallet } from "lucide-react";
 
 function ReportRow({
   label,
@@ -63,6 +66,7 @@ function SectionBlock({
 
 export function UsdCashDiagnosticsPanel() {
   const { data, stockData, optionsData } = usePortfolio();
+  const [brokerUsdCashInput, setBrokerUsdCashInput] = useState("");
 
   const report = useMemo(() => {
     if (!data || !stockData) return null;
@@ -74,6 +78,23 @@ export function UsdCashDiagnosticsPanel() {
       optionsTrades: optionsData?.trades ?? [],
     });
   }, [data, stockData, optionsData?.trades]);
+
+  const brokerUsdCash = useMemo(() => {
+    const trimmed = brokerUsdCashInput.trim();
+    if (!trimmed) return null;
+    const parsed = parseFloat(trimmed);
+    return Number.isFinite(parsed) ? parsed : null;
+  }, [brokerUsdCashInput]);
+
+  const collateralComparison = useMemo(() => {
+    if (!report) return null;
+    return compareBrokerCashToCollateral({
+      expectedUsdCash: report.expectedUsdCash,
+      brokerUsdCash,
+      estimatedReservedCapitalUsd:
+        report.openCollateralSummary.estimatedReservedCapitalUsd,
+    });
+  }, [report, brokerUsdCash]);
 
   if (!report) {
     return (
@@ -140,85 +161,6 @@ export function UsdCashDiagnosticsPanel() {
             value={report.options.closedTradesPremiumUsd}
           />
         </SectionBlock>
-      </div>
-
-      <div className="space-y-4">
-        <SectionBlock title="Open Trades Cash">
-          <ReportRow
-            label="Open Trades Count"
-            value={report.openTradesCashSummary.openTradesCount}
-            format="count"
-          />
-          <ReportRow
-            label="Premium Received"
-            value={report.openTradesCashSummary.premiumReceivedUsd}
-          />
-          <div className="flex items-center justify-between gap-4 py-2">
-            <div>
-              <span className="text-sm text-slate-400">Current Market Value</span>
-              {report.openTradesCashSummary.currentMarketValueUsd == null && (
-                <p className="text-xs text-slate-600">
-                  Mark open trades to include market value
-                </p>
-              )}
-            </div>
-            <span className="text-sm font-medium tabular-nums text-slate-200">
-              {report.openTradesCashSummary.currentMarketValueUsd != null
-                ? formatUsd(report.openTradesCashSummary.currentMarketValueUsd)
-                : "—"}
-            </span>
-          </div>
-          <ReportRow
-            label="Net Open Cash Contribution"
-            value={report.openTradesCashSummary.netOpenCashContributionUsd}
-            emphasize
-          />
-        </SectionBlock>
-
-        <div className="overflow-x-auto rounded-xl border border-surface-border/60">
-          <table className="w-full min-w-[640px] text-sm">
-            <thead className="bg-surface/60 text-xs uppercase text-slate-500">
-              <tr>
-                <th className="px-3 py-3 text-left">Ticker</th>
-                <th className="px-3 py-3 text-right">Premium Received</th>
-                <th className="px-3 py-3 text-right">Current Value</th>
-                <th className="px-3 py-3 text-right">Cash Already Received</th>
-              </tr>
-            </thead>
-            <tbody>
-              {report.openTradesCash.length === 0 ? (
-                <tr>
-                  <td
-                    colSpan={4}
-                    className="px-4 py-8 text-center text-slate-500"
-                  >
-                    No open option trades.
-                  </td>
-                </tr>
-              ) : (
-                report.openTradesCash.map((row) => (
-                  <tr
-                    key={row.tradeId}
-                    className="border-b border-surface-border/40 text-slate-300 last:border-0"
-                  >
-                    <td className="px-3 py-2.5 font-medium">{row.ticker}</td>
-                    <td className="px-3 py-2.5 text-right tabular-nums">
-                      {formatUsd(row.premiumReceivedUsd)}
-                    </td>
-                    <td className="px-3 py-2.5 text-right tabular-nums">
-                      {row.currentValueUsd != null
-                        ? formatUsd(row.currentValueUsd)
-                        : "—"}
-                    </td>
-                    <td className="px-3 py-2.5 text-right tabular-nums font-medium">
-                      {formatUsd(row.cashAlreadyReceivedUsd)}
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
       </div>
 
       <div className="rounded-2xl border border-surface-border/80 bg-surface-card/90 p-5">
@@ -358,29 +300,227 @@ export function UsdCashDiagnosticsPanel() {
             </tbody>
           </table>
         </div>
+
+        <SectionBlock title="Closed Options Summary">
+          <ReportRow
+            label="Total Premium Received"
+            value={report.optionAuditSummary.totalPremiumReceivedUsd}
+          />
+          <ReportRow
+            label="Total Realized P/L"
+            value={report.optionAuditSummary.totalRealizedPlUsd}
+          />
+          <ReportRow
+            label="Difference"
+            value={report.optionAuditSummary.differenceUsd}
+            emphasize
+          />
+          {summaryMismatch && (
+            <p className="pt-2 text-sm text-accent-red" role="alert">
+              Premium vs realized P/L mismatch — may indicate premium counted twice
+              or realized P/L added on top of premium cash.
+            </p>
+          )}
+        </SectionBlock>
       </div>
 
-      <SectionBlock title="F) Summary">
-        <ReportRow
-          label="Total Premium Received"
-          value={report.optionAuditSummary.totalPremiumReceivedUsd}
-        />
-        <ReportRow
-          label="Total Realized P/L"
-          value={report.optionAuditSummary.totalRealizedPlUsd}
-        />
-        <ReportRow
-          label="Difference"
-          value={report.optionAuditSummary.differenceUsd}
-          emphasize
-        />
-        {summaryMismatch && (
-          <p className="pt-2 text-sm text-accent-red" role="alert">
-            Premium vs realized P/L mismatch — may indicate premium counted twice
-            or realized P/L added on top of premium cash.
+      <div className="space-y-6">
+        <div>
+          <h4 className="text-sm font-semibold text-white">
+            F) Open Option Collateral Audit
+          </h4>
+          <p className="mt-1 text-sm text-slate-500">
+            Reporting only — does not affect cash calculations. Investigate whether
+            broker cash differences are explained by open option collateral.
           </p>
+        </div>
+
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
+          <SummaryCard
+            label="Open Trades Count"
+            value={String(report.openCollateralSummary.openTradesCount)}
+            icon={<Layers size={18} />}
+            compact
+          />
+          <SummaryCard
+            label="Total Open Risk"
+            value={formatUsd(report.openCollateralSummary.totalOpenRiskUsd)}
+            subValue="Sum of max risk on open trades"
+            icon={<Shield size={18} />}
+            compact
+          />
+          <SummaryCard
+            label="Total Premium Received"
+            value={formatUsd(report.openCollateralSummary.premiumReceivedUsd)}
+            icon={<TrendingUp size={18} />}
+            compact
+          />
+          <SummaryCard
+            label="Total Current Market Value"
+            value={
+              report.openCollateralSummary.currentMarketValueUsd != null
+                ? formatUsd(report.openCollateralSummary.currentMarketValueUsd)
+                : "—"
+            }
+            subValue={
+              report.openCollateralSummary.currentMarketValueUsd == null
+                ? "Mark open trades to include"
+                : undefined
+            }
+            icon={<Wallet size={18} />}
+            compact
+          />
+          <SummaryCard
+            label="Net Open Cash Contribution"
+            value={formatUsd(
+              report.openCollateralSummary.netOpenCashContributionUsd
+            )}
+            subValue="Premium − Market Value − Fees"
+            icon={<Wallet size={18} />}
+            highlight
+            compact
+          />
+        </div>
+
+        <div className="grid gap-4 lg:grid-cols-2">
+          <SectionBlock title="Estimated Reserved Capital">
+            <ReportRow
+              label="Estimated Reserved Capital"
+              value={report.openCollateralSummary.estimatedReservedCapitalUsd}
+              sublabel="= Total Open Risk (reporting only)"
+              emphasize
+            />
+          </SectionBlock>
+
+          <SectionBlock title="Broker Cash Difference">
+            <div className="py-2">
+              <Input
+                label="Broker USD Cash"
+                type="number"
+                min="0"
+                step="0.01"
+                placeholder="e.g. 1341.21"
+                value={brokerUsdCashInput}
+                onChange={(e) => setBrokerUsdCashInput(e.target.value)}
+                hint="Enter broker-reported USD cash to compare against expected"
+              />
+            </div>
+            <ReportRow
+              label="Expected USD Cash"
+              value={report.expectedUsdCash}
+            />
+            {collateralComparison?.brokerCashDifferenceUsd != null && (
+              <ReportRow
+                label="Difference"
+                value={collateralComparison.brokerCashDifferenceUsd}
+                sublabel="Expected USD Cash − Broker USD Cash"
+                emphasize
+              />
+            )}
+          </SectionBlock>
+        </div>
+
+        {collateralComparison?.brokerCashDifferenceUsd != null && (
+          <div className="rounded-2xl border border-surface-border/80 bg-surface-card/90 p-5">
+            <h5 className="text-sm font-semibold text-white">Comparison</h5>
+            <div className="mt-4 grid gap-4 sm:grid-cols-3">
+              <SummaryCard
+                label="Difference"
+                value={formatUsd(collateralComparison.brokerCashDifferenceUsd)}
+                compact
+              />
+              <SummaryCard
+                label="Estimated Reserved Capital"
+                value={formatUsd(
+                  collateralComparison.estimatedReservedCapitalUsd
+                )}
+                compact
+              />
+              <SummaryCard
+                label="Difference ÷ Open Risk"
+                value={
+                  collateralComparison.differenceVsOpenRiskPercent != null
+                    ? `${collateralComparison.differenceVsOpenRiskPercent.toFixed(1)}%`
+                    : "—"
+                }
+                compact
+              />
+            </div>
+            <div
+              className={`mt-4 rounded-lg border px-4 py-3 text-sm ${
+                collateralComparison.collateralExplainsDifference
+                  ? "border-accent-green/40 bg-accent-green/10 text-accent-green"
+                  : "border-amber-500/40 bg-amber-500/10 text-amber-200"
+              }`}
+            >
+              <span className="font-medium">
+                Difference explained by open collateral:{" "}
+                {collateralComparison.collateralExplainsDifference ? "YES" : "NO"}
+              </span>
+              {collateralComparison.collateralExplainsDifference && (
+                <p className="mt-1 text-xs opacity-90">
+                  The broker cash gap aligns with estimated open risk collateral.
+                </p>
+              )}
+            </div>
+          </div>
         )}
-      </SectionBlock>
+
+        <div className="overflow-x-auto rounded-xl border border-surface-border/60">
+          <table className="w-full min-w-[960px] text-sm">
+            <thead className="bg-surface/60 text-xs uppercase text-slate-500">
+              <tr>
+                <th className="px-3 py-3 text-left">Ticker</th>
+                <th className="px-3 py-3 text-left">Strategy</th>
+                <th className="px-3 py-3 text-right">Premium Received</th>
+                <th className="px-3 py-3 text-right">Current Market Value</th>
+                <th className="px-3 py-3 text-right">Opening Fees</th>
+                <th className="px-3 py-3 text-right">Net Open Cash Contribution</th>
+                <th className="px-3 py-3 text-right">Max Risk</th>
+              </tr>
+            </thead>
+            <tbody>
+              {report.openCollateral.length === 0 ? (
+                <tr>
+                  <td
+                    colSpan={7}
+                    className="px-4 py-8 text-center text-slate-500"
+                  >
+                    No open option trades.
+                  </td>
+                </tr>
+              ) : (
+                report.openCollateral.map((row) => (
+                  <tr
+                    key={row.tradeId}
+                    className="border-b border-surface-border/40 text-slate-300 last:border-0"
+                  >
+                    <td className="px-3 py-2.5 font-medium">{row.ticker}</td>
+                    <td className="px-3 py-2.5">{row.strategy}</td>
+                    <td className="px-3 py-2.5 text-right tabular-nums">
+                      {formatUsd(row.premiumReceivedUsd)}
+                    </td>
+                    <td className="px-3 py-2.5 text-right tabular-nums">
+                      {row.currentMarketValueUsd != null
+                        ? formatUsd(row.currentMarketValueUsd)
+                        : "—"}
+                    </td>
+                    <td className="px-3 py-2.5 text-right tabular-nums">
+                      {formatUsd(row.openingFeesUsd)}
+                    </td>
+                    <td className="px-3 py-2.5 text-right tabular-nums font-medium">
+                      {formatUsd(row.netOpenCashContributionUsd)}
+                    </td>
+                    <td className="px-3 py-2.5 text-right tabular-nums">
+                      {formatUsd(row.maxRiskUsd)}
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
     </div>
   );
 }

@@ -4,13 +4,13 @@ import {
   summarizeOptionCashAudit,
 } from "./option-cash-audit";
 import type {
-  OpenTradeCashRow,
-  OpenTradesCashSummary,
-} from "./open-trades-cash-audit";
+  OpenOptionCollateralRow,
+  OpenOptionCollateralSummary,
+} from "./open-option-collateral-audit";
 import {
-  buildOpenTradesCashRows,
-  summarizeOpenTradesCash,
-} from "./open-trades-cash-audit";
+  buildOpenOptionCollateralRows,
+  summarizeOpenOptionCollateral,
+} from "./open-option-collateral-audit";
 import {
   buildUsCashReconciliationReport,
   reconcileUsCashFromReport,
@@ -22,8 +22,8 @@ export interface UsCashDiagnosticsReport extends UsCashReconciliationReport {
   expectedUsdCash: number;
   actualUsdCash: number;
   differenceUsd: number;
-  openTradesCash: OpenTradeCashRow[];
-  openTradesCashSummary: OpenTradesCashSummary;
+  openCollateral: OpenOptionCollateralRow[];
+  openCollateralSummary: OpenOptionCollateralSummary;
   optionAudit: OptionCashAuditRow[];
   optionAuditSummary: OptionCashAuditSummary;
 }
@@ -34,8 +34,8 @@ export function buildUsCashDiagnosticsReport(
   const base = buildUsCashReconciliationReport(input);
   const expectedUsdCash = reconcileUsCashFromReport(base);
   const actualUsdCash = base.currentUsdCash;
-  const openTradesCash = buildOpenTradesCashRows(input.optionsTrades ?? []);
-  const openTradesCashSummary = summarizeOpenTradesCash(openTradesCash);
+  const openCollateral = buildOpenOptionCollateralRows(input.optionsTrades ?? []);
+  const openCollateralSummary = summarizeOpenOptionCollateral(openCollateral);
   const optionAudit = buildOptionCashAuditRows(input.optionsTrades ?? []);
   const optionAuditSummary = summarizeOptionCashAudit(optionAudit);
 
@@ -44,8 +44,8 @@ export function buildUsCashDiagnosticsReport(
     expectedUsdCash,
     actualUsdCash,
     differenceUsd: actualUsdCash - expectedUsdCash,
-    openTradesCash,
-    openTradesCashSummary,
+    openCollateral,
+    openCollateralSummary,
     optionAudit,
     optionAuditSummary,
   };

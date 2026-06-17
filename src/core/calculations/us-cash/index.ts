@@ -12,9 +12,10 @@ export type {
 export type { UsCashDiagnosticsReport } from "./diagnostics";
 export type { OptionsReconciliationTotals } from "./options-cash-flow";
 export type {
-  OpenTradeCashRow,
-  OpenTradesCashSummary,
-} from "./open-trades-cash-audit";
+  BrokerCollateralComparison,
+  OpenOptionCollateralRow,
+  OpenOptionCollateralSummary,
+} from "./open-option-collateral-audit";
 export type {
   OptionCashAuditRow,
   OptionCashAuditSummary,
@@ -32,10 +33,11 @@ export {
   reconcileUsCashFromReport,
 } from "./reconciliation";
 export {
-  buildOpenTradesCashRows,
-  computeRemainingOpenCashFlowUsd,
-  summarizeOpenTradesCash,
-} from "./open-trades-cash-audit";
+  buildOpenOptionCollateralRows,
+  compareBrokerCashToCollateral,
+  computeNetOpenCashContributionUsd,
+  summarizeOpenOptionCollateral,
+} from "./open-option-collateral-audit";
 export {
   buildOptionCashAuditRows,
   computeOptionAuditCashImpactUsd,

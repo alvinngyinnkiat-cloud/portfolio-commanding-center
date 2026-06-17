@@ -110,7 +110,7 @@ describe("buildUsCashDiagnosticsReport", () => {
 
     expect(report.expectedUsdCash).toBeCloseTo(report.actualUsdCash, 2);
     expect(report.optionAudit).toHaveLength(1);
-    expect(report.openTradesCash).toHaveLength(0);
+    expect(report.openCollateral).toHaveLength(0);
     expect(report.optionAuditSummary.totalPremiumReceivedUsd).toBe(100);
   });
 });

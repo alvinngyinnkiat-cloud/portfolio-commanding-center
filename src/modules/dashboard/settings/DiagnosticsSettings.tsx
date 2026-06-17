@@ -10,11 +10,11 @@ export function DiagnosticsSettings() {
     () => [
       {
         id: "usd-cash",
-        label: "USD Cash Reconciliation",
+        label: "Cash Reconciliation",
         content: (
           <Card
-            title="USD Cash Reconciliation"
-            subtitle="Audit USD cash from FX, stock, and options activity against the live cash engine"
+            title="Cash Reconciliation"
+            subtitle="Audit USD cash from FX, stock, and options activity against broker balances"
           >
             <UsdCashDiagnosticsPanel />
           </Card>
