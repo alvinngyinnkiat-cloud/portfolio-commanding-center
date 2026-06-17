@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 import { usePortfolio } from "@/context/PortfolioContext";
 import {
   buildUsCashDiagnosticsReport,
@@ -8,7 +8,6 @@ import {
   compareBrokerCashToCollateral,
 } from "@/core/calculations/us-cash";
 import { formatDate, formatUsd } from "@/shared/lib/format";
-import { Input } from "@/shared/components/ui/Input";
 import { SummaryCard } from "@/shared/components/ui/SummaryCard";
 import { AlertTriangle, Layers, Shield, TrendingUp, Wallet } from "lucide-react";
 
@@ -66,7 +65,7 @@ function SectionBlock({
 
 export function UsdCashDiagnosticsPanel() {
   const { data, stockData, optionsData } = usePortfolio();
-  const [brokerUsdCashInput, setBrokerUsdCashInput] = useState("");
+  const brokerUsdCashOverride = data?.settings.brokerUsdCashOverride ?? null;
 
   const report = useMemo(() => {
     if (!data || !stockData) return null;
@@ -79,22 +78,15 @@ export function UsdCashDiagnosticsPanel() {
     });
   }, [data, stockData, optionsData?.trades]);
 
-  const brokerUsdCash = useMemo(() => {
-    const trimmed = brokerUsdCashInput.trim();
-    if (!trimmed) return null;
-    const parsed = parseFloat(trimmed);
-    return Number.isFinite(parsed) ? parsed : null;
-  }, [brokerUsdCashInput]);
-
   const collateralComparison = useMemo(() => {
     if (!report) return null;
     return compareBrokerCashToCollateral({
       expectedUsdCash: report.expectedUsdCash,
-      brokerUsdCash,
+      brokerUsdCash: brokerUsdCashOverride,
       estimatedReservedCapitalUsd:
         report.openCollateralSummary.estimatedReservedCapitalUsd,
     });
-  }, [report, brokerUsdCash]);
+  }, [report, brokerUsdCashOverride]);
 
   if (!report) {
     return (
@@ -199,19 +191,32 @@ export function UsdCashDiagnosticsPanel() {
 
         <div className="mt-6 space-y-2 border-t border-surface-border/40 pt-4">
           <ReportRow
-            label="Expected USD Cash"
+            label="System Calculated USD Cash"
             value={report.expectedUsdCash}
             emphasize
           />
+          {brokerUsdCashOverride != null && (
+            <>
+              <ReportRow
+                label="Broker USD Cash Override"
+                value={brokerUsdCashOverride}
+                emphasize
+              />
+              <ReportRow
+                label="Historical reconciliation difference"
+                value={report.expectedUsdCash - brokerUsdCashOverride}
+                sublabel="System Calculated − Broker Override"
+                emphasize
+              />
+            </>
+          )}
           <ReportRow
-            label="Actual USD Cash"
+            label="Engine Actual USD Cash"
             value={report.actualUsdCash}
-            emphasize
           />
           <ReportRow
-            label="Difference"
+            label="Engine vs formula difference"
             value={report.differenceUsd}
-            emphasize
           />
         </div>
 
@@ -528,29 +533,30 @@ export function UsdCashDiagnosticsPanel() {
           </SectionBlock>
 
           <SectionBlock title="Broker Cash Difference">
-            <div className="py-2">
-              <Input
-                label="Broker USD Cash"
-                type="number"
-                min="0"
-                step="0.01"
-                placeholder="e.g. 1341.21"
-                value={brokerUsdCashInput}
-                onChange={(e) => setBrokerUsdCashInput(e.target.value)}
-                hint="Enter broker-reported USD cash to compare against expected"
-              />
-            </div>
-            <ReportRow
-              label="Expected USD Cash"
-              value={report.expectedUsdCash}
-            />
-            {collateralComparison?.brokerCashDifferenceUsd != null && (
-              <ReportRow
-                label="Difference"
-                value={collateralComparison.brokerCashDifferenceUsd}
-                sublabel="Expected USD Cash − Broker USD Cash"
-                emphasize
-              />
+            {brokerUsdCashOverride == null ? (
+              <p className="py-2 text-sm text-slate-500">
+                Set Broker USD Cash Override in Settings → Portfolio Values to
+                compare against system calculated cash.
+              </p>
+            ) : (
+              <>
+                <ReportRow
+                  label="System Calculated USD Cash"
+                  value={report.expectedUsdCash}
+                />
+                <ReportRow
+                  label="Broker USD Cash Override"
+                  value={brokerUsdCashOverride}
+                />
+                {collateralComparison?.brokerCashDifferenceUsd != null && (
+                  <ReportRow
+                    label="Historical reconciliation difference"
+                    value={collateralComparison.brokerCashDifferenceUsd}
+                    sublabel="System Calculated − Broker Override"
+                    emphasize
+                  />
+                )}
+              </>
             )}
           </SectionBlock>
         </div>

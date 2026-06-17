@@ -27,6 +27,7 @@ import type {
 import { usdToSgd } from "@/core/calculations/fx";
 import { isValidFxRate } from "@/core/calculations/fx-validation";
 import { calculateUsAvailableCashUsd } from "@/core/calculations/us-cash";
+import { buildUsEffectiveCashFields } from "@/core/calculations/us-cash/effective-cash";
 import {
   calculateRemainingCapacityUsd,
   calculateRiskUtilizationPercent,
@@ -170,35 +171,53 @@ export function buildClosedTradeRows(trades: OptionsTrade[]): OptionsClosedTrade
     });
 }
 
-function buildUsCashSnapshot(input: {
-  contributions: ContributionTransaction[];
-  fxConversions?: StockFxConversion[];
-  stockTransactions: StockTransaction[];
-  optionsTrades: OptionsTrade[];
-  fxRate: number | null;
-}) {
-  const usAvailableCashUsd = calculateUsAvailableCashUsd({
+function buildUsCashSnapshot(
+  input: {
+    contributions: ContributionTransaction[];
+    fxConversions?: StockFxConversion[];
+    stockTransactions: StockTransaction[];
+    optionsTrades: OptionsTrade[];
+    fxRate: number | null;
+  },
+  brokerUsdCashOverride: number | null = null
+) {
+  const systemCalculatedUsCashUsd = calculateUsAvailableCashUsd({
     contributions: input.contributions,
     fxConversions: input.fxConversions ?? [],
     stockTransactions: input.stockTransactions,
     fxRate: input.fxRate,
     optionsTrades: input.optionsTrades,
   });
+  const usCash = buildUsEffectiveCashFields(
+    systemCalculatedUsCashUsd,
+    brokerUsdCashOverride
+  );
   const fxValid = isValidFxRate(input.fxRate) && input.fxRate != null;
   const usAvailableCashSgd = fxValid
-    ? usdToSgd(usAvailableCashUsd, input.fxRate!)
+    ? usdToSgd(usCash.usAvailableTradingCashUsd, input.fxRate!)
     : 0;
-  return { usAvailableCashUsd, usAvailableCashSgd };
+  return {
+    usAvailableCashUsd: usCash.usAvailableTradingCashUsd,
+    usAvailableCashSgd,
+    systemCalculatedUsCashUsd: usCash.systemCalculatedUsCashUsd,
+    brokerUsdCashOverrideUsd: usCash.brokerUsdCashOverrideUsd,
+    historicalReconciliationDifferenceUsd:
+      usCash.historicalReconciliationDifferenceUsd,
+    usesBrokerUsdCashOverride: usCash.usesBrokerUsdCashOverride,
+  };
 }
 
-export function buildOptionsCapitalReadiness(input: {
-  contributions: ContributionTransaction[];
-  fxConversions?: StockFxConversion[];
-  stockTransactions: StockTransaction[];
-  optionsTrades: OptionsTrade[];
-  fxRate: number | null;
-}): OptionsCapitalReadiness {
-  const cash = buildUsCashSnapshot(input);
+export function buildOptionsCapitalReadiness(
+  input: {
+    contributions: ContributionTransaction[];
+    fxConversions?: StockFxConversion[];
+    stockTransactions: StockTransaction[];
+    optionsTrades: OptionsTrade[];
+    fxRate: number | null;
+  },
+  brokerUsdCashOverride: number | null = null
+): OptionsCapitalReadiness {
+  const cash = buildUsCashSnapshot(input, brokerUsdCashOverride);
   const totalOpenRiskUsd = sumOpenRiskUsd(input.optionsTrades);
   const remainingCapacityUsd = calculateRemainingCapacityUsd(
     cash.usAvailableCashUsd,
@@ -208,6 +227,11 @@ export function buildOptionsCapitalReadiness(input: {
   return {
     usAvailableCashUsd: cash.usAvailableCashUsd,
     usAvailableCashSgd: cash.usAvailableCashSgd,
+    systemCalculatedUsCashUsd: cash.systemCalculatedUsCashUsd,
+    brokerUsdCashOverrideUsd: cash.brokerUsdCashOverrideUsd,
+    historicalReconciliationDifferenceUsd:
+      cash.historicalReconciliationDifferenceUsd,
+    usesBrokerUsdCashOverride: cash.usesBrokerUsdCashOverride,
     totalOpenRiskUsd,
     remainingCapacityUsd,
     capacityStatus: deriveCapacityStatus(remainingCapacityUsd),
@@ -218,14 +242,17 @@ export function buildOptionsCapitalReadiness(input: {
   };
 }
 
-export function buildOptionsTrackerSummary(input: {
-  contributions: ContributionTransaction[];
-  fxConversions?: StockFxConversion[];
-  stockTransactions: StockTransaction[];
-  optionsTrades: OptionsTrade[];
-  fxRate: number | null;
-}): OptionsTrackerSummary {
-  const readiness = buildOptionsCapitalReadiness(input);
+export function buildOptionsTrackerSummary(
+  input: {
+    contributions: ContributionTransaction[];
+    fxConversions?: StockFxConversion[];
+    stockTransactions: StockTransaction[];
+    optionsTrades: OptionsTrade[];
+    fxRate: number | null;
+  },
+  brokerUsdCashOverride: number | null = null
+): OptionsTrackerSummary {
+  const readiness = buildOptionsCapitalReadiness(input, brokerUsdCashOverride);
   const openTrades = input.optionsTrades.filter((trade) => trade.status === "open");
   const closedTrades = input.optionsTrades.filter((trade) => trade.status === "closed");
   const today = todayOptionsTradeDate();
@@ -299,6 +326,11 @@ export function buildOptionsTrackerSummary(input: {
   return {
     usAvailableCashUsd: readiness.usAvailableCashUsd,
     usAvailableCashSgd: readiness.usAvailableCashSgd,
+    systemCalculatedUsCashUsd: readiness.systemCalculatedUsCashUsd,
+    brokerUsdCashOverrideUsd: readiness.brokerUsdCashOverrideUsd,
+    historicalReconciliationDifferenceUsd:
+      readiness.historicalReconciliationDifferenceUsd,
+    usesBrokerUsdCashOverride: readiness.usesBrokerUsdCashOverride,
     totalOpenRiskUsd: readiness.totalOpenRiskUsd,
     totalUnrealizedPlUsd: totalUnrealized,
     userUnrealizedPlUsd: userUnrealized,

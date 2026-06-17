@@ -101,7 +101,8 @@ export class PortfolioAggregator {
       stockData.transactions,
       fxRate,
       optionsTrades,
-      stockData.cashFlow.fxConversions
+      stockData.cashFlow.fxConversions,
+      settings.brokerUsdCashOverride
     );
     const stockOutputs = deriveDashboardStockOutputs(stockSummary);
     const cryptoData = this.cryptoTracker.getData();

@@ -322,6 +322,8 @@ export function StockHoldingsTable() {
 
   const filtered = openPositions;
 
+  const brokerUsdCashOverride = data?.settings.brokerUsdCashOverride ?? null;
+
   const summary = useMemo(
     () =>
       buildStockPortfolioSummary(
@@ -330,9 +332,18 @@ export function StockHoldingsTable() {
         transactions,
         fxRate,
         optionsData?.trades ?? [],
-        stockData?.cashFlow.fxConversions ?? []
+        stockData?.cashFlow.fxConversions ?? [],
+        brokerUsdCashOverride
       ),
-    [holdings, contributions, transactions, fxRate, optionsData?.trades, stockData?.cashFlow.fxConversions]
+    [
+      holdings,
+      contributions,
+      transactions,
+      fxRate,
+      optionsData?.trades,
+      stockData?.cashFlow.fxConversions,
+      brokerUsdCashOverride,
+    ]
   );
 
   const handleRefreshPrices = async () => {

@@ -5,6 +5,7 @@ import {
 } from "@/core/domain/defaults";
 import { sgdToUsd } from "@/core/calculations/fx";
 import { isValidFxRate } from "@/core/calculations/fx-validation";
+import { normalizeBrokerUsdCashOverride } from "@/core/calculations/us-cash/effective-cash";
 
 interface LegacyManualValues extends Partial<ManualPortfolioValues> {
   clientPortfolioSgd?: number;
@@ -12,6 +13,8 @@ interface LegacyManualValues extends Partial<ManualPortfolioValues> {
 
 interface LegacyDashboardSettings {
   usdSgdFxRate?: number | null;
+  brokerUsdCashOverride?: number | null;
+  brokerUsdCashLastUpdated?: string | null;
   stockCashUsd?: number;
   usdTradingCashUsd?: number;
   sgdTradingCashSgd?: number;
@@ -64,6 +67,14 @@ export function normalizeDashboardSettings(
   return {
     usdSgdFxRate: fxRate,
     manualValues: normalizeManualValues(raw.manualValues, fxRate),
+    brokerUsdCashOverride: normalizeBrokerUsdCashOverride(
+      raw.brokerUsdCashOverride
+    ),
+    brokerUsdCashLastUpdated:
+      typeof raw.brokerUsdCashLastUpdated === "string" &&
+      raw.brokerUsdCashLastUpdated.trim()
+        ? raw.brokerUsdCashLastUpdated.trim()
+        : null,
     cryptoLegacyTradesMigrated: raw.cryptoLegacyTradesMigrated === true,
   };
 }

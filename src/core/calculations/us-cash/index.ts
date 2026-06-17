@@ -21,6 +21,11 @@ export type {
   OptionCashAuditRow,
   OptionCashAuditSummary,
 } from "./option-cash-audit";
+export type { UsEffectiveCashFields } from "./effective-cash";
+export {
+  buildUsEffectiveCashFields,
+  normalizeBrokerUsdCashOverride,
+} from "./effective-cash";
 export {
   buildUsAvailableCashResult,
   calculateUsAvailableCashUsd,

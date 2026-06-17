@@ -30,7 +30,7 @@ import {
   optionsTradeDateForInput,
   todayOptionsTradeDate,
 } from "@/core/calculations/options";
-import { buildUsAvailableCashResult } from "@/core/calculations/us-cash";
+import { buildUsAvailableCashResult, buildUsEffectiveCashFields } from "@/core/calculations/us-cash";
 import { Input } from "@/shared/components/ui/Input";
 import { Button } from "@/shared/components/ui/Button";
 import { Select } from "@/shared/components/ui/Select";
@@ -435,6 +435,10 @@ export function OpenTradeModal({
       fxRate: optionsData.fxRate,
       optionsTrades: optionsData.trades,
     });
+    const effectiveCash = buildUsEffectiveCashFields(
+      cash.usAvailableCashUsd,
+      data.settings.brokerUsdCashOverride
+    );
     const openRisk = sumOpenRiskUsd(optionsData.trades);
     let addRisk = 0;
     if (!editTrade) {
@@ -446,11 +450,11 @@ export function OpenTradeModal({
       }
     }
     const projected = calculateRemainingCapacityUsd(
-      cash.usAvailableCashUsd,
+      effectiveCash.usAvailableTradingCashUsd,
       openRisk + addRisk
     );
     return {
-      cash: cash.usAvailableCashUsd,
+      cash: effectiveCash.usAvailableTradingCashUsd,
       openRisk,
       addRisk,
       projected,

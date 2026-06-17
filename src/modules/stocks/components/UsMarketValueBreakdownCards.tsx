@@ -3,6 +3,7 @@
 import type { ReactNode } from "react";
 import type { StockPortfolioSummary } from "@/core/calculations/stocks/summary";
 import { formatSgd, formatUsd } from "@/shared/lib/format";
+import { formatUsCashComparisonSubValue } from "@/shared/lib/us-cash-display";
 
 function formatSgdOrDash(value: number | null | undefined): string {
   return value != null ? formatSgd(value) : "—";
@@ -47,6 +48,7 @@ export function UsMarketValueBreakdownCards({
   summary: StockPortfolioSummary;
 }) {
   const optionsSgdLabel = formatSgdOrDash(summary.netOptionsMarketValueSgd);
+  const cashComparison = formatUsCashComparisonSubValue(summary);
 
   return (
     <div className="grid gap-4 lg:grid-cols-3">
@@ -80,6 +82,11 @@ export function UsMarketValueBreakdownCards({
             <p className="mt-1 text-xs text-slate-500">
               {formatUsd(summary.usAvailableTradingCashUsd)}
             </p>
+            {cashComparison && (
+              <p className="mt-2 whitespace-pre-line text-xs leading-relaxed text-slate-500">
+                {cashComparison}
+              </p>
+            )}
           </div>
 
           <div className="border-t border-surface-border/60 pt-4">

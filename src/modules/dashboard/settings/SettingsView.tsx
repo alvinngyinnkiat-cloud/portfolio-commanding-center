@@ -4,6 +4,7 @@ import { useMemo } from "react";
 import { Card } from "@/shared/components/ui/Card";
 import { Tabs, type TabItem } from "@/shared/components/ui/Tabs";
 import { ManualValuesSettings } from "./ManualValuesSettings";
+import { BrokerUsdCashSettings } from "./BrokerUsdCashSettings";
 import { ContributionTransactionsTable } from "./ContributionTransactionsTable";
 import { GoalsTable } from "./GoalsTable";
 import { DailySnapshotTrigger } from "./DailySnapshotTrigger";
@@ -21,6 +22,9 @@ export function SettingsView() {
             subtitle="FX rate and read-only holdings sourced from tracker modules"
           >
             <ManualValuesSettings />
+            <div className="mt-6">
+              <BrokerUsdCashSettings />
+            </div>
           </Card>
         ),
       },

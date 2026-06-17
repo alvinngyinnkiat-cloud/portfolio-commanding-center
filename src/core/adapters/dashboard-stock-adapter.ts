@@ -56,7 +56,8 @@ export function buildDashboardStockSummary(
   transactions: StockTransaction[],
   fxRate: number | null,
   optionsTrades: OptionsTrade[] = [],
-  fxConversions: StockFxConversion[] = []
+  fxConversions: StockFxConversion[] = [],
+  brokerUsdCashOverride: number | null = null
 ): StockTrackerSummary {
   return buildStockTrackerSummary(
     holdings,
@@ -64,6 +65,7 @@ export function buildDashboardStockSummary(
     transactions,
     fxRate,
     optionsTrades,
-    fxConversions
+    fxConversions,
+    brokerUsdCashOverride
   );
 }

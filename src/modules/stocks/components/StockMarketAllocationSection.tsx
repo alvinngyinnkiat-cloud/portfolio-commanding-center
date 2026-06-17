@@ -82,6 +82,8 @@ function LegBreakdown({
 export function StockMarketAllocationSection() {
   const { stockData, data, optionsData } = usePortfolio();
 
+  const brokerUsdCashOverride = data?.settings.brokerUsdCashOverride ?? null;
+
   const allocation = useMemo(() => {
     if (!stockData || !data?.contributions) return null;
 
@@ -91,11 +93,12 @@ export function StockMarketAllocationSection() {
       stockData.transactions,
       stockData.fxRate,
       optionsData?.trades ?? [],
-      stockData.cashFlow.fxConversions
+      stockData.cashFlow.fxConversions,
+      brokerUsdCashOverride
     );
 
     return buildStockMarketAllocation(summary);
-  }, [stockData, data?.contributions, optionsData?.trades]);
+  }, [stockData, data?.contributions, optionsData?.trades, brokerUsdCashOverride]);
 
   const chartData = useMemo(() => {
     if (!allocation || allocation.totalStockValueSgd <= 0) return [];

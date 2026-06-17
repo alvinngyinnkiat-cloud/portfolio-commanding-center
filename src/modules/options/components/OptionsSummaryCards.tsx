@@ -1,6 +1,7 @@
 "use client";
 
 import { formatSgd, formatUsd } from "@/shared/lib/format";
+import { formatUsCashComparisonSubValue } from "@/shared/lib/us-cash-display";
 import { coerceNumber } from "@/shared/lib/coerce-number";
 import { SummaryCard } from "@/shared/components/ui/SummaryCard";
 import {
@@ -66,11 +67,14 @@ export function OptionsSummaryCards() {
         <SummaryCard
           label="US Available Cash"
           value={formatUsd(summary.usAvailableCashUsd)}
-          subValue={
+          subValue={[
             optionsData.fxRateValid
-              ? `≈ ${formatSgd(summary.usAvailableCashSgd)} · Shared Engine`
-              : "FX required for SGD"
-          }
+              ? `≈ ${formatSgd(summary.usAvailableCashSgd)}`
+              : "FX required for SGD",
+            formatUsCashComparisonSubValue(summary),
+          ]
+            .filter(Boolean)
+            .join("\n")}
           icon={<Wallet size={18} />}
         />
         <SummaryCard

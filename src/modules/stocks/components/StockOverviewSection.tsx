@@ -22,6 +22,8 @@ export function StockOverviewSection() {
   const transactions = stockData?.transactions ?? [];
   const contributions = data?.contributions ?? [];
 
+  const brokerUsdCashOverride = data?.settings.brokerUsdCashOverride ?? null;
+
   const summary = useMemo(
     () =>
       buildStockPortfolioSummary(
@@ -30,7 +32,8 @@ export function StockOverviewSection() {
         transactions,
         fxRate,
         optionsData?.trades ?? [],
-        stockData?.cashFlow.fxConversions ?? []
+        stockData?.cashFlow.fxConversions ?? [],
+        brokerUsdCashOverride
       ),
     [
       holdings,
@@ -39,6 +42,7 @@ export function StockOverviewSection() {
       fxRate,
       optionsData?.trades,
       stockData?.cashFlow.fxConversions,
+      brokerUsdCashOverride,
     ]
   );
 

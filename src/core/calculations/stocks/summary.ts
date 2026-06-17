@@ -12,6 +12,7 @@ import { summarizeStockContributionFromDeposits } from "@/core/calculations/stoc
 import { summarizeNetStockCashBreakdown } from "@/core/calculations/stocks/contributions";
 import { calculateSgAvailableCashSgd } from "@/core/calculations/stocks/trading-cash";
 import { calculateUsAvailableCashUsd } from "@/core/calculations/us-cash";
+import { buildUsEffectiveCashFields } from "@/core/calculations/us-cash/effective-cash";
 import { calculateNetOptionsMarketValueUsd } from "@/core/calculations/options/net-options-market-value";
 
 /** UI aggregation — sums derived holding fields; does not alter ledger math. */
@@ -30,6 +31,10 @@ export interface StockPortfolioSummary extends StockHoldingsSummary {
   usStockContributionUsd: number;
   usAvailableTradingCashUsd: number;
   usAvailableTradingCashSgd: number;
+  systemCalculatedUsCashUsd: number;
+  brokerUsdCashOverrideUsd: number | null;
+  historicalReconciliationDifferenceUsd: number | null;
+  usesBrokerUsdCashOverride: boolean;
   sgAvailableTradingCashSgd: number;
   usTotalValueUsd: number;
   usTotalValueSgd: number;
@@ -95,7 +100,8 @@ export function buildStockTrackerSummary(
   transactions: StockTransaction[],
   fxRate: number | null,
   optionsTrades: OptionsTrade[] = [],
-  fxConversions: StockFxConversion[] = []
+  fxConversions: StockFxConversion[] = [],
+  brokerUsdCashOverride: number | null = null
 ): StockTrackerSummary {
   const holdingsSummary = summarizeStockHoldings(holdings, fxRate);
   const netCash = summarizeNetStockCashBreakdown(contributions, fxConversions);
@@ -105,13 +111,18 @@ export function buildStockTrackerSummary(
     fxRate
   );
 
-  const usAvailableTradingCashUsd = calculateUsAvailableCashUsd({
+  const systemCalculatedUsCashUsd = calculateUsAvailableCashUsd({
     contributions,
     fxConversions,
     stockTransactions: transactions,
     fxRate,
     optionsTrades,
   });
+  const usCash = buildUsEffectiveCashFields(
+    systemCalculatedUsCashUsd,
+    brokerUsdCashOverride
+  );
+  const usAvailableTradingCashUsd = usCash.usAvailableTradingCashUsd;
   const sgAvailableTradingCashSgd = calculateSgAvailableCashSgd(
     netCash.sgNetStockCashContributedSgd,
     transactions
@@ -139,6 +150,11 @@ export function buildStockTrackerSummary(
     availableTradingCashSgd,
     usAvailableTradingCashUsd,
     usAvailableTradingCashSgd,
+    systemCalculatedUsCashUsd: usCash.systemCalculatedUsCashUsd,
+    brokerUsdCashOverrideUsd: usCash.brokerUsdCashOverrideUsd,
+    historicalReconciliationDifferenceUsd:
+      usCash.historicalReconciliationDifferenceUsd,
+    usesBrokerUsdCashOverride: usCash.usesBrokerUsdCashOverride,
     sgAvailableTradingCashSgd,
     usMarketValueSgd,
     sgMarketValueSgd,
@@ -156,7 +172,8 @@ export function buildStockPortfolioSummary(
   transactions: StockTransaction[],
   fxRate: number | null,
   optionsTrades: OptionsTrade[] = [],
-  fxConversions: StockFxConversion[] = []
+  fxConversions: StockFxConversion[] = [],
+  brokerUsdCashOverride: number | null = null
 ): StockPortfolioSummary {
   const fxRateValid = isValidFxRate(fxRate);
   const holdingsSummary = summarizeStockHoldings(holdings, fxRate);
@@ -167,13 +184,18 @@ export function buildStockPortfolioSummary(
     fxRate
   );
 
-  const usAvailableTradingCashUsd = calculateUsAvailableCashUsd({
+  const systemCalculatedUsCashUsd = calculateUsAvailableCashUsd({
     contributions,
     fxConversions,
     stockTransactions: transactions,
     fxRate,
     optionsTrades,
   });
+  const usCash = buildUsEffectiveCashFields(
+    systemCalculatedUsCashUsd,
+    brokerUsdCashOverride
+  );
+  const usAvailableTradingCashUsd = usCash.usAvailableTradingCashUsd;
   const sgAvailableTradingCashSgd = calculateSgAvailableCashSgd(
     netCash.sgNetStockCashContributedSgd,
     transactions
@@ -223,6 +245,11 @@ export function buildStockPortfolioSummary(
     usStockContributionUsd: contribution.usStockContributionUsd,
     usAvailableTradingCashUsd,
     usAvailableTradingCashSgd,
+    systemCalculatedUsCashUsd: usCash.systemCalculatedUsCashUsd,
+    brokerUsdCashOverrideUsd: usCash.brokerUsdCashOverrideUsd,
+    historicalReconciliationDifferenceUsd:
+      usCash.historicalReconciliationDifferenceUsd,
+    usesBrokerUsdCashOverride: usCash.usesBrokerUsdCashOverride,
     sgAvailableTradingCashSgd,
     usTotalValueUsd,
     usTotalValueSgd,

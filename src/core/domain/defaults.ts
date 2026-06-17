@@ -35,6 +35,8 @@ export const DEFAULT_MANUAL_VALUES: ManualPortfolioValues = {
 export const DEFAULT_DASHBOARD_SETTINGS: DashboardSettings = {
   usdSgdFxRate: 1.35,
   manualValues: DEFAULT_MANUAL_VALUES,
+  brokerUsdCashOverride: null,
+  brokerUsdCashLastUpdated: null,
 };
 
 export function normalizeManualPortfolioValues(

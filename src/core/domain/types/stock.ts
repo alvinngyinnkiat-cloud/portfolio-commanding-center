@@ -89,6 +89,10 @@ export interface StockTrackerSummary {
   availableTradingCashSgd: number;
   usAvailableTradingCashUsd: number;
   usAvailableTradingCashSgd: number;
+  systemCalculatedUsCashUsd: number;
+  brokerUsdCashOverrideUsd: number | null;
+  historicalReconciliationDifferenceUsd: number | null;
+  usesBrokerUsdCashOverride: boolean;
   sgAvailableTradingCashSgd: number;
   usMarketValueSgd: number;
   sgMarketValueSgd: number;

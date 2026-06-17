@@ -47,6 +47,9 @@ export class OptionsTrackerService {
     const fxRate = this.dashboardSettingsRepo.get().usdSgdFxRate;
     const fxRateValid = isValidFxRate(fxRate);
 
+    const dashboardSettings = this.dashboardSettingsRepo.get();
+    const brokerUsdCashOverride = dashboardSettings.brokerUsdCashOverride;
+
     const calcInput = {
       contributions,
       fxConversions,
@@ -65,8 +68,8 @@ export class OptionsTrackerService {
     return {
       trades,
       settings,
-      summary: buildOptionsTrackerSummary(calcInput),
-      readiness: buildOptionsCapitalReadiness(calcInput),
+      summary: buildOptionsTrackerSummary(calcInput, brokerUsdCashOverride),
+      readiness: buildOptionsCapitalReadiness(calcInput, brokerUsdCashOverride),
       risk: buildOptionsRiskSummary(calcInput),
       performance: buildOptionsPerformanceSummary(trades),
       personalPerformance: buildTradeTypePerformanceDetail(trades, "personal"),

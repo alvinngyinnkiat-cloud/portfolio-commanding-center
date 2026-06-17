@@ -208,6 +208,10 @@ export interface OptionsMonthlyPerformanceRow {
 export interface OptionsTrackerSummary {
   usAvailableCashUsd: number;
   usAvailableCashSgd: number;
+  systemCalculatedUsCashUsd: number;
+  brokerUsdCashOverrideUsd: number | null;
+  historicalReconciliationDifferenceUsd: number | null;
+  usesBrokerUsdCashOverride: boolean;
   totalOpenRiskUsd: number;
   totalUnrealizedPlUsd: number | null;
   userUnrealizedPlUsd: number | null;
@@ -231,6 +235,10 @@ export interface OptionsTrackerSummary {
 export interface OptionsCapitalReadiness {
   usAvailableCashUsd: number;
   usAvailableCashSgd: number;
+  systemCalculatedUsCashUsd: number;
+  brokerUsdCashOverrideUsd: number | null;
+  historicalReconciliationDifferenceUsd: number | null;
+  usesBrokerUsdCashOverride: boolean;
   totalOpenRiskUsd: number;
   remainingCapacityUsd: number;
   capacityStatus: OptionsCapacityStatus;
