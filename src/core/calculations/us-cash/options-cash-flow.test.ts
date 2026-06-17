@@ -4,6 +4,7 @@ import {
   computeCloseEventCashFlowUsd,
   computeOptionOpenCashFlowUsd,
   summarizeOptionsCashFlowUsd,
+  summarizeOptionsReconciliationUsd,
 } from "./options-cash-flow";
 
 function creditTrade(
@@ -135,6 +136,17 @@ describe("options cash flow — broker reconciliation", () => {
     expect(summary.optionOpenCashFlowUsd).toBe(495);
     expect(summary.optionManualCloseCashFlowUsd).toBeCloseTo(-1685.59, 2);
     expect(summary.netOptionsCashFlowUsd).toBeCloseTo(-1190.59, 2);
+
+    const reconciliation = summarizeOptionsReconciliationUsd([trade]);
+    expect(reconciliation.totalPremiumReceivedUsd).toBe(500);
+    expect(reconciliation.totalOptionFeesUsd).toBe(5);
+    expect(reconciliation.totalManualPlAdjustmentsUsd).toBeCloseTo(-1685.59, 2);
+    expect(
+      reconciliation.totalPremiumReceivedUsd -
+        reconciliation.totalCloseDebitsUsd -
+        reconciliation.totalOptionFeesUsd +
+        reconciliation.totalManualPlAdjustmentsUsd
+    ).toBeCloseTo(-1190.59, 2);
   });
 
   it("open credit trades contribute open cash even before close", () => {

@@ -11,6 +11,7 @@ import type {
 import {
   calculateStockFxRate,
 } from "@/core/calculations/stocks/cash-flow";
+import { buildUsCashReconciliationReport } from "@/core/calculations/us-cash";
 import { createStockFxConversionId } from "@/core/calculations/stocks/migrate-stock-cash-flow";
 import { getPersistenceManager } from "@/core/database/supabase";
 import { generateId } from "@/core/database/local/local-storage";
@@ -23,6 +24,7 @@ import { SummaryCard } from "@/shared/components/ui/SummaryCard";
 import { FxRateErrorBanner } from "@/shared/components/ui/FxRateErrorBanner";
 import { Wallet, ArrowLeftRight } from "lucide-react";
 import { Modal } from "@/shared/components/ui/Modal";
+import { UsdCashReconciliationReport } from "./UsdCashReconciliationReport";
 
 const HISTORY_PREVIEW_LIMIT = 5;
 
@@ -222,7 +224,7 @@ function FxHistoryTable({
 }
 
 export function StockCashFlowSection() {
-  const { stockData, services, refresh } = usePortfolio();
+  const { data, stockData, optionsData, services, refresh } = usePortfolio();
   const [depositForm, setDepositForm] = useState<DepositForm>(emptyDepositForm);
   const [fxForm, setFxForm] = useState<FxForm>(emptyFxForm);
   const [editingDepositId, setEditingDepositId] = useState<string | null>(null);
@@ -253,6 +255,17 @@ export function StockCashFlowSection() {
     if (!sgd || !usd) return null;
     return calculateStockFxRate(sgd, usd);
   }, [fxForm.sgdAmount, fxForm.usdAmount]);
+
+  const usdCashReconciliation = useMemo(() => {
+    if (!data || !stockData) return null;
+    return buildUsCashReconciliationReport({
+      contributions: data.contributions,
+      fxConversions: stockData.cashFlow.fxConversions,
+      stockTransactions: stockData.transactions,
+      fxRate: stockData.fxRate,
+      optionsTrades: optionsData?.trades ?? [],
+    });
+  }, [data, stockData, optionsData?.trades]);
 
   const resetDepositForm = () => {
     setEditingDepositId(null);
@@ -385,6 +398,10 @@ export function StockCashFlowSection() {
           />
         </div>
       </section>
+
+      {usdCashReconciliation && (
+        <UsdCashReconciliationReport report={usdCashReconciliation} />
+      )}
 
       <section className="grid gap-8 lg:grid-cols-2">
         <div className="space-y-4 rounded-2xl border border-surface-border/80 bg-surface/30 p-5">

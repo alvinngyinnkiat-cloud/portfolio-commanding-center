@@ -7,6 +7,7 @@ import { ManualValuesSettings } from "./ManualValuesSettings";
 import { ContributionTransactionsTable } from "./ContributionTransactionsTable";
 import { GoalsTable } from "./GoalsTable";
 import { DailySnapshotTrigger } from "./DailySnapshotTrigger";
+import { DiagnosticsSettings } from "./DiagnosticsSettings";
 
 export function SettingsView() {
   const tabs = useMemo<TabItem[]>(
@@ -53,6 +54,18 @@ export function SettingsView() {
             subtitle="Manual capture now · Auto 11:59pm SGT prepared (client poll; server cron later)"
           >
             <DailySnapshotTrigger />
+          </Card>
+        ),
+      },
+      {
+        id: "diagnostics",
+        label: "Diagnostics",
+        content: (
+          <Card
+            title="Diagnostics"
+            subtitle="Reconciliation and audit tools for portfolio cash flows"
+          >
+            <DiagnosticsSettings />
           </Card>
         ),
       },
