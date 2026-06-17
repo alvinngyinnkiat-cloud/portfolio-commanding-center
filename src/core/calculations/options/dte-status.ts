@@ -23,10 +23,22 @@ export function dteStatusSortOrder(status: OptionsDteStatus): number {
 
 /** Lowest DTE first — trades requiring attention surface at the top. */
 export function compareOpenTradesByDte(
-  a: { daysToExpiration: number },
-  b: { daysToExpiration: number }
+  a: {
+    daysToExpiration: number;
+    trade: { expirationDate: string; underlying: string };
+  },
+  b: {
+    daysToExpiration: number;
+    trade: { expirationDate: string; underlying: string };
+  }
 ): number {
-  return a.daysToExpiration - b.daysToExpiration;
+  const byDte = a.daysToExpiration - b.daysToExpiration;
+  if (byDte !== 0) return byDte;
+
+  const byExpiration = a.trade.expirationDate.localeCompare(b.trade.expirationDate);
+  if (byExpiration !== 0) return byExpiration;
+
+  return a.trade.underlying.localeCompare(b.trade.underlying);
 }
 
 /** Newest open date first — transaction history tables show latest entries at the top. */

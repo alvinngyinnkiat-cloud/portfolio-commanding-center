@@ -43,6 +43,12 @@ export function dteStatusLabel(status: OptionsDteStatus): string {
   return "Normal";
 }
 
+export function dteWarningColorClass(daysToExpiration: number): string {
+  if (daysToExpiration <= 7) return "text-accent-red";
+  if (daysToExpiration <= 14) return "text-amber-300";
+  return "text-slate-400";
+}
+
 export function dteStatusBadgeClass(status: OptionsDteStatus): string {
   if (status === "ACTION_REQUIRED") return "bg-accent-red/15 text-accent-red";
   if (status === "WATCH") return "bg-amber-500/15 text-amber-300";

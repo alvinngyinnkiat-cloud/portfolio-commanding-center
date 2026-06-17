@@ -7,7 +7,7 @@ import {
   buildStackedOptionPrice,
   calculateOptionDollarValue,
   calculatePerShareOptionPrice,
-  compareOpenTradesByOpenDate,
+  compareOpenTradesByDte,
   formatOptionsTradeDate,
   getOriginalContracts,
   getRemainingContracts,
@@ -36,6 +36,7 @@ import {
 } from "@/shared/components/ui/data-table";
 import {
   breakevenDiffColorClass,
+  dteWarningColorClass,
   formatSignedPercent,
   formatSignedUsdCompact,
   plColorClass,
@@ -342,6 +343,7 @@ function OpenTradesTable({
                     <StackedValue
                       primary={formatOptionsTradeDate(row.trade.expirationDate)}
                       secondary={`${row.daysToExpiration} DTE`}
+                      secondaryClassName={dteWarningColorClass(row.daysToExpiration)}
                     />
                   </td>
                   <td className={dataTableTdRightClass}>{originalContracts}</td>
@@ -422,17 +424,17 @@ export function OpenTradesTab({
 
   const personalRows = useMemo(
     () =>
-      [...rows.filter((row) => row.trade.tradeType === "personal")].sort(
-        compareOpenTradesByOpenDate
-      ),
+      rows
+        .filter((row) => row.trade.tradeType === "personal")
+        .sort(compareOpenTradesByDte),
     [rows]
   );
 
   const sharedRows = useMemo(
     () =>
-      [...rows.filter((row) => row.trade.tradeType === "shared")].sort(
-        compareOpenTradesByOpenDate
-      ),
+      rows
+        .filter((row) => row.trade.tradeType === "shared")
+        .sort(compareOpenTradesByDte),
     [rows]
   );
 

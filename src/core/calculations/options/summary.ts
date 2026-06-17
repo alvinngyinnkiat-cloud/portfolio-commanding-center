@@ -61,7 +61,7 @@ import {
 import { buildTradeEconomicsFromTrade } from "./trade-economics";
 import { calculateNetOptionsMarketValueUsd } from "./net-options-market-value";
 import {
-  compareOpenTradesByOpenDate,
+  compareOpenTradesByDte,
   deriveDteStatus,
   summarizeActionRequiredOpenRisk,
 } from "./dte-status";
@@ -138,7 +138,7 @@ export function buildOpenTradeRows(
       };
     });
 
-  return rows.sort(compareOpenTradesByOpenDate);
+  return rows.sort(compareOpenTradesByDte);
 }
 
 export function buildClosedTradeRows(trades: OptionsTrade[]): OptionsClosedTradeRow[] {
