@@ -11,6 +11,7 @@ export type {
 } from "./reconciliation";
 export type { UsCashDiagnosticsReport } from "./diagnostics";
 export type { OptionsReconciliationTotals } from "./options-cash-flow";
+export type { OptionsCashEngineAudit } from "./options-cash-engine-audit";
 export type {
   BrokerCollateralComparison,
   OpenOptionCollateralRow,
@@ -38,6 +39,12 @@ export {
   computeNetOpenCashContributionUsd,
   summarizeOpenOptionCollateral,
 } from "./open-option-collateral-audit";
+export {
+  buildOptionsCashEngineAudit,
+  computeCashFromPremiumFormulaUsd,
+  detectOptionsCashDoubleCount,
+  sumAllOptionsRealizedPlUsd,
+} from "./options-cash-engine-audit";
 export {
   buildOptionCashAuditRows,
   computeOptionAuditCashImpactUsd,

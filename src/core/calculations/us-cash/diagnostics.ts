@@ -12,6 +12,10 @@ import {
   summarizeOpenOptionCollateral,
 } from "./open-option-collateral-audit";
 import {
+  buildOptionsCashEngineAudit,
+  type OptionsCashEngineAudit,
+} from "./options-cash-engine-audit";
+import {
   buildUsCashReconciliationReport,
   reconcileUsCashFromReport,
   type UsCashReconciliationReport,
@@ -24,6 +28,7 @@ export interface UsCashDiagnosticsReport extends UsCashReconciliationReport {
   differenceUsd: number;
   openCollateral: OpenOptionCollateralRow[];
   openCollateralSummary: OpenOptionCollateralSummary;
+  optionsCashEngineAudit: OptionsCashEngineAudit;
   optionAudit: OptionCashAuditRow[];
   optionAuditSummary: OptionCashAuditSummary;
 }
@@ -36,6 +41,9 @@ export function buildUsCashDiagnosticsReport(
   const actualUsdCash = base.currentUsdCash;
   const openCollateral = buildOpenOptionCollateralRows(input.optionsTrades ?? []);
   const openCollateralSummary = summarizeOpenOptionCollateral(openCollateral);
+  const optionsCashEngineAudit = buildOptionsCashEngineAudit(
+    input.optionsTrades ?? []
+  );
   const optionAudit = buildOptionCashAuditRows(input.optionsTrades ?? []);
   const optionAuditSummary = summarizeOptionCashAudit(optionAudit);
 
@@ -46,6 +54,7 @@ export function buildUsCashDiagnosticsReport(
     differenceUsd: actualUsdCash - expectedUsdCash,
     openCollateral,
     openCollateralSummary,
+    optionsCashEngineAudit,
     optionAudit,
     optionAuditSummary,
   };

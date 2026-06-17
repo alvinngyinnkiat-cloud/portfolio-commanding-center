@@ -103,6 +103,7 @@ export function UsdCashDiagnosticsPanel() {
   }
 
   const formula = buildUsCashReconciliationFormula(report);
+  const engineAudit = report.optionsCashEngineAudit;
   const cashMismatch = Math.abs(report.differenceUsd) >= 0.01;
   const summaryMismatch =
     Math.abs(report.optionAuditSummary.differenceUsd) >= 0.01;
@@ -221,6 +222,140 @@ export function UsdCashDiagnosticsPanel() {
           >
             <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
             <span>Cash reconciliation mismatch</span>
+          </div>
+        )}
+      </div>
+
+      <div className="rounded-2xl border border-surface-border/80 bg-surface-card/90 p-5 space-y-6">
+        <div>
+          <h4 className="text-sm font-semibold text-white">
+            USD Cash Engine Audit
+          </h4>
+          <p className="mt-1 text-sm text-slate-500">
+            Verify the Module 2 + Module 5 shared USD cash engine uses broker
+            premium flows only — realized P/L is reporting and must not be added
+            to cash again.
+          </p>
+        </div>
+
+        <div className="grid gap-4 lg:grid-cols-2">
+          <SectionBlock title="Expected Broker Cash Flow">
+            <ReportRow
+              label="Open: Premium Received (at open)"
+              value={engineAudit.engineOpenCashFlowUsd}
+              sublabel="Cash += Premium − Opening Fees (credit) or −(Premium + Fees) (debit)"
+            />
+            <ReportRow
+              label="Close: Normal close cash"
+              value={engineAudit.engineNormalCloseCashFlowUsd}
+              sublabel="Cash −= Close Debit and Close Fees"
+            />
+            <ReportRow
+              label="Close: Manual P/L adjustments"
+              value={engineAudit.engineManualCloseCashFlowUsd}
+              sublabel="Reconciles manual broker P/L to open premium already counted"
+            />
+          </SectionBlock>
+
+          <SectionBlock title="Premium Formula Components">
+            <ReportRow
+              label="Total Premium Received"
+              value={engineAudit.totalPremiumReceivedUsd}
+            />
+            <ReportRow
+              label="Total Close Debits"
+              value={engineAudit.totalCloseDebitsUsd}
+            />
+            <ReportRow
+              label="Total Opening Fees"
+              value={engineAudit.totalOpeningFeesUsd}
+            />
+            <ReportRow
+              label="Total Closing Fees"
+              value={engineAudit.totalClosingFeesUsd}
+            />
+          </SectionBlock>
+        </div>
+
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          <SummaryCard
+            label="Cash from Options (Premium Formula)"
+            value={formatUsd(engineAudit.cashFromPremiumFormulaUsd)}
+            subValue="Premium − Close Debits − Opening Fees − Closing Fees"
+            icon={<Wallet size={18} />}
+            compact
+          />
+          <SummaryCard
+            label="Cash from Options (Realized P/L Sum)"
+            value={formatUsd(engineAudit.cashFromRealizedPlSumUsd)}
+            subValue="Sum of all realized P/L — reporting only"
+            icon={<TrendingUp size={18} />}
+            compact
+          />
+          <SummaryCard
+            label="Engine Actual (Module 2 + 5)"
+            value={formatUsd(engineAudit.engineNetOptionsCashUsd)}
+            subValue="Shared USD cash engine net options cash"
+            icon={<Layers size={18} />}
+            highlight
+            compact
+          />
+        </div>
+
+        <SectionBlock title="Engine vs Formula Check">
+          <ReportRow
+            label="Premium formula + manual adjustments"
+            value={engineAudit.reconciliationOptionsCashUsd}
+          />
+          <ReportRow
+            label="Engine net options cash"
+            value={engineAudit.engineNetOptionsCashUsd}
+          />
+          <ReportRow
+            label="Premium formula vs realized P/L"
+            value={engineAudit.premiumFormulaVsRealizedPlUsd}
+            sublabel="Difference between the two comparison totals"
+          />
+          <div className="py-2 text-sm">
+            <span className="text-slate-400">Engine matches premium formula: </span>
+            <span
+              className={
+                engineAudit.engineMatchesPremiumFormula
+                  ? "font-medium text-accent-green"
+                  : "font-medium text-amber-300"
+              }
+            >
+              {engineAudit.engineMatchesPremiumFormula ? "YES" : "NO"}
+            </span>
+          </div>
+          <div className="py-2 text-sm">
+            <span className="text-slate-400">Engine equals realized P/L sum only: </span>
+            <span
+              className={
+                engineAudit.engineMatchesRealizedPlSum
+                  ? "font-medium text-slate-300"
+                  : "font-medium text-slate-500"
+              }
+            >
+              {engineAudit.engineMatchesRealizedPlSum ? "YES" : "NO"}
+            </span>
+          </div>
+        </SectionBlock>
+
+        {engineAudit.optionCashDoubleCountDetected && (
+          <div
+            className="flex items-start gap-2 rounded-lg border border-accent-red/50 bg-accent-red/10 px-4 py-3 text-sm text-accent-red"
+            role="alert"
+          >
+            <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+            <div>
+              <p className="font-semibold">OPTION CASH DOUBLE COUNT DETECTED</p>
+              <p className="mt-1">
+                Premium-based cash and realized P/L appear to both be included in
+                the engine. Amount double counted:{" "}
+                {formatUsd(engineAudit.doubleCountAmountUsd)}
+              </p>
+            </div>
           </div>
         )}
       </div>
