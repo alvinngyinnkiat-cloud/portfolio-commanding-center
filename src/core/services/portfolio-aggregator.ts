@@ -161,6 +161,7 @@ export class PortfolioAggregator {
       personalCashContributionSgd:
         calculatePersonalCashContributionSgd(contributions),
       optionsValueSgd: 0,
+      netOptionsMarketValueSgd: stockSummary.netOptionsMarketValueSgd,
     };
   }
 

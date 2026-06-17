@@ -220,6 +220,7 @@ function assembleDashboardMetrics(input: {
     personalCashContributionSgd:
       calculatePersonalCashContributionSgd(contributions),
     optionsValueSgd: 0,
+    netOptionsMarketValueSgd: stockSummary.netOptionsMarketValueSgd,
   });
 
   return { metrics, stockSummary, cryptoSummary, clientSummary };

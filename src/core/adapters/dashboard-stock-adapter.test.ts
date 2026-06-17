@@ -198,6 +198,7 @@ describe("deriveDashboardStockValues", () => {
       cryptoAvailableTradingCashSgd: 0,
       personalCashContributionSgd: 0,
       optionsValueSgd: 0,
+      netOptionsMarketValueSgd: null,
     });
 
     expect(metrics.usStockContributionSgd).toBe(module2.usStockContributionSgd);

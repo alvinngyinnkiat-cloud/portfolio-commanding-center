@@ -64,17 +64,51 @@ function derivePersonalCashSgd(
   breakdown: DailySnapshot["breakdown"],
   clientPortfolio: number
 ): number {
+  if (typeof raw.totalCashSgd === "number") {
+    return Math.max(0, num(raw.totalCashSgd));
+  }
   if (typeof raw.personalCashSgd === "number") {
     return Math.max(0, num(raw.personalCashSgd));
+  }
+  if (breakdown?.totalCashSgd !== undefined) {
+    return Math.max(0, num(breakdown.totalCashSgd));
   }
   if (breakdown?.personalCashSgd !== undefined) {
     return Math.max(0, num(breakdown.personalCashSgd));
   }
-  const legacyCash = num(
-    raw.cashSgd,
-    breakdown?.totalCashSgd ?? breakdown?.personalCashSgd
-  );
+  const legacyCash = num(raw.cashSgd, breakdown?.personalCashSgd);
   return Math.max(0, legacyCash - Math.min(clientPortfolio, legacyCash));
+}
+
+function resolveSnapshotTotalCashSgd(
+  raw: Partial<DailySnapshot>,
+  breakdown: DailySnapshot["breakdown"],
+  clientPortfolio: number
+): number {
+  if (typeof raw.totalCashSgd === "number") {
+    return Math.max(0, num(raw.totalCashSgd));
+  }
+  if (breakdown?.totalCashSgd !== undefined) {
+    return Math.max(0, num(breakdown.totalCashSgd));
+  }
+  return derivePersonalCashSgd(raw, breakdown, clientPortfolio);
+}
+
+function resolveSnapshotCryptoHoldingsSgd(raw: Partial<DailySnapshot>): number {
+  if (typeof raw.cryptoHoldingsValueSgd === "number") {
+    return Math.max(0, num(raw.cryptoHoldingsValueSgd));
+  }
+  return Math.max(0, num(raw.cryptoSgd));
+}
+
+function resolveSnapshotNetOptionsSgd(
+  raw: Partial<DailySnapshot>
+): number | null {
+  if (raw.netOptionsMarketValueSgd === null) return null;
+  if (typeof raw.netOptionsMarketValueSgd === "number") {
+    return num(raw.netOptionsMarketValueSgd);
+  }
+  return null;
 }
 
 export function normalizeDailySnapshot(
@@ -84,10 +118,20 @@ export function normalizeDailySnapshot(
   const clientPortfolio = num(raw.clientPortfolio);
   const usStocksEtfSgd = num(raw.usStocksEtfSgd, breakdown?.usStocksEtfSgd);
   const sgStocksSgd = num(raw.sgStocksSgd, breakdown?.sgStocksSgd);
-  const cryptoSgd = num(raw.cryptoSgd, breakdown?.cryptoSgd);
-  const personalCashSgd = derivePersonalCashSgd(raw, breakdown, clientPortfolio);
+  const cryptoHoldingsValueSgd = resolveSnapshotCryptoHoldingsSgd(raw);
+  const totalCashSgd = resolveSnapshotTotalCashSgd(raw, breakdown, clientPortfolio);
+  const personalCashSgd = totalCashSgd;
+  const netOptionsMarketValueSgd = resolveSnapshotNetOptionsSgd(raw);
+  const netOptionsForChart = netOptionsMarketValueSgd ?? 0;
+
   const ownPortfolio =
-    usStocksEtfSgd + sgStocksSgd + cryptoSgd + personalCashSgd;
+    raw.ownPortfolio !== undefined
+      ? num(raw.ownPortfolio)
+      : usStocksEtfSgd +
+        netOptionsForChart +
+        sgStocksSgd +
+        cryptoHoldingsValueSgd +
+        totalCashSgd;
   const totalPortfolio = ownPortfolio + clientPortfolio;
 
   return {
@@ -100,14 +144,18 @@ export function normalizeDailySnapshot(
     totalContribution: num(raw.totalContribution),
     usStocksEtfSgd,
     sgStocksSgd,
-    cryptoSgd,
+    cryptoSgd: cryptoHoldingsValueSgd,
     personalCashSgd,
-    cashSgd: personalCashSgd,
+    cashSgd: totalCashSgd,
+    netOptionsMarketValueSgd,
+    cryptoHoldingsValueSgd,
+    totalCashSgd,
     breakdown: raw.breakdown,
     fxRateUsed: raw.fxRateUsed,
   };
 }
 
+/** Chart series values — standardised daily worth formulas (SGD). */
 export function getSnapshotChartValue(
   snapshot: DailySnapshot,
   series: SnapshotChartSeries
@@ -116,13 +164,19 @@ export function getSnapshotChartValue(
     case "ownPortfolio":
       return snapshot.ownPortfolio;
     case "usStocksEtfSgd":
-      return snapshot.usStocksEtfSgd;
+      return (
+        snapshot.usStocksEtfSgd + (snapshot.netOptionsMarketValueSgd ?? 0)
+      );
     case "sgStocksSgd":
       return snapshot.sgStocksSgd;
     case "cryptoSgd":
-      return snapshot.cryptoSgd;
+      return snapshot.cryptoHoldingsValueSgd ?? snapshot.cryptoSgd;
     case "cashSgd":
-      return snapshot.personalCashSgd;
+      return (
+        snapshot.totalCashSgd ??
+        snapshot.breakdown?.totalCashSgd ??
+        snapshot.personalCashSgd
+      );
     default:
       return snapshot.ownPortfolio;
   }
@@ -184,9 +238,12 @@ export function createDailySnapshot(
     totalContribution: metrics.totalContribution,
     usStocksEtfSgd: metrics.usStocksEtfSgd,
     sgStocksSgd: metrics.sgStocksSgd,
-    cryptoSgd: metrics.cryptoSgd,
-    personalCashSgd: metrics.personalCashSgd,
-    cashSgd: metrics.personalCashSgd,
+    cryptoSgd: metrics.cryptoHoldingsValueSgd,
+    cryptoHoldingsValueSgd: metrics.cryptoHoldingsValueSgd,
+    netOptionsMarketValueSgd: inputs.netOptionsMarketValueSgd,
+    totalCashSgd: metrics.totalCashSgd,
+    personalCashSgd: metrics.totalCashSgd,
+    cashSgd: metrics.totalCashSgd,
     breakdown: buildPortfolioBreakdown(inputs, metrics),
     fxRateUsed: inputs.fxRate,
   });

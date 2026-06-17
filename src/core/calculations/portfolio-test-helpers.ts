@@ -45,6 +45,7 @@ export function emptyModuleContributionInputs(): Pick<
     cryptoAvailableTradingCashSgd: 0,
     personalCashContributionSgd: 0,
     optionsValueSgd: 0,
+    netOptionsMarketValueSgd: null,
     clientStartingCapitalUsd: 0,
     clientStartingCapitalSgd: 0,
     clientRealizedPlUsd: 0,
