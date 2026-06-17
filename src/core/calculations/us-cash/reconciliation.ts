@@ -1,4 +1,6 @@
 import { summarizeMarketTradingCashFlow } from "@/core/calculations/stocks/trading-cash";
+import { buildFxPerformanceMetrics } from "@/core/calculations/stocks/fx-performance";
+import type { FxPerformanceMetrics } from "@/core/calculations/stocks/fx-performance";
 import { buildUsAvailableCashResult } from "./ledger";
 import { summarizeOptionsReconciliationUsd } from "./options-cash-flow";
 import type { UsCashLedgerInput } from "./types";
@@ -19,6 +21,8 @@ export interface UsCashReconciliationReport {
   options: OptionsReconciliationTotals;
   /** D) Current USD cash (shared engine). */
   currentUsdCash: number;
+  /** E) FX performance — informational only, not in portfolio P/L. */
+  fxPerformance: FxPerformanceMetrics;
 }
 
 export interface UsCashReconciliationFormulaLine {
@@ -42,6 +46,7 @@ export function buildUsCashReconciliationReport(
     stockStandaloneFeesUsd: flow.fees,
     options,
     currentUsdCash: result.usAvailableCashUsd,
+    fxPerformance: buildFxPerformanceMetrics(input),
   };
 }
 

@@ -10,6 +10,7 @@ export interface UsCashLedgerInput {
   fxRate: number | null;
   /** Options ledger — open and close cash flows drive USD cash reconciliation. */
   optionsTrades?: OptionsTrade[];
+  brokerUsdCashOverride?: number | null;
 }
 
 export interface UsAvailableCashBreakdown {

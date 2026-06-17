@@ -22,7 +22,7 @@ import { Select } from "@/shared/components/ui/Select";
 import { Button } from "@/shared/components/ui/Button";
 import { SummaryCard } from "@/shared/components/ui/SummaryCard";
 import { FxRateErrorBanner } from "@/shared/components/ui/FxRateErrorBanner";
-import { Wallet, ArrowLeftRight } from "lucide-react";
+import { Wallet, ArrowLeftRight, TrendingUp, TrendingDown } from "lucide-react";
 import { Modal } from "@/shared/components/ui/Modal";
 import { UsdCashReconciliationReport } from "./UsdCashReconciliationReport";
 
@@ -264,8 +264,11 @@ export function StockCashFlowSection() {
       stockTransactions: stockData.transactions,
       fxRate: stockData.fxRate,
       optionsTrades: optionsData?.trades ?? [],
+      brokerUsdCashOverride: data.settings.brokerUsdCashOverride,
     });
   }, [data, stockData, optionsData?.trades]);
+
+  const fxPerformance = usdCashReconciliation?.fxPerformance;
 
   const resetDepositForm = () => {
     setEditingDepositId(null);
@@ -395,6 +398,35 @@ export function StockCashFlowSection() {
                 : formatSgd(summary?.sgdCashBalanceSgd ?? 0)
             }
             icon={<Wallet size={18} />}
+          />
+          <SummaryCard
+            label="FX Cost Basis (SGD)"
+            value={formatSgd(fxPerformance?.fxCostBasisSgd ?? 0)}
+            icon={<ArrowLeftRight size={18} />}
+            subValue="Remaining SGD cost of converted USD"
+          />
+          <SummaryCard
+            label="FX Gain/Loss"
+            value={
+              fxRateValid && fxPerformance
+                ? `${fxPerformance.fxGainLossSgd >= 0 ? "+" : "−"}${formatSgd(Math.abs(fxPerformance.fxGainLossSgd))}`
+                : "FX required"
+            }
+            trend={
+              !fxRateValid || !fxPerformance
+                ? "neutral"
+                : fxPerformance.fxGainLossSgd >= 0
+                  ? "positive"
+                  : "negative"
+            }
+            icon={
+              fxPerformance && fxPerformance.fxGainLossSgd >= 0 ? (
+                <TrendingUp size={18} />
+              ) : (
+                <TrendingDown size={18} />
+              )
+            }
+            subValue="Informational only — not in portfolio P/L"
           />
         </div>
       </section>

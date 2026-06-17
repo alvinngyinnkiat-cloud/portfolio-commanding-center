@@ -6,7 +6,40 @@ import {
   buildUsCashReconciliationFormula,
   reconcileUsCashFromReport,
 } from "@/core/calculations/us-cash";
-import { formatUsd } from "@/shared/lib/format";
+import { formatSgd, formatUsd } from "@/shared/lib/format";
+
+function SgdReportRow({
+  label,
+  value,
+  emphasize = false,
+  signed = false,
+}: {
+  label: string;
+  value: number;
+  emphasize?: boolean;
+  signed?: boolean;
+}) {
+  const display = signed
+    ? `${value >= 0 ? "+" : "−"}${formatSgd(Math.abs(value))}`
+    : formatSgd(value);
+
+  return (
+    <div className="flex items-center justify-between gap-4 py-2">
+      <span className="text-sm text-slate-400">{label}</span>
+      <span
+        className={`text-sm tabular-nums ${
+          emphasize
+            ? value >= 0
+              ? "font-semibold text-accent-green"
+              : "font-semibold text-accent-red"
+            : "font-medium text-slate-200"
+        }`}
+      >
+        {display}
+      </span>
+    </div>
+  );
+}
 
 function ReportRow({
   label,
@@ -117,6 +150,23 @@ export function UsdCashReconciliationReport({
             label="Actual USD Cash"
             value={report.currentUsdCash}
             emphasize
+          />
+        </SectionBlock>
+
+        <SectionBlock title="E) FX Performance">
+          <SgdReportRow
+            label="FX Cost Basis"
+            value={report.fxPerformance.fxCostBasisSgd}
+          />
+          <SgdReportRow
+            label="Current USD Value"
+            value={report.fxPerformance.currentUsdValueSgd}
+          />
+          <SgdReportRow
+            label="FX Gain/Loss"
+            value={report.fxPerformance.fxGainLossSgd}
+            emphasize
+            signed
           />
         </SectionBlock>
       </div>
