@@ -101,6 +101,9 @@ export interface StockTrackerSummary {
   usStockContributionSgd: number;
   sgStockContributionSgd: number;
   openPositionCount: number;
+  /** Module 5 — net options market value for chart / US net breakdown */
+  netOptionsMarketValueUsd?: number | null;
+  netOptionsMarketValueSgd?: number | null;
 }
 
 /** Prepared outputs for future Dashboard integration. */

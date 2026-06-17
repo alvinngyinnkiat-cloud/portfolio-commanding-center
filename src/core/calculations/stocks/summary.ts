@@ -176,6 +176,8 @@ export function buildStockTrackerSummary(
     usStockContributionSgd: contribution.usStockContributionSgd,
     sgStockContributionSgd: contribution.sgStockContributionSgd,
     openPositionCount: holdingsSummary.openPositionCount,
+    netOptionsMarketValueUsd,
+    netOptionsMarketValueSgd,
   };
 }
 

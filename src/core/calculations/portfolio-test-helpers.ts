@@ -21,6 +21,7 @@ export function emptyModuleContributionInputs(): Pick<
   | "cryptoAvailableTradingCashSgd"
   | "personalCashContributionSgd"
   | "optionsValueSgd"
+  | "netOptionsMarketValueSgd"
   | "clientStartingCapitalUsd"
   | "clientStartingCapitalSgd"
   | "clientRealizedPlUsd"

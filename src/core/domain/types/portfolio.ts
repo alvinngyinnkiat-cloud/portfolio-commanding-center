@@ -61,7 +61,7 @@ export interface PortfolioInputs {
   /** @deprecated Options unrealised P/L is not added separately — embedded in stock value */
   optionsValueSgd: number;
   /** Module 5 — net options market value at capture (USD → SGD) for chart series */
-  netOptionsMarketValueSgd: number | null;
+  netOptionsMarketValueSgd?: number | null;
 }
 
 export interface PortfolioMetrics {

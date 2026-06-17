@@ -164,9 +164,7 @@ export function getSnapshotChartValue(
     case "ownPortfolio":
       return snapshot.ownPortfolio;
     case "usStocksEtfSgd":
-      return (
-        snapshot.usStocksEtfSgd + (snapshot.netOptionsMarketValueSgd ?? 0)
-      );
+      return (snapshot.usStocksEtfSgd || 0) + (snapshot.netOptionsMarketValueSgd || 0);
     case "sgStocksSgd":
       return snapshot.sgStocksSgd;
     case "cryptoSgd":
