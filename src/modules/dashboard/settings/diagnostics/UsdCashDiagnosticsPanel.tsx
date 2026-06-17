@@ -14,12 +14,17 @@ function ReportRow({
   value,
   emphasize = false,
   sublabel,
+  format = "usd",
 }: {
   label: string;
   value: number;
   emphasize?: boolean;
   sublabel?: string;
+  format?: "usd" | "count";
 }) {
+  const display =
+    format === "count" ? String(value) : formatUsd(value);
+
   return (
     <div className="flex items-center justify-between gap-4 py-2">
       <div>
@@ -33,7 +38,7 @@ function ReportRow({
           emphasize ? "font-semibold text-white" : "font-medium text-slate-200"
         }`}
       >
-        {formatUsd(value)}
+        {display}
       </span>
     </div>
   );
@@ -135,6 +140,85 @@ export function UsdCashDiagnosticsPanel() {
             value={report.options.closedTradesPremiumUsd}
           />
         </SectionBlock>
+      </div>
+
+      <div className="space-y-4">
+        <SectionBlock title="Open Trades Cash">
+          <ReportRow
+            label="Open Trades Count"
+            value={report.openTradesCashSummary.openTradesCount}
+            format="count"
+          />
+          <ReportRow
+            label="Premium Received"
+            value={report.openTradesCashSummary.premiumReceivedUsd}
+          />
+          <div className="flex items-center justify-between gap-4 py-2">
+            <div>
+              <span className="text-sm text-slate-400">Current Market Value</span>
+              {report.openTradesCashSummary.currentMarketValueUsd == null && (
+                <p className="text-xs text-slate-600">
+                  Mark open trades to include market value
+                </p>
+              )}
+            </div>
+            <span className="text-sm font-medium tabular-nums text-slate-200">
+              {report.openTradesCashSummary.currentMarketValueUsd != null
+                ? formatUsd(report.openTradesCashSummary.currentMarketValueUsd)
+                : "—"}
+            </span>
+          </div>
+          <ReportRow
+            label="Net Open Cash Contribution"
+            value={report.openTradesCashSummary.netOpenCashContributionUsd}
+            emphasize
+          />
+        </SectionBlock>
+
+        <div className="overflow-x-auto rounded-xl border border-surface-border/60">
+          <table className="w-full min-w-[640px] text-sm">
+            <thead className="bg-surface/60 text-xs uppercase text-slate-500">
+              <tr>
+                <th className="px-3 py-3 text-left">Ticker</th>
+                <th className="px-3 py-3 text-right">Premium Received</th>
+                <th className="px-3 py-3 text-right">Current Value</th>
+                <th className="px-3 py-3 text-right">Cash Already Received</th>
+              </tr>
+            </thead>
+            <tbody>
+              {report.openTradesCash.length === 0 ? (
+                <tr>
+                  <td
+                    colSpan={4}
+                    className="px-4 py-8 text-center text-slate-500"
+                  >
+                    No open option trades.
+                  </td>
+                </tr>
+              ) : (
+                report.openTradesCash.map((row) => (
+                  <tr
+                    key={row.tradeId}
+                    className="border-b border-surface-border/40 text-slate-300 last:border-0"
+                  >
+                    <td className="px-3 py-2.5 font-medium">{row.ticker}</td>
+                    <td className="px-3 py-2.5 text-right tabular-nums">
+                      {formatUsd(row.premiumReceivedUsd)}
+                    </td>
+                    <td className="px-3 py-2.5 text-right tabular-nums">
+                      {row.currentValueUsd != null
+                        ? formatUsd(row.currentValueUsd)
+                        : "—"}
+                    </td>
+                    <td className="px-3 py-2.5 text-right tabular-nums font-medium">
+                      {formatUsd(row.cashAlreadyReceivedUsd)}
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
       </div>
 
       <div className="rounded-2xl border border-surface-border/80 bg-surface-card/90 p-5">
