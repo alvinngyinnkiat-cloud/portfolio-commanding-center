@@ -154,14 +154,14 @@ export function MonthlyContributionChart({
               />
               <Bar
                 dataKey="usdTradingCashSgd"
-                name="USD Trading Cash"
+                name="US Available Cash"
                 stackId="cash"
                 fill="#3b82f6"
                 radius={[0, 0, 0, 0]}
               />
               <Bar
                 dataKey="sgdTradingCashSgd"
-                name="SGD Trading Cash"
+                name="SG Available Cash"
                 stackId="cash"
                 fill="#8b5cf6"
               />

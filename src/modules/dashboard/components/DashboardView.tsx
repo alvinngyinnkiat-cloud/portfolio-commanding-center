@@ -10,7 +10,6 @@ import { AssetAllocationChart } from "./AssetAllocationChart";
 import { DailyPortfolioChart } from "./DailyPortfolioChart";
 import { MonthlyContributionChart } from "./MonthlyContributionChart";
 import { GoalProgressCards } from "./GoalProgressCards";
-import { OverdeploymentAlert } from "./OverdeploymentAlert";
 import { isEmptyPortfolio } from "@/shared/lib/portfolio-empty";
 import {
   Wallet,
@@ -93,8 +92,6 @@ export function DashboardView() {
           Read-only overview · All values in SGD · Edit in Settings
         </p>
       </header>
-
-      <OverdeploymentAlert overdeploymentUsd={metrics.usdOverdeploymentUsd} />
 
       {isEmptyPortfolio(metrics) && (
         <div className="rounded-2xl border border-dashed border-surface-border bg-surface/40 px-6 py-5 text-center">

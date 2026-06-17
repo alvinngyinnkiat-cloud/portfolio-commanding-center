@@ -49,7 +49,6 @@ function metrics(
     ownPL: 15_845,
     ownPLPercent: 97.81,
     ownPortfolio: 32_045,
-    usdOverdeploymentUsd: 0,
     ...overrides,
   };
 }

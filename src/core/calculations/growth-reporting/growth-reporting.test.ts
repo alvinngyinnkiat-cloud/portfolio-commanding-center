@@ -72,7 +72,6 @@ function metrics(overrides: Partial<PortfolioMetrics> = {}): PortfolioMetrics {
     ownPL: 2_000,
     ownPLPercent: 25,
     ownPortfolio: 10_000,
-    usdOverdeploymentUsd: 0,
     ...overrides,
   };
 }

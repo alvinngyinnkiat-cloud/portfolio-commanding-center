@@ -144,14 +144,6 @@ export function calculateContributionTotalSgd(
   }, 0);
 }
 
-export function calculateUsdOverdeployment(
-  usdHoldingsUsd: number,
-  usdTradingCashUsd: number
-): number {
-  const excess = usdHoldingsUsd - usdTradingCashUsd;
-  return excess > 0 ? excess : 0;
-}
-
 /** Cash balances derived from contribution transactions and stock FX conversions. */
 export function calculateCashBalancesFromContributions(
   contributions: ContributionTransaction[],

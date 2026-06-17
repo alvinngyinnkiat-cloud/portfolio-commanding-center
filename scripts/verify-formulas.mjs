@@ -95,8 +95,8 @@ const expectedCryptoCash = 5000;
 const ok6a = Math.abs(cash.usdTradingCashUsd - expectedUsdCash) < 0.01;
 const ok6b = Math.abs(cash.sgdTradingCashSgd - expectedSgdCash) < 0.01;
 const ok6c = Math.abs(cash.cryptoCashSgd - expectedCryptoCash) < 0.01;
-console.log(`${ok6a ? "PASS" : "FAIL"} USD Trading Cash from contributions`);
-console.log(`${ok6b ? "PASS" : "FAIL"} SGD Trading Cash from contributions`);
+console.log(`${ok6a ? "PASS" : "FAIL"} US Available Cash from contributions`);
+console.log(`${ok6b ? "PASS" : "FAIL"} SG Available Cash from contributions`);
 console.log(`${ok6c ? "PASS" : "FAIL"} Crypto Cash from contributions`);
 if (!ok6a || !ok6b || !ok6c) failed++;
 
@@ -106,14 +106,6 @@ const clientSgd = usdToSgd(clientUsd, fx);
 const ok7 = Math.abs(clientSgd - 20250) < 0.01;
 console.log(`${ok7 ? "PASS" : "FAIL"} Client Portfolio SGD = USD × FX (${clientSgd})`);
 if (!ok7) failed++;
-
-// Overdeployment
-const holdings = 11000;
-const cashUsd = 10000;
-const over = holdings > cashUsd ? holdings - cashUsd : 0;
-const ok8 = over === 1000;
-console.log(`${ok8 ? "PASS" : "FAIL"} Overdeployment = 1000 USD`);
-if (!ok8) failed++;
 
 // Full transaction history regression (user-reported bug)
 const userTxs = [
@@ -128,8 +120,8 @@ const userCash = calculateCashBalancesFromContributions(userTxs, fx);
 const ok9 = Math.abs(userCash.usdTradingCashUsd - 13333.34) < 0.01;
 const ok10 = Math.abs(userCash.sgdTradingCashSgd - 0) < 0.01;
 const ok11 = Math.abs(userCash.cryptoCashSgd - 6000) < 0.01;
-console.log(`${ok9 ? "PASS" : "FAIL"} User history USD Trading Cash = 13333.34`);
-console.log(`${ok10 ? "PASS" : "FAIL"} User history SGD Trading Cash = 0`);
+console.log(`${ok9 ? "PASS" : "FAIL"} User history US Available Cash = 13333.34`);
+console.log(`${ok10 ? "PASS" : "FAIL"} User history SG Available Cash = 0`);
 console.log(`${ok11 ? "PASS" : "FAIL"} User history Crypto Cash = 6000`);
 if (!ok9 || !ok10 || !ok11) failed++;
 

@@ -65,7 +65,7 @@ function CashDeploymentGuide({
     <div className="rounded-xl border border-surface-border/60 bg-surface/40 p-4">
       <h4 className="text-sm font-semibold text-white">Cash Deployment Guide</h4>
       <p className="mt-1 text-xs text-slate-500">
-        Suggested allocation of available trading cash across holding tiers
+        Suggested allocation of Crypto Cash across holding tiers
       </p>
 
       <div className="mt-4 grid gap-3 sm:grid-cols-2">

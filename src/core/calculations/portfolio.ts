@@ -9,7 +9,6 @@ import {
   aggregateTotalPortfolioValue,
   aggregatePLPercent,
 } from "./dashboard-aggregation";
-import { calculateUsdOverdeployment } from "./contribution-cash";
 import { normalizeCashBalances } from "@/core/domain/defaults";
 import { calculateClientOwnershipPercent } from "./cash-split";
 
@@ -93,11 +92,6 @@ export function calculatePortfolioMetrics(
     totalPortfolio
   );
 
-  const usdOverdeploymentUsd = calculateUsdOverdeployment(
-    usStocksEtfUsd,
-    usdTradingCashUsd
-  );
-
   return {
     usStocksEtfSgd,
     usStocksEtfUsd,
@@ -138,6 +132,5 @@ export function calculatePortfolioMetrics(
     ownPL: totalPL,
     ownPLPercent: totalPLPercent,
     ownPortfolio,
-    usdOverdeploymentUsd,
   };
 }

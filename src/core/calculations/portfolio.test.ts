@@ -53,7 +53,6 @@ describe("calculatePortfolioMetrics capital model", () => {
     expect(metrics.cryptoAvailableTradingCashSgd).toBe(2_000);
     expect(metrics.ownPortfolio).toBe(metrics.totalPortfolioValue);
     expect(metrics.ownPL).toBe(metrics.totalPL);
-    expect(metrics.usdOverdeploymentUsd).toBe(2_000);
   });
 
   it("Own Portfolio = Total Portfolio − Client Equity", () => {

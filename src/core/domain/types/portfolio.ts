@@ -115,7 +115,6 @@ export interface PortfolioMetrics {
   ownPLPercent: number;
   /** @deprecated use totalPortfolioValue — kept for goal/snapshot compatibility */
   ownPortfolio: number;
-  usdOverdeploymentUsd: number;
 }
 
 export interface PortfolioBreakdown {

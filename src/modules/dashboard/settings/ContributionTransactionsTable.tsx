@@ -92,13 +92,13 @@ export function ContributionTransactionsTable() {
 
       <div className="grid gap-3 rounded-xl border border-surface-border/60 bg-surface/40 p-4 sm:grid-cols-3">
         <div>
-          <p className="text-xs font-medium text-slate-500">USD Trading Cash</p>
+          <p className="text-xs font-medium text-slate-500">US Available Cash</p>
           <p className="mt-1 text-sm font-semibold text-white">
             {fxRateValid ? formatUsd(cashBalances.usdTradingCashUsd) : "—"}
           </p>
         </div>
         <div>
-          <p className="text-xs font-medium text-slate-500">SGD Trading Cash</p>
+          <p className="text-xs font-medium text-slate-500">SG Available Cash</p>
           <p className="mt-1 text-sm font-semibold text-white">
             {fxRateValid ? formatSgd(cashBalances.sgdTradingCashSgd) : "—"}
           </p>
