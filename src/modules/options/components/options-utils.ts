@@ -9,11 +9,11 @@ import type { TargetExitKind } from "@/core/calculations/options/open-trade-disp
 import { coerceNumber } from "@/shared/lib/coerce-number";
 
 export function plColorClass(value: number | null | undefined, missing = false): string {
-  if (missing) return "text-slate-300";
+  if (missing) return "text-slate-500";
   const n = coerceNumber(value);
-  if (n > 0) return "text-emerald-400";
-  if (n < 0) return "text-accent-red";
-  return "text-slate-300";
+  if (n > 0) return "text-accent-green font-medium";
+  if (n < 0) return "text-accent-red font-medium";
+  return "text-white";
 }
 
 export function plTrend(

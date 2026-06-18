@@ -40,6 +40,7 @@ import {
   formatSignedPercent,
   formatSignedUsdCompact,
   plColorClass,
+  plTrend,
 } from "./options-utils";
 import { usePortfolio } from "@/context/PortfolioContext";
 
@@ -230,7 +231,12 @@ function CompactBreakevenCell({
 function SectionSummaryStrip({
   items,
 }: {
-  items: Array<{ label: string; value: string; subValue?: string }>;
+  items: Array<{
+    label: string;
+    value: string;
+    subValue?: string;
+    trend?: "positive" | "negative" | "neutral";
+  }>;
 }) {
   return (
     <div
@@ -247,9 +253,21 @@ function SectionSummaryStrip({
           label={item.label}
           value={item.value}
           subValue={item.subValue}
+          trend={item.trend}
         />
       ))}
     </div>
+  );
+}
+
+function UnrealizedPlCell({ value }: { value: number | null }) {
+  const missing = value == null;
+  return (
+    <td className={dataTableTdRightClass}>
+      <span className={plColorClass(value ?? 0, missing)}>
+        {missing ? "—" : formatUsd(value)}
+      </span>
+    </td>
   );
 }
 
@@ -369,16 +387,7 @@ function OpenTradesTable({
                   <td className={dataTableTdRightClass}>
                     {formatUsd(scaleMaxRiskForRemaining(row.trade))}
                   </td>
-                  <td
-                    className={`${dataTableTdRightClass} ${plColorClass(
-                      row.unrealizedPlUsd ?? 0,
-                      row.unrealizedPlUsd == null
-                    )}`}
-                  >
-                    {row.unrealizedPlUsd != null
-                      ? formatUsd(row.unrealizedPlUsd)
-                      : "—"}
-                  </td>
+                  <UnrealizedPlCell value={row.unrealizedPlUsd} />
                   <td className={dataTableTdLeftClass}>
                     <div className="flex flex-wrap gap-0.5">
                       <Button size="sm" variant="ghost" onClick={() => onEdit(row)}>
@@ -483,6 +492,7 @@ export function OpenTradesTab({
             {
               label: "Unrealized P/L",
               value: formatUnrealized(personalSummary.totalUnrealizedPlUsd),
+              trend: plTrend(personalSummary.totalUnrealizedPlUsd),
             },
           ]}
         />
@@ -513,14 +523,17 @@ export function OpenTradesTab({
             {
               label: "Total Unrealized P/L",
               value: formatUnrealized(sharedSummary.totalUnrealizedPlUsd),
+              trend: plTrend(sharedSummary.totalUnrealizedPlUsd),
             },
             {
               label: "Your Unrealized P/L",
               value: formatUnrealized(sharedSummary.userUnrealizedPlUsd),
+              trend: plTrend(sharedSummary.userUnrealizedPlUsd),
             },
             {
               label: "Client Unrealized P/L",
               value: formatUnrealized(sharedSummary.clientUnrealizedPlUsd),
+              trend: plTrend(sharedSummary.clientUnrealizedPlUsd),
             },
           ]}
         />
