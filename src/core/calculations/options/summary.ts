@@ -33,6 +33,7 @@ import {
   calculateRiskUtilizationPercent,
   deriveCapacityStatus,
   sumOpenRiskUsd,
+  sumOpenRiskUsdForCapacity,
 } from "./capacity";
 import {
   daysBetween,
@@ -219,9 +220,10 @@ export function buildOptionsCapitalReadiness(
 ): OptionsCapitalReadiness {
   const cash = buildUsCashSnapshot(input, brokerUsdCashOverride);
   const totalOpenRiskUsd = sumOpenRiskUsd(input.optionsTrades);
+  const capacityOpenRiskUsd = sumOpenRiskUsdForCapacity(input.optionsTrades);
   const remainingCapacityUsd = calculateRemainingCapacityUsd(
     cash.usAvailableCashUsd,
-    totalOpenRiskUsd
+    capacityOpenRiskUsd
   );
 
   return {

@@ -20,7 +20,8 @@ import {
   requiresManualMaxRisk,
   resolveClosedTradeRealizedPlUsd,
   resolvePartialCloseRealizedPlUsd,
-  sumOpenRiskUsd,
+  countsTowardCapacityRisk,
+  sumOpenRiskUsdForCapacity,
   getRemainingContracts,
   getOriginalContracts,
   type CloseTradeDraft,
@@ -439,7 +440,7 @@ export function OpenTradeModal({
       cash.usAvailableCashUsd,
       data.settings.brokerUsdCashOverride
     );
-    const openRisk = sumOpenRiskUsd(optionsData.trades);
+    const openRisk = sumOpenRiskUsdForCapacity(optionsData.trades);
     let addRisk = 0;
     if (!editTrade) {
       if (autoRiskPreview != null && autoRiskPreview > 0) {
@@ -447,6 +448,9 @@ export function OpenTradeModal({
       } else if (showManualMaxRisk) {
         const draftRisk = parseFloat(form.maxRiskUsd);
         if (Number.isFinite(draftRisk) && draftRisk > 0) addRisk = draftRisk;
+      }
+      if (!countsTowardCapacityRisk({ expirationDate: form.expirationDate })) {
+        addRisk = 0;
       }
     }
     const projected = calculateRemainingCapacityUsd(
@@ -468,6 +472,7 @@ export function OpenTradeModal({
     autoRiskPreview,
     showManualMaxRisk,
     editTrade,
+    form.expirationDate,
   ]);
 
   const handleStrategyChange = (strategy: OptionsStrategy) => {
@@ -962,7 +967,7 @@ export function OpenTradeModal({
         {capacityPreview && (
           <div className="rounded-xl border border-surface-border/60 bg-surface/40 p-3 text-xs text-slate-400">
             <p>US Available Cash: {formatUsd(capacityPreview.cash)}</p>
-            <p>Current open risk: {formatUsd(capacityPreview.openRisk)}</p>
+            <p>Current open risk (DTE ≤ 45): {formatUsd(capacityPreview.openRisk)}</p>
             {!editTrade && capacityPreview.addRisk > 0 && (
               <p>This trade adds: {formatUsd(capacityPreview.addRisk)}</p>
             )}

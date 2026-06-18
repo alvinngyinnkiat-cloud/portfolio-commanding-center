@@ -188,7 +188,7 @@ export function OptionsSummaryCards() {
         <SummaryCard
           label="Remaining Capacity"
           value={formatUsd(summary.remainingCapacityUsd)}
-          subValue="US cash − open risk"
+          subValue="US cash − open risk DTE ≤ 45"
           trend={plTrend(summary.remainingCapacityUsd)}
           icon={<Gauge size={18} />}
         />

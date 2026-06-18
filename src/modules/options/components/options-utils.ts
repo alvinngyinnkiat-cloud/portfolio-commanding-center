@@ -32,7 +32,7 @@ export function capacityBadgeClass(status: OptionsCapacityStatus): string {
 }
 
 export function capacityLabel(status: OptionsCapacityStatus): string {
-  if (status === "OK") return "OK";
+  if (status === "OK") return "CAN TRADE";
   if (status === "AT_LIMIT") return "AT LIMIT";
   return "NO TRADE";
 }

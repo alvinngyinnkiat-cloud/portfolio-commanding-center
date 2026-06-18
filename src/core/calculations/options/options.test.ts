@@ -42,7 +42,7 @@ describe("options calculations", () => {
 
   it("capacity status thresholds", () => {
     expect(deriveCapacityStatus(100)).toBe("OK");
-    expect(deriveCapacityStatus(0)).toBe("AT_LIMIT");
+    expect(deriveCapacityStatus(0)).toBe("NO_TRADE");
     expect(deriveCapacityStatus(-1)).toBe("NO_TRADE");
   });
 

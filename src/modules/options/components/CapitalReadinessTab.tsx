@@ -31,6 +31,7 @@ export function CapitalReadinessTab() {
         <SummaryCard
           label="Remaining Capacity"
           value={formatUsd(readiness.remainingCapacityUsd)}
+          subValue="US cash − open risk DTE ≤ 45"
           trend={plTrend(readiness.remainingCapacityUsd)}
         />
         <div className="rounded-2xl border border-surface-border/80 bg-surface-card p-5">
@@ -63,8 +64,8 @@ export function CapitalReadinessTab() {
       <div className="rounded-xl border border-surface-border/60 bg-surface/30 p-4 text-sm text-slate-400">
         <p className="font-medium text-slate-300">Rules</p>
         <ul className="mt-2 list-inside list-disc space-y-1">
-          <li>Remaining Capacity = US Available Cash − Total Open Risk</li>
-          <li>&gt; 0 = OK · = 0 = AT LIMIT · &lt; 0 = NO TRADE</li>
+          <li>Remaining Capacity = US Available Cash − Open Risk (DTE ≤ 45)</li>
+          <li>&gt; 0 = OK · ≤ 0 = NO TRADE</li>
           <li>Unrealized P/L and open risk do not change US Available Cash</li>
           <li>No options deposits, withdrawals, or contributions</li>
         </ul>
