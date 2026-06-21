@@ -90,6 +90,14 @@ export function calculateUnrealizedPlPercent(
   return (unrealizedPlUsd / maxRiskUsd) * 100;
 }
 
+export function calculateRiskUsedPercent(
+  unrealizedPlUsd: number | null,
+  maxRiskUsd: number
+): number | null {
+  if (unrealizedPlUsd == null || maxRiskUsd <= 0) return null;
+  return (Math.abs(unrealizedPlUsd) / maxRiskUsd) * 100;
+}
+
 function resolveBreakevenPriceUsd(
   row: Omit<OptionsOpenTradeRow, "dashboard">
 ): number | null {
@@ -161,7 +169,7 @@ function buildDeltaSide(
 export function buildDeltaHealth(trade: OptionsTrade): DashboardDeltaHealth | null {
   if (trade.strategy === "bullPut") {
     const putSide = buildDeltaSide(
-      "Short Put",
+      "",
       trade.openingShortPutDelta,
       trade.currentShortPutDelta,
       "put"
@@ -171,7 +179,7 @@ export function buildDeltaHealth(trade: OptionsTrade): DashboardDeltaHealth | nu
 
   if (trade.strategy === "bearCall") {
     const callSide = buildDeltaSide(
-      "Short Call",
+      "",
       trade.openingShortCallDelta,
       trade.currentShortCallDelta,
       "call"
@@ -181,13 +189,13 @@ export function buildDeltaHealth(trade: OptionsTrade): DashboardDeltaHealth | nu
 
   if (trade.strategy === "ironCondor") {
     const putSide = buildDeltaSide(
-      "Put Side",
+      "PUT SIDE",
       trade.openingPutSideDelta,
       trade.currentPutSideDelta,
       "put"
     );
     const callSide = buildDeltaSide(
-      "Call Side",
+      "CALL SIDE",
       trade.openingCallSideDelta,
       trade.currentCallSideDelta,
       "call"
@@ -264,11 +272,12 @@ export function buildOpenTradeDashboardMetrics(
     ? deriveTradeHealth(daysToExpiration, breakevenDistancePct)
     : null;
 
-  const maxRisk = scaleMaxRiskForRemaining(trade);
+  const maxRiskUsd = scaleMaxRiskForRemaining(trade);
   const unrealizedPlPct = calculateUnrealizedPlPercent(
     unrealizedPlUsd,
-    maxRisk
+    maxRiskUsd
   );
+  const riskUsedPct = calculateRiskUsedPercent(unrealizedPlUsd, maxRiskUsd);
 
   const effectiveTrade = trade;
   const entryCreditUsd = supportsDashboard
@@ -283,7 +292,10 @@ export function buildOpenTradeDashboardMetrics(
     breakevenDistancePct,
     breakevenStatus,
     tradeHealth,
+    unrealizedPlUsd,
     unrealizedPlPct,
+    maxRiskUsd,
+    riskUsedPct,
     deltaHealth: supportsDashboard ? buildDeltaHealth(trade) : null,
     trendHealth: buildTrendHealth(scannerIndicators),
     entryCreditUsd,

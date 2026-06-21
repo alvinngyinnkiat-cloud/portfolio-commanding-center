@@ -8,7 +8,6 @@ import {
   calculatePerShareOptionPrice,
   formatOptionsTradeDate,
   getRemainingContracts,
-  scaleMaxRiskForRemaining,
   supportsOpenTradeDashboard,
 } from "@/core/calculations/options";
 import { formatTradeStrikes } from "@/core/calculations/options/helpers";
@@ -23,6 +22,7 @@ import {
   dashboardTrendColorClass,
   formatDelta,
   formatSignedPercent,
+  formatSignedUsdCompact,
   plColorClass,
 } from "./options-utils";
 
@@ -140,17 +140,22 @@ function DeltaSideBlock({ side }: { side: DeltaSideHealth }) {
         : "text-slate-400";
 
   return (
-    <div className="space-y-0.5 border-t border-surface-border/50 pt-2 first:border-0 first:pt-0">
-      <p className="text-[10px] font-medium uppercase text-slate-500">
-        {side.label}
+    <div className="space-y-1 border-t border-surface-border/50 pt-2 first:border-0 first:pt-0">
+      {side.label ? (
+        <p className="text-[10px] font-medium uppercase text-slate-500">
+          {side.label}
+        </p>
+      ) : null}
+      <p className="text-xs text-slate-400">
+        Opening Delta {formatDelta(side.openingDelta)}
       </p>
       <p className="text-xs text-slate-400">
-        Open {formatDelta(side.openingDelta)} · Now {formatDelta(side.currentDelta)}
+        Current Delta {formatDelta(side.currentDelta)}
       </p>
-      <p className="text-xs">
-        Δ {formatDelta(side.deltaChange)}{" "}
-        <span className={riskClass}>{riskLabel}</span>
+      <p className="text-xs text-slate-400">
+        Delta Change {formatDelta(side.deltaChange)}
       </p>
+      <p className={`text-xs font-medium ${riskClass}`}>{riskLabel}</p>
     </div>
   );
 }
@@ -253,9 +258,7 @@ export function OpenTradeDashboardCard({
               </span>
             )}
           </div>
-          <p className="text-xs text-slate-500">
-            {formatTradeStrikes(trade)} · Risk {formatUsd(scaleMaxRiskForRemaining(trade))}
-          </p>
+          <p className="text-xs text-slate-500">{formatTradeStrikes(trade)}</p>
         </div>
         <div className="flex flex-wrap gap-1">
           <Button size="sm" variant="ghost" onClick={() => onEdit(row)}>
@@ -281,29 +284,32 @@ export function OpenTradeDashboardCard({
               value={dashboard.currentPriceUsd}
               onSave={(v) => saveMonitoring({ underlyingPriceUsd: v })}
             />
-            {trade.strategy === "bullPut" && (
+            {(trade.strategy === "bullPut" || trade.strategy === "bearCall") && (
               <InlineNumberInput
-                label="Current Short Put Δ"
-                value={trade.currentShortPutDelta}
-                onSave={(v) => saveMonitoring({ currentShortPutDelta: v })}
-              />
-            )}
-            {trade.strategy === "bearCall" && (
-              <InlineNumberInput
-                label="Current Short Call Δ"
-                value={trade.currentShortCallDelta}
-                onSave={(v) => saveMonitoring({ currentShortCallDelta: v })}
+                label="Current Delta"
+                value={
+                  trade.strategy === "bullPut"
+                    ? trade.currentShortPutDelta
+                    : trade.currentShortCallDelta
+                }
+                onSave={(v) =>
+                  saveMonitoring(
+                    trade.strategy === "bullPut"
+                      ? { currentShortPutDelta: v }
+                      : { currentShortCallDelta: v }
+                  )
+                }
               />
             )}
             {trade.strategy === "ironCondor" && (
               <>
                 <InlineNumberInput
-                  label="Current Put Side Δ"
+                  label="Current Put Delta"
                   value={trade.currentPutSideDelta}
                   onSave={(v) => saveMonitoring({ currentPutSideDelta: v })}
                 />
                 <InlineNumberInput
-                  label="Current Call Side Δ"
+                  label="Current Call Delta"
                   value={trade.currentCallSideDelta}
                   onSave={(v) => saveMonitoring({ currentCallSideDelta: v })}
                 />
@@ -358,18 +364,41 @@ export function OpenTradeDashboardCard({
             <p className="text-lg font-bold">{dashboard.tradeHealth ?? "—"}</p>
           </MetricCard>
 
-          <MetricCard title="Current P/L %">
+          <MetricCard title="Current P/L">
             <p
-              className={`text-lg font-bold ${plColorClass(
+              className={`text-lg font-bold leading-tight ${plColorClass(
+                dashboard.unrealizedPlUsd ?? 0,
+                dashboard.unrealizedPlUsd == null
+              )}`}
+            >
+              {dashboard.unrealizedPlUsd != null
+                ? formatSignedUsdCompact(dashboard.unrealizedPlUsd)
+                : "—"}
+            </p>
+            <p
+              className={`text-sm ${plColorClass(
                 dashboard.unrealizedPlPct ?? 0,
                 dashboard.unrealizedPlPct == null
               )}`}
             >
               {dashboard.unrealizedPlPct != null
-                ? formatSignedPercent(dashboard.unrealizedPlPct)
-                : "—"}
+                ? `(${formatSignedPercent(dashboard.unrealizedPlPct, 1)})`
+                : ""}
             </p>
-            <p className="text-xs text-slate-400">Unrealized · reference only</p>
+            <p className="pt-1 text-xs text-slate-500">
+              Max Risk{" "}
+              <span className="text-slate-300">
+                {formatUsd(dashboard.maxRiskUsd)}
+              </span>
+            </p>
+            <p className="text-xs text-slate-500">
+              Risk Used{" "}
+              <span className="text-slate-300">
+                {dashboard.riskUsedPct != null
+                  ? `${dashboard.riskUsedPct.toFixed(1)}%`
+                  : "—"}
+              </span>
+            </p>
           </MetricCard>
 
           <MetricCard title="Delta Health">

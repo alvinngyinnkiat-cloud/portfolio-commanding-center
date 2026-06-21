@@ -8,6 +8,7 @@ import {
   buildDeltaHealth,
   buildTrendHealth,
   calculateUnrealizedPlPercent,
+  calculateRiskUsedPercent,
 } from "./open-trade-dashboard";
 
 describe("open-trade-dashboard", () => {
@@ -131,6 +132,14 @@ describe("open-trade-dashboard", () => {
     it("returns percent of max risk", () => {
       expect(calculateUnrealizedPlPercent(50, 500)).toBe(10);
       expect(calculateUnrealizedPlPercent(null, 500)).toBeNull();
+    });
+  });
+
+  describe("calculateRiskUsedPercent", () => {
+    it("returns abs P/L over max risk as percent", () => {
+      expect(calculateRiskUsedPercent(-280.6, 798.08)).toBeCloseTo(35.2, 0);
+      expect(calculateRiskUsedPercent(105.25, 201.5)).toBeCloseTo(52.2, 0);
+      expect(calculateRiskUsedPercent(null, 500)).toBeNull();
     });
   });
 });

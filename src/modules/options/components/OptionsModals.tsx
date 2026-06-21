@@ -1034,7 +1034,7 @@ export function OpenTradeModal({
             <div className="grid gap-3 sm:grid-cols-2">
               {form.strategy === "bullPut" && (
                 <Input
-                  label="Opening Short Put Delta"
+                  label="Opening Delta"
                   type="number"
                   step="any"
                   value={form.openingShortPutDelta}
@@ -1045,7 +1045,7 @@ export function OpenTradeModal({
               )}
               {form.strategy === "bearCall" && (
                 <Input
-                  label="Opening Short Call Delta"
+                  label="Opening Delta"
                   type="number"
                   step="any"
                   value={form.openingShortCallDelta}
@@ -1057,7 +1057,7 @@ export function OpenTradeModal({
               {form.strategy === "ironCondor" && (
                 <>
                   <Input
-                    label="Opening Put Side Delta"
+                    label="Opening Put Delta"
                     type="number"
                     step="any"
                     value={form.openingPutSideDelta}
@@ -1066,7 +1066,7 @@ export function OpenTradeModal({
                     }
                   />
                   <Input
-                    label="Opening Call Side Delta"
+                    label="Opening Call Delta"
                     type="number"
                     step="any"
                     value={form.openingCallSideDelta}
@@ -1114,15 +1114,15 @@ export function OpenTradeModal({
               Opening snapshot (read-only)
             </p>
             {form.strategy === "bullPut" && (
-              <p>Opening Short Put Δ: {form.openingShortPutDelta || "—"}</p>
+              <p>Opening Delta: {form.openingShortPutDelta || "—"}</p>
             )}
             {form.strategy === "bearCall" && (
-              <p>Opening Short Call Δ: {form.openingShortCallDelta || "—"}</p>
+              <p>Opening Delta: {form.openingShortCallDelta || "—"}</p>
             )}
             {form.strategy === "ironCondor" && (
               <>
-                <p>Opening Put Side Δ: {form.openingPutSideDelta || "—"}</p>
-                <p>Opening Call Side Δ: {form.openingCallSideDelta || "—"}</p>
+                <p>Opening Put Delta: {form.openingPutSideDelta || "—"}</p>
+                <p>Opening Call Delta: {form.openingCallSideDelta || "—"}</p>
               </>
             )}
             <p>Opening EMA20: {form.openingEma20 || "—"}</p>

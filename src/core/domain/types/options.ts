@@ -68,7 +68,10 @@ export interface OpenTradeDashboardMetrics {
   breakevenDistancePct: number | null;
   breakevenStatus: DashboardBreakevenStatus | null;
   tradeHealth: DashboardTradeHealth | null;
+  unrealizedPlUsd: number | null;
   unrealizedPlPct: number | null;
+  maxRiskUsd: number;
+  riskUsedPct: number | null;
   deltaHealth: DashboardDeltaHealth | null;
   trendHealth: DashboardTrendHealth | null;
   entryCreditUsd: number | null;
