@@ -3,19 +3,16 @@ import type {
   DashboardDeltaHealth,
   DashboardDteStatus,
   DashboardTradeHealth,
-  DashboardTrendDirection,
   DashboardTrendHealth,
   DeltaSideHealth,
+  IronCondorBreakevenDisplay,
   OpenTradeDashboardMetrics,
-  OptionsIronCondorMetrics,
   OptionsOpenTradeRow,
   OptionsStrategy,
   OptionsTrade,
-  OptionsVerticalSpreadMetrics,
 } from "@/core/domain/types/options";
 import type { ScannerIndicators } from "@/core/domain/types/scanner";
 import { scaleMaxRiskForRemaining } from "./contract-tracking";
-import { resolveBreakevenDifference } from "./open-trade-display";
 
 export type {
   DashboardBreakevenStatus,
@@ -25,6 +22,7 @@ export type {
   DeltaSideHealth,
   DashboardDeltaHealth,
   DashboardTrendHealth,
+  IronCondorBreakevenDisplay,
   OpenTradeDashboardMetrics,
 } from "@/core/domain/types/options";
 
@@ -44,12 +42,48 @@ export function deriveDashboardDteStatus(dte: number): DashboardDteStatus {
   return "green";
 }
 
-export function calculateDashboardBreakevenDistancePct(
+/** Bull put / sell put spread — positive when price is above breakeven. */
+export function calculateBullPutBreakevenDistancePct(
   currentPriceUsd: number,
   breakevenPriceUsd: number
 ): number {
   if (breakevenPriceUsd === 0) return 0;
   return ((currentPriceUsd - breakevenPriceUsd) / breakevenPriceUsd) * 100;
+}
+
+/** Bear call / sell call spread — positive when price is below breakeven. */
+export function calculateBearCallBreakevenDistancePct(
+  currentPriceUsd: number,
+  breakevenPriceUsd: number
+): number {
+  if (breakevenPriceUsd === 0) return 0;
+  return ((breakevenPriceUsd - currentPriceUsd) / breakevenPriceUsd) * 100;
+}
+
+/** Iron condor put wing — positive when price is above lower breakeven. */
+export function calculateIronCondorPutSideDistancePct(
+  currentPriceUsd: number,
+  lowerBreakevenUsd: number
+): number {
+  if (lowerBreakevenUsd === 0) return 0;
+  return ((currentPriceUsd - lowerBreakevenUsd) / lowerBreakevenUsd) * 100;
+}
+
+/** Iron condor call wing — positive when price is below upper breakeven. */
+export function calculateIronCondorCallSideDistancePct(
+  currentPriceUsd: number,
+  upperBreakevenUsd: number
+): number {
+  if (upperBreakevenUsd === 0) return 0;
+  return ((upperBreakevenUsd - currentPriceUsd) / upperBreakevenUsd) * 100;
+}
+
+/** @deprecated Use strategy-specific helpers. Kept for bull put tests. */
+export function calculateDashboardBreakevenDistancePct(
+  currentPriceUsd: number,
+  breakevenPriceUsd: number
+): number {
+  return calculateBullPutBreakevenDistancePct(currentPriceUsd, breakevenPriceUsd);
 }
 
 export function deriveBreakevenDistanceStatus(
@@ -67,8 +101,7 @@ export function deriveTradeHealth(
 ): DashboardTradeHealth | null {
   if (breakevenDistancePct == null) return null;
 
-  const threatened =
-    dte <= 7 || breakevenDistancePct < -2.5;
+  const threatened = dte <= 7 || breakevenDistancePct < -2.5;
   if (threatened) return "THREATENED";
 
   const healthy = dte > 14 && breakevenDistancePct > 0;
@@ -98,31 +131,94 @@ export function calculateRiskUsedPercent(
   return (Math.abs(unrealizedPlUsd) / maxRiskUsd) * 100;
 }
 
-function resolveBreakevenPriceUsd(
-  row: Omit<OptionsOpenTradeRow, "dashboard">
-): number | null {
-  const { trade, spreadMetrics, ironCondorMetrics, tradeEconomics } = row;
-  const strategy = trade.strategy;
+export function buildIronCondorBreakevenDisplay(
+  currentPriceUsd: number,
+  lowerBreakevenUsd: number,
+  upperBreakevenUsd: number
+): IronCondorBreakevenDisplay {
+  const putSideDistancePct = calculateIronCondorPutSideDistancePct(
+    currentPriceUsd,
+    lowerBreakevenUsd
+  );
+  const callSideDistancePct = calculateIronCondorCallSideDistancePct(
+    currentPriceUsd,
+    upperBreakevenUsd
+  );
+  const closestSide =
+    putSideDistancePct <= callSideDistancePct ? "put" : "call";
 
-  if (strategy === "bullPut" || strategy === "bearCall") {
-    return spreadMetrics?.breakevenUsd ?? null;
+  return {
+    lowerBreakevenUsd,
+    upperBreakevenUsd,
+    putSideDistancePct,
+    callSideDistancePct,
+    closestSide,
+  };
+}
+
+interface BreakevenDashboardResult {
+  breakevenPriceUsd: number | null;
+  breakevenDistancePct: number | null;
+  ironCondorBreakeven: IronCondorBreakevenDisplay | null;
+}
+
+function resolveBreakevenDashboard(
+  row: Omit<OptionsOpenTradeRow, "dashboard">,
+  currentPriceUsd: number | null
+): BreakevenDashboardResult {
+  const { trade, spreadMetrics, ironCondorMetrics } = row;
+
+  if (currentPriceUsd == null) {
+    return {
+      breakevenPriceUsd: null,
+      breakevenDistancePct: null,
+      ironCondorBreakeven: null,
+    };
   }
-  if (strategy === "ironCondor") {
-    const diff = resolveBreakevenDifference(
-      strategy,
-      row.underlyingPrice.priceUsd,
-      spreadMetrics,
-      ironCondorMetrics,
-      tradeEconomics
+
+  if (trade.strategy === "bullPut" && spreadMetrics) {
+    return {
+      breakevenPriceUsd: spreadMetrics.breakevenUsd,
+      breakevenDistancePct: calculateBullPutBreakevenDistancePct(
+        currentPriceUsd,
+        spreadMetrics.breakevenUsd
+      ),
+      ironCondorBreakeven: null,
+    };
+  }
+
+  if (trade.strategy === "bearCall" && spreadMetrics) {
+    return {
+      breakevenPriceUsd: spreadMetrics.breakevenUsd,
+      breakevenDistancePct: calculateBearCallBreakevenDistancePct(
+        currentPriceUsd,
+        spreadMetrics.breakevenUsd
+      ),
+      ironCondorBreakeven: null,
+    };
+  }
+
+  if (trade.strategy === "ironCondor" && ironCondorMetrics) {
+    const ironCondorBreakeven = buildIronCondorBreakevenDisplay(
+      currentPriceUsd,
+      ironCondorMetrics.lowerBreakevenUsd,
+      ironCondorMetrics.upperBreakevenUsd
     );
-    if (!ironCondorMetrics || !diff) {
-      return ironCondorMetrics?.lowerBreakevenUsd ?? null;
-    }
-    return diff.activeSide === "upper"
-      ? ironCondorMetrics.upperBreakevenUsd
-      : ironCondorMetrics.lowerBreakevenUsd;
+    return {
+      breakevenPriceUsd: null,
+      breakevenDistancePct: Math.min(
+        ironCondorBreakeven.putSideDistancePct,
+        ironCondorBreakeven.callSideDistancePct
+      ),
+      ironCondorBreakeven,
+    };
   }
-  return tradeEconomics?.breakevenUsd ?? null;
+
+  return {
+    breakevenPriceUsd: null,
+    breakevenDistancePct: null,
+    ironCondorBreakeven: null,
+  };
 }
 
 function derivePutSideRiskDirection(
@@ -251,25 +347,22 @@ export function buildOpenTradeDashboardMetrics(
   const dteStatus = deriveDashboardDteStatus(daysToExpiration);
   const currentPriceUsd =
     trade.underlyingPriceUsd ?? row.underlyingPrice.priceUsd ?? null;
-  const breakevenPriceUsd = supportsDashboard
-    ? resolveBreakevenPriceUsd(row)
-    : null;
 
-  const breakevenDistancePct =
-    currentPriceUsd != null && breakevenPriceUsd != null
-      ? calculateDashboardBreakevenDistancePct(
-          currentPriceUsd,
-          breakevenPriceUsd
-        )
-      : null;
+  const breakeven = supportsDashboard
+    ? resolveBreakevenDashboard(row, currentPriceUsd)
+    : {
+        breakevenPriceUsd: null,
+        breakevenDistancePct: null,
+        ironCondorBreakeven: null,
+      };
 
   const breakevenStatus =
-    breakevenDistancePct != null
-      ? deriveBreakevenDistanceStatus(breakevenDistancePct)
+    breakeven.breakevenDistancePct != null
+      ? deriveBreakevenDistanceStatus(breakeven.breakevenDistancePct)
       : null;
 
   const tradeHealth = supportsDashboard
-    ? deriveTradeHealth(daysToExpiration, breakevenDistancePct)
+    ? deriveTradeHealth(daysToExpiration, breakeven.breakevenDistancePct)
     : null;
 
   const maxRiskUsd = scaleMaxRiskForRemaining(trade);
@@ -279,18 +372,18 @@ export function buildOpenTradeDashboardMetrics(
   );
   const riskUsedPct = calculateRiskUsedPercent(unrealizedPlUsd, maxRiskUsd);
 
-  const effectiveTrade = trade;
   const entryCreditUsd = supportsDashboard
-    ? effectiveTrade.openPremiumUsd - effectiveTrade.openFeesUsd
+    ? trade.openPremiumUsd - trade.openFeesUsd
     : null;
 
   return {
     dte: daysToExpiration,
     dteStatus,
     currentPriceUsd,
-    breakevenPriceUsd,
-    breakevenDistancePct,
+    breakevenPriceUsd: breakeven.breakevenPriceUsd,
+    breakevenDistancePct: breakeven.breakevenDistancePct,
     breakevenStatus,
+    ironCondorBreakeven: breakeven.ironCondorBreakeven,
     tradeHealth,
     unrealizedPlUsd,
     unrealizedPlPct,

@@ -210,9 +210,11 @@ export function OpenTradeDashboardCard({
       {
         label: "Breakeven",
         value:
-          dashboard.breakevenPriceUsd != null
-            ? formatUsd(dashboard.breakevenPriceUsd)
-            : "—",
+          dashboard.ironCondorBreakeven != null
+            ? `${formatUsd(dashboard.ironCondorBreakeven.lowerBreakevenUsd)} / ${formatUsd(dashboard.ironCondorBreakeven.upperBreakevenUsd)}`
+            : dashboard.breakevenPriceUsd != null
+              ? formatUsd(dashboard.breakevenPriceUsd)
+              : "—",
       },
       { label: "Opened", value: formatOptionsTradeDate(trade.openDate) },
       {
@@ -338,23 +340,50 @@ export function OpenTradeDashboardCard({
             title="Breakeven Distance"
             statusClass={dashboardBreakevenColorClass(dashboard.breakevenStatus)}
           >
-            <p className="text-lg font-bold">
-              {dashboard.breakevenDistancePct != null
-                ? formatSignedPercent(dashboard.breakevenDistancePct)
-                : "—"}
-            </p>
-            <p className="text-xs text-slate-400">
-              Price{" "}
-              {dashboard.currentPriceUsd != null
-                ? formatUsd(dashboard.currentPriceUsd)
-                : "—"}
-            </p>
-            <p className="text-xs text-slate-400">
-              BE{" "}
-              {dashboard.breakevenPriceUsd != null
-                ? formatUsd(dashboard.breakevenPriceUsd)
-                : "—"}
-            </p>
+            {dashboard.ironCondorBreakeven ? (
+              <>
+                <p className="text-xs text-slate-400">
+                  Lower Breakeven {formatUsd(dashboard.ironCondorBreakeven.lowerBreakevenUsd)}
+                </p>
+                <p className="text-sm font-bold">
+                  Put Side{" "}
+                  {formatSignedPercent(dashboard.ironCondorBreakeven.putSideDistancePct)}
+                </p>
+                <p className="text-xs text-slate-400">
+                  Upper Breakeven {formatUsd(dashboard.ironCondorBreakeven.upperBreakevenUsd)}
+                </p>
+                <p className="text-sm font-bold">
+                  Call Side{" "}
+                  {formatSignedPercent(dashboard.ironCondorBreakeven.callSideDistancePct)}
+                </p>
+                <p className="text-xs text-slate-500">
+                  Closest Side{" "}
+                  {dashboard.ironCondorBreakeven.closestSide === "put"
+                    ? "Put Side"
+                    : "Call Side"}
+                </p>
+              </>
+            ) : (
+              <>
+                <p className="text-lg font-bold">
+                  {dashboard.breakevenDistancePct != null
+                    ? formatSignedPercent(dashboard.breakevenDistancePct)
+                    : "—"}
+                </p>
+                <p className="text-xs text-slate-400">
+                  Price{" "}
+                  {dashboard.currentPriceUsd != null
+                    ? formatUsd(dashboard.currentPriceUsd)
+                    : "—"}
+                </p>
+                <p className="text-xs text-slate-400">
+                  Breakeven{" "}
+                  {dashboard.breakevenPriceUsd != null
+                    ? formatUsd(dashboard.breakevenPriceUsd)
+                    : "—"}
+                </p>
+              </>
+            )}
           </MetricCard>
 
           <MetricCard

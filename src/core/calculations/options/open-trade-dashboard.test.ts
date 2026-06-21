@@ -1,7 +1,12 @@
 import { describe, expect, it } from "vitest";
 import type { OptionsTrade } from "@/core/domain/types/options";
 import {
+  buildIronCondorBreakevenDisplay,
+  calculateBearCallBreakevenDistancePct,
+  calculateBullPutBreakevenDistancePct,
   calculateDashboardBreakevenDistancePct,
+  calculateIronCondorCallSideDistancePct,
+  calculateIronCondorPutSideDistancePct,
   deriveBreakevenDistanceStatus,
   deriveDashboardDteStatus,
   deriveTradeHealth,
@@ -29,10 +34,54 @@ describe("open-trade-dashboard", () => {
     });
   });
 
+  describe("bull put breakeven distance", () => {
+    it("is positive when price is above breakeven", () => {
+      expect(calculateBullPutBreakevenDistancePct(105, 100)).toBeCloseTo(5);
+    });
+
+    it("is negative when price is below breakeven", () => {
+      expect(calculateBullPutBreakevenDistancePct(97.5, 100)).toBeCloseTo(-2.5);
+    });
+  });
+
+  describe("bear call breakeven distance", () => {
+    it("is positive when price is below breakeven", () => {
+      expect(calculateBearCallBreakevenDistancePct(580, 605)).toBeCloseTo(4.13, 1);
+    });
+
+    it("is negative when price is above breakeven", () => {
+      expect(calculateBearCallBreakevenDistancePct(620, 605)).toBeCloseTo(-2.48, 1);
+    });
+  });
+
+  describe("iron condor breakeven distances", () => {
+    it("computes put and call side distances from spec example", () => {
+      const lower = 572.72;
+      const upper = 697.28;
+      const current = 577.19;
+
+      expect(calculateIronCondorPutSideDistancePct(current, lower)).toBeCloseTo(
+        0.78,
+        1
+      );
+      expect(calculateIronCondorCallSideDistancePct(current, upper)).toBeCloseTo(
+        17.22,
+        1
+      );
+    });
+
+    it("identifies closest side as put when put distance is smaller", () => {
+      const display = buildIronCondorBreakevenDisplay(577.19, 572.72, 697.28);
+      expect(display.closestSide).toBe("put");
+      expect(display.putSideDistancePct).toBeLessThan(
+        display.callSideDistancePct
+      );
+    });
+  });
+
   describe("calculateDashboardBreakevenDistancePct", () => {
-    it("computes (current - breakeven) / breakeven × 100", () => {
+    it("matches bull put formula", () => {
       expect(calculateDashboardBreakevenDistancePct(105, 100)).toBeCloseTo(5);
-      expect(calculateDashboardBreakevenDistancePct(97.5, 100)).toBeCloseTo(-2.5);
     });
   });
 
@@ -64,6 +113,12 @@ describe("open-trade-dashboard", () => {
 
     it("returns REVIEW when distance between 0 and -2.5%", () => {
       expect(deriveTradeHealth(20, -1)).toBe("REVIEW");
+    });
+
+    it("uses closest iron condor side distance for trade health", () => {
+      expect(deriveTradeHealth(20, 0.78)).toBe("HEALTHY");
+      expect(deriveTradeHealth(10, 0.78)).toBe("REVIEW");
+      expect(deriveBreakevenDistanceStatus(0.78)).toBe("yellow");
     });
   });
 

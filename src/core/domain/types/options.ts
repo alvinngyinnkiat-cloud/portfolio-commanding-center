@@ -60,13 +60,24 @@ export interface DashboardTrendHealth {
   } | null;
 }
 
+export interface IronCondorBreakevenDisplay {
+  lowerBreakevenUsd: number;
+  upperBreakevenUsd: number;
+  putSideDistancePct: number;
+  callSideDistancePct: number;
+  closestSide: "put" | "call";
+}
+
 export interface OpenTradeDashboardMetrics {
   dte: number;
   dteStatus: DashboardDteStatus;
   currentPriceUsd: number | null;
+  /** Single breakeven for vertical spreads; null for iron condor. */
   breakevenPriceUsd: number | null;
+  /** Effective distance for trade health — worst / closest side for iron condor. */
   breakevenDistancePct: number | null;
   breakevenStatus: DashboardBreakevenStatus | null;
+  ironCondorBreakeven: IronCondorBreakevenDisplay | null;
   tradeHealth: DashboardTradeHealth | null;
   unrealizedPlUsd: number | null;
   unrealizedPlPct: number | null;
