@@ -22,3 +22,4 @@ export * from "./performance-analytics";
 export * from "./return-percent";
 export * from "./client-summary";
 export * from "./net-options-market-value";
+export * from "./open-trade-dashboard";

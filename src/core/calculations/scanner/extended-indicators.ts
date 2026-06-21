@@ -29,6 +29,16 @@ export function computeAvgPricePrev(candles: OhlcBar[]): number | null {
   return (prev.high + prev.low) / 2;
 }
 
+export function computeSma200Prev(candles: OhlcBar[]): number | null {
+  if (candles.length < 201) {
+    return null;
+  }
+  return sma(
+    candles.slice(0, -1).map((bar) => bar.close),
+    200
+  );
+}
+
 export function computeSma50SlopePct(
   sma50: number | null,
   sma50Prev: number | null

@@ -31,6 +31,50 @@ export type OptionsCapacityStatus = "OK" | "AT_LIMIT" | "NO_TRADE";
 
 export type OptionsDteStatus = "NORMAL" | "WATCH" | "ACTION_REQUIRED";
 
+export type DashboardDteStatus = "green" | "yellow" | "red";
+export type DashboardBreakevenStatus = "green" | "yellow" | "orange" | "red";
+export type DashboardTradeHealth = "HEALTHY" | "REVIEW" | "THREATENED";
+export type DashboardTrendDirection = "positive" | "negative" | "neutral";
+
+export interface DeltaSideHealth {
+  label: string;
+  openingDelta: number | null;
+  currentDelta: number | null;
+  deltaChange: number | null;
+  riskDirection: "increasing" | "decreasing" | "unchanged" | null;
+}
+
+export interface DashboardDeltaHealth {
+  putSide: DeltaSideHealth | null;
+  callSide: DeltaSideHealth | null;
+}
+
+export interface DashboardTrendHealth {
+  shortTrend: {
+    label: string;
+    direction: DashboardTrendDirection;
+  } | null;
+  longTrend: {
+    label: string;
+    direction: DashboardTrendDirection;
+  } | null;
+}
+
+export interface OpenTradeDashboardMetrics {
+  dte: number;
+  dteStatus: DashboardDteStatus;
+  currentPriceUsd: number | null;
+  breakevenPriceUsd: number | null;
+  breakevenDistancePct: number | null;
+  breakevenStatus: DashboardBreakevenStatus | null;
+  tradeHealth: DashboardTradeHealth | null;
+  unrealizedPlPct: number | null;
+  deltaHealth: DashboardDeltaHealth | null;
+  trendHealth: DashboardTrendHealth | null;
+  entryCreditUsd: number | null;
+  supportsDashboard: boolean;
+}
+
 export interface OptionsSettings {
   clientName: string;
   clientStartingCapitalUsd: number;
@@ -116,6 +160,19 @@ export interface OptionsTrade {
   /** Manual underlying stock price for breakeven difference. */
   underlyingPriceUsd?: number;
   underlyingPriceUpdatedAt?: string;
+  /** Opening snapshot — immutable after trade creation. */
+  openingShortPutDelta?: number;
+  openingShortCallDelta?: number;
+  openingPutSideDelta?: number;
+  openingCallSideDelta?: number;
+  openingEma20?: number;
+  openingSma50?: number;
+  openingSma200?: number;
+  /** Manual monitoring inputs — updated on open trade dashboard. */
+  currentShortPutDelta?: number;
+  currentShortCallDelta?: number;
+  currentPutSideDelta?: number;
+  currentCallSideDelta?: number;
   closePremiumUsd?: number;
   closeFeesUsd?: number;
   /** How the trade was closed — normal debit math or broker manual P/L. */
@@ -137,6 +194,7 @@ export interface OptionsSplitLegs {
 
 import type { ResolvedScannerPrice } from "@/core/calculations/scanner/price-engine";
 import type { OptionsTradeEconomics } from "@/core/calculations/options/trade-economics";
+import type { ScannerIndicators } from "@/core/domain/types/scanner";
 
 export interface OptionsOpenTradeRow {
   trade: OptionsTrade;
@@ -150,6 +208,8 @@ export interface OptionsOpenTradeRow {
   daysToExpiration: number;
   dteStatus: OptionsDteStatus;
   strategyDisplay: string;
+  dashboard: OpenTradeDashboardMetrics;
+  scannerIndicators: ScannerIndicators | null;
 }
 
 export interface OptionsClosedTradeRow {

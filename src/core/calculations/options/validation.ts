@@ -66,6 +66,14 @@ export interface OpenTradeDraft {
   currentValueUsd?: number;
   underlyingPriceUsd?: number;
   notes?: string;
+  /** Opening snapshot at trade entry. */
+  openingShortPutDelta?: number;
+  openingShortCallDelta?: number;
+  openingPutSideDelta?: number;
+  openingCallSideDelta?: number;
+  openingEma20?: number;
+  openingSma50?: number;
+  openingSma200?: number;
 }
 
 export interface ResolvedOpenTradeDraft extends OpenTradeDraft {
@@ -76,6 +84,13 @@ export interface ResolvedOpenTradeDraft extends OpenTradeDraft {
   bullPutLongStrikeUsd?: number;
   bearCallShortStrikeUsd?: number;
   bearCallLongStrikeUsd?: number;
+  openingShortPutDelta?: number;
+  openingShortCallDelta?: number;
+  openingPutSideDelta?: number;
+  openingCallSideDelta?: number;
+  openingEma20?: number;
+  openingSma50?: number;
+  openingSma200?: number;
 }
 
 export interface CloseTradeDraft {
@@ -626,6 +641,55 @@ export function validateUnderlyingPriceUpdate(
     ];
   }
   return [];
+}
+
+export interface OpenTradeMonitoringUpdate {
+  underlyingPriceUsd?: number | null;
+  currentValueUsd?: number | null;
+  currentShortPutDelta?: number | null;
+  currentShortCallDelta?: number | null;
+  currentPutSideDelta?: number | null;
+  currentCallSideDelta?: number | null;
+}
+
+export function validateOpenTradeMonitoringUpdate(
+  update: OpenTradeMonitoringUpdate
+): OptionsValidationError[] {
+  const errors: OptionsValidationError[] = [];
+  const hasField =
+    update.underlyingPriceUsd !== undefined ||
+    update.currentValueUsd !== undefined ||
+    update.currentShortPutDelta !== undefined ||
+    update.currentShortCallDelta !== undefined ||
+    update.currentPutSideDelta !== undefined ||
+    update.currentCallSideDelta !== undefined;
+
+  if (!hasField) {
+    errors.push({ field: "monitoring", message: "Enter at least one value to save" });
+    return errors;
+  }
+
+  if (update.underlyingPriceUsd !== undefined && update.underlyingPriceUsd != null) {
+    errors.push(...validateUnderlyingPriceUpdate(update.underlyingPriceUsd));
+  }
+  if (update.currentValueUsd !== undefined && update.currentValueUsd != null) {
+    errors.push(...validateCurrentValueUpdate(update.currentValueUsd));
+  }
+
+  const deltaFields = [
+    ["currentShortPutDelta", update.currentShortPutDelta],
+    ["currentShortCallDelta", update.currentShortCallDelta],
+    ["currentPutSideDelta", update.currentPutSideDelta],
+    ["currentCallSideDelta", update.currentCallSideDelta],
+  ] as const;
+
+  for (const [field, value] of deltaFields) {
+    if (value !== undefined && value != null && !Number.isFinite(value)) {
+      errors.push({ field, message: "Delta must be a valid number" });
+    }
+  }
+
+  return errors;
 }
 
 export interface MarkTradeUpdate {

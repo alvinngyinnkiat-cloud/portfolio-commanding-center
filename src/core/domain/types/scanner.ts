@@ -202,6 +202,8 @@ export interface ScannerIndicators {
 
   sma200: number | null;
 
+  sma200Prev: number | null;
+
   atr14: number | null;
 
   so: number | null;

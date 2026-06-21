@@ -5,6 +5,12 @@ import type {
 } from "@/core/domain/types/options";
 import { formatCloseMethodLabel, getTradeCloseMethod } from "@/core/calculations/options/realized-pl";
 import type { BreakevenDifference } from "@/core/calculations/options/open-trade-display";
+import type {
+  DashboardBreakevenStatus,
+  DashboardDteStatus,
+  DashboardTradeHealth,
+  DashboardTrendDirection,
+} from "@/core/domain/types/options";
 import type { TargetExitKind } from "@/core/calculations/options/open-trade-display";
 import { coerceNumber } from "@/shared/lib/coerce-number";
 
@@ -47,6 +53,53 @@ export function dteWarningColorClass(daysToExpiration: number): string {
   if (daysToExpiration <= 7) return "text-accent-red";
   if (daysToExpiration <= 14) return "text-amber-300";
   return "text-slate-400";
+}
+
+export function dashboardDteColorClass(status: DashboardDteStatus): string {
+  if (status === "green") return "text-accent-green";
+  if (status === "yellow") return "text-amber-300";
+  return "text-accent-red";
+}
+
+export function dashboardBreakevenColorClass(
+  status: DashboardBreakevenStatus | null
+): string {
+  if (status === "green") return "text-accent-green";
+  if (status === "yellow") return "text-amber-300";
+  if (status === "orange") return "text-orange-400";
+  if (status === "red") return "text-accent-red";
+  return "text-slate-400";
+}
+
+export function dashboardTradeHealthColorClass(
+  health: DashboardTradeHealth | null
+): string {
+  if (health === "HEALTHY") return "text-accent-green";
+  if (health === "REVIEW") return "text-amber-300";
+  if (health === "THREATENED") return "text-accent-red";
+  return "text-slate-400";
+}
+
+export function dashboardTradeHealthBadgeClass(
+  health: DashboardTradeHealth | null
+): string {
+  if (health === "HEALTHY") return "bg-emerald-500/15 text-emerald-400";
+  if (health === "REVIEW") return "bg-amber-500/15 text-amber-300";
+  if (health === "THREATENED") return "bg-accent-red/15 text-accent-red";
+  return "bg-surface text-slate-400";
+}
+
+export function dashboardTrendColorClass(
+  direction: DashboardTrendDirection
+): string {
+  if (direction === "positive") return "text-accent-green";
+  if (direction === "negative") return "text-accent-red";
+  return "text-slate-400";
+}
+
+export function formatDelta(value: number | null | undefined): string {
+  if (value == null || !Number.isFinite(value)) return "—";
+  return value.toFixed(2);
 }
 
 export function dteStatusBadgeClass(status: OptionsDteStatus): string {

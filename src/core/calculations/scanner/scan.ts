@@ -23,6 +23,7 @@ import {
   computeEma20Prev,
   computeEmaDiff,
   computeSma50Prev,
+  computeSma200Prev,
   computeSma50SlopePct,
 } from "./extended-indicators";
 
@@ -94,6 +95,7 @@ export function scanTicker(input: ScanTickerInput): ScannerTickerResult {
     currentPrice ?? dailyBars[dailyBars.length - 1]?.close ?? null;
   const ema20Prev = computeEma20Prev(dailyBars);
   const sma50Prev = computeSma50Prev(dailyBars);
+  const sma200Prev = computeSma200Prev(dailyBars);
   const avgPricePrev = computeAvgPricePrev(dailyBars);
   const { emaDiff, emaDiffPct } = computeEmaDiff(
     indicatorValues.avgPrice,
@@ -180,6 +182,7 @@ export function scanTicker(input: ScanTickerInput): ScannerTickerResult {
       sma50Prev,
       sma50SlopePct: computeSma50SlopePct(indicatorValues.sma50, sma50Prev),
       sma200: indicatorValues.sma200,
+      sma200Prev,
       atr14: indicatorValues.atr14,
       so: indicatorValues.so,
       soPrev: indicatorValues.soPrev,
@@ -238,6 +241,7 @@ function incompleteResult(
       sma50Prev: null,
       sma50SlopePct: null,
       sma200: null,
+      sma200Prev: null,
       atr14: null,
       so: null,
       soPrev: null,

@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
 import type { OptionsCloseMethod, OptionsStrategy, OptionsTrade } from "@/core/domain/types/options";
 import {
   calculateRemainingCapacityUsd,
@@ -42,6 +42,7 @@ import { deriveCapacityStatus } from "@/core/calculations/options/capacity";
 import { splitForTrade } from "@/core/calculations/options/split";
 import { usePortfolio } from "@/context/PortfolioContext";
 import { DEFAULT_OPTIONS_SETTINGS } from "@/core/domain/defaults-options";
+import { normalizeTicker } from "@/core/calculations/stocks/normalize";
 
 function premiumOptionPriceFromTrade(trade: OptionsTrade): string {
   const price = calculatePerShareOptionPrice(trade.openPremiumUsd, trade.contracts);
@@ -86,6 +87,13 @@ const emptyOpenForm = {
   userSharePercent: "55",
   clientSharePercent: "45",
   notes: "",
+  openingShortPutDelta: "",
+  openingShortCallDelta: "",
+  openingPutSideDelta: "",
+  openingCallSideDelta: "",
+  openingEma20: "",
+  openingSma50: "",
+  openingSma200: "",
 };
 
 type OpenTradeForm = Omit<typeof emptyOpenForm, "strategy" | "tradeType"> & {
@@ -94,9 +102,15 @@ type OpenTradeForm = Omit<typeof emptyOpenForm, "strategy" | "tradeType"> & {
   underlyingPriceUsd?: string;
 };
 
-function parseStrikeField(value: string): number | undefined {
-  const parsed = parseFloat(value);
+function parseOptionalFloat(value: string | undefined): number | undefined {
+  const raw = value?.trim();
+  if (!raw) return undefined;
+  const parsed = parseFloat(raw);
   return Number.isFinite(parsed) ? parsed : undefined;
+}
+
+function parseStrikeField(value: string): number | undefined {
+  return parseOptionalFloat(value);
 }
 
 function closedEditStrikeFields(
@@ -193,7 +207,7 @@ export function OpenTradeModal({
   onClose: () => void;
   editTrade?: OptionsTrade;
 }) {
-  const { optionsData, data, stockData, services, refresh } = usePortfolio();
+  const { optionsData, data, stockData, scannerData, services, refresh } = usePortfolio();
   const settings = optionsData?.settings;
   const [form, setForm] = useState<OpenTradeForm>(() => {
     if (!editTrade) {
@@ -237,6 +251,28 @@ export function OpenTradeModal({
         editTrade.underlyingPriceUsd != null
           ? String(editTrade.underlyingPriceUsd)
           : "",
+      openingShortPutDelta:
+        editTrade.openingShortPutDelta != null
+          ? String(editTrade.openingShortPutDelta)
+          : "",
+      openingShortCallDelta:
+        editTrade.openingShortCallDelta != null
+          ? String(editTrade.openingShortCallDelta)
+          : "",
+      openingPutSideDelta:
+        editTrade.openingPutSideDelta != null
+          ? String(editTrade.openingPutSideDelta)
+          : "",
+      openingCallSideDelta:
+        editTrade.openingCallSideDelta != null
+          ? String(editTrade.openingCallSideDelta)
+          : "",
+      openingEma20:
+        editTrade.openingEma20 != null ? String(editTrade.openingEma20) : "",
+      openingSma50:
+        editTrade.openingSma50 != null ? String(editTrade.openingSma50) : "",
+      openingSma200:
+        editTrade.openingSma200 != null ? String(editTrade.openingSma200) : "",
     };
   });
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -248,6 +284,37 @@ export function OpenTradeModal({
   const isDebit = isDebitStrategy(form.strategy);
   const showManualMaxRisk = requiresManualMaxRisk(form.strategy);
   const openPremiumLabel = getOpenPremiumFieldLabel(form.strategy);
+  const isDashboardStrategy =
+    form.strategy === "bullPut" ||
+    form.strategy === "bearCall" ||
+    form.strategy === "ironCondor";
+  const showOpeningSnapshot = !editTrade && isDashboardStrategy;
+  const showOpeningSnapshotReadOnly = !!editTrade && isDashboardStrategy;
+
+  useEffect(() => {
+    if (editTrade || !form.underlying.trim()) return;
+    const ticker = normalizeTicker(form.underlying);
+    const scanResult = scannerData?.latestRun?.results.find(
+      (row) => normalizeTicker(row.ticker) === ticker
+    );
+    if (!scanResult?.indicators) return;
+    const { ema20, sma50, sma200 } = scanResult.indicators;
+    setForm((prev) => ({
+      ...prev,
+      openingEma20:
+        prev.openingEma20.trim() === "" && ema20 != null
+          ? String(ema20)
+          : prev.openingEma20,
+      openingSma50:
+        prev.openingSma50.trim() === "" && sma50 != null
+          ? String(sma50)
+          : prev.openingSma50,
+      openingSma200:
+        prev.openingSma200.trim() === "" && sma200 != null
+          ? String(sma200)
+          : prev.openingSma200,
+    }));
+  }, [editTrade, form.underlying, scannerData?.latestRun?.results]);
 
   const spreadPreview = useMemo(() => {
     if (!isVertical) return null;
@@ -568,6 +635,17 @@ export function OpenTradeModal({
         const raw = form.underlyingPriceUsd?.trim();
         return editTrade && raw ? parseFloat(raw) : undefined;
       })(),
+      ...(editTrade
+        ? {}
+        : {
+            openingShortPutDelta: parseOptionalFloat(form.openingShortPutDelta),
+            openingShortCallDelta: parseOptionalFloat(form.openingShortCallDelta),
+            openingPutSideDelta: parseOptionalFloat(form.openingPutSideDelta),
+            openingCallSideDelta: parseOptionalFloat(form.openingCallSideDelta),
+            openingEma20: parseOptionalFloat(form.openingEma20),
+            openingSma50: parseOptionalFloat(form.openingSma50),
+            openingSma200: parseOptionalFloat(form.openingSma200),
+          }),
     };
 
     const result = services.optionsTrades.openTrade(draft);
@@ -947,6 +1025,113 @@ export function OpenTradeModal({
           value={form.notes}
           onChange={(e) => setForm((p) => ({ ...p, notes: e.target.value }))}
         />
+
+        {showOpeningSnapshot && (
+          <div className="rounded-xl border border-surface-border/60 bg-surface/40 p-4">
+            <p className="mb-3 text-sm font-medium text-slate-300">
+              Opening Snapshot (stored permanently)
+            </p>
+            <div className="grid gap-3 sm:grid-cols-2">
+              {form.strategy === "bullPut" && (
+                <Input
+                  label="Opening Short Put Delta"
+                  type="number"
+                  step="any"
+                  value={form.openingShortPutDelta}
+                  onChange={(e) =>
+                    setForm((p) => ({ ...p, openingShortPutDelta: e.target.value }))
+                  }
+                />
+              )}
+              {form.strategy === "bearCall" && (
+                <Input
+                  label="Opening Short Call Delta"
+                  type="number"
+                  step="any"
+                  value={form.openingShortCallDelta}
+                  onChange={(e) =>
+                    setForm((p) => ({ ...p, openingShortCallDelta: e.target.value }))
+                  }
+                />
+              )}
+              {form.strategy === "ironCondor" && (
+                <>
+                  <Input
+                    label="Opening Put Side Delta"
+                    type="number"
+                    step="any"
+                    value={form.openingPutSideDelta}
+                    onChange={(e) =>
+                      setForm((p) => ({ ...p, openingPutSideDelta: e.target.value }))
+                    }
+                  />
+                  <Input
+                    label="Opening Call Side Delta"
+                    type="number"
+                    step="any"
+                    value={form.openingCallSideDelta}
+                    onChange={(e) =>
+                      setForm((p) => ({ ...p, openingCallSideDelta: e.target.value }))
+                    }
+                  />
+                </>
+              )}
+              <Input
+                label="Opening EMA20"
+                type="number"
+                step="any"
+                value={form.openingEma20}
+                onChange={(e) =>
+                  setForm((p) => ({ ...p, openingEma20: e.target.value }))
+                }
+                hint="Auto-filled from Scanner when available"
+              />
+              <Input
+                label="Opening SMA50"
+                type="number"
+                step="any"
+                value={form.openingSma50}
+                onChange={(e) =>
+                  setForm((p) => ({ ...p, openingSma50: e.target.value }))
+                }
+              />
+              <Input
+                label="Opening SMA200"
+                type="number"
+                step="any"
+                value={form.openingSma200}
+                onChange={(e) =>
+                  setForm((p) => ({ ...p, openingSma200: e.target.value }))
+                }
+              />
+            </div>
+          </div>
+        )}
+
+        {showOpeningSnapshotReadOnly && (
+          <div className="rounded-xl border border-surface-border/60 bg-surface/40 p-3 text-xs text-slate-400">
+            <p className="mb-1 text-sm font-medium text-slate-300">
+              Opening snapshot (read-only)
+            </p>
+            {form.strategy === "bullPut" && (
+              <p>Opening Short Put Δ: {form.openingShortPutDelta || "—"}</p>
+            )}
+            {form.strategy === "bearCall" && (
+              <p>Opening Short Call Δ: {form.openingShortCallDelta || "—"}</p>
+            )}
+            {form.strategy === "ironCondor" && (
+              <>
+                <p>Opening Put Side Δ: {form.openingPutSideDelta || "—"}</p>
+                <p>Opening Call Side Δ: {form.openingCallSideDelta || "—"}</p>
+              </>
+            )}
+            <p>Opening EMA20: {form.openingEma20 || "—"}</p>
+            <p>
+              Opening SMA50 / SMA200: {form.openingSma50 || "—"} /{" "}
+              {form.openingSma200 || "—"}
+            </p>
+          </div>
+        )}
 
         {editTrade && (
           <Input

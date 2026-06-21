@@ -23,9 +23,11 @@ import {
   validateClosedTradeEditDraft,
   validateCurrentValueUpdate,
   validateMarkTradeUpdate,
+  validateOpenTradeMonitoringUpdate,
   validateOpenTradeDraft,
   type ClosedTradeEditDraft,
   type MarkTradeUpdate,
+  type OpenTradeMonitoringUpdate,
 } from "@/core/calculations/options";
 import { normalizeOptionsTradeForStorage } from "@/core/calculations/options/trade-dates";
 import { generateId } from "@/core/database/local/local-storage";
@@ -110,6 +112,21 @@ export class OptionsTradeService {
         resolved.underlyingPriceUsd != null
           ? now
           : existing?.underlyingPriceUpdatedAt,
+      openingShortPutDelta:
+        existing?.openingShortPutDelta ?? resolved.openingShortPutDelta,
+      openingShortCallDelta:
+        existing?.openingShortCallDelta ?? resolved.openingShortCallDelta,
+      openingPutSideDelta:
+        existing?.openingPutSideDelta ?? resolved.openingPutSideDelta,
+      openingCallSideDelta:
+        existing?.openingCallSideDelta ?? resolved.openingCallSideDelta,
+      openingEma20: existing?.openingEma20 ?? resolved.openingEma20,
+      openingSma50: existing?.openingSma50 ?? resolved.openingSma50,
+      openingSma200: existing?.openingSma200 ?? resolved.openingSma200,
+      currentShortPutDelta: existing?.currentShortPutDelta,
+      currentShortCallDelta: existing?.currentShortCallDelta,
+      currentPutSideDelta: existing?.currentPutSideDelta,
+      currentCallSideDelta: existing?.currentCallSideDelta,
       notes: normalizedDraft.notes?.trim() || undefined,
       createdAt: existing?.createdAt ?? now,
       updatedAt: now,
@@ -163,6 +180,48 @@ export class OptionsTradeService {
     currentValueUsd: number | null
   ): OptionsMutationResult {
     return this.updateMark(id, { currentValueUsd });
+  }
+
+  updateMonitoringInputs(
+    id: string,
+    update: OpenTradeMonitoringUpdate
+  ): OptionsMutationResult {
+    const trade = this.tradeRepo.getById(id);
+    if (!trade || trade.status !== "open") {
+      return { ok: false, errors: [{ field: "id", message: "Open trade not found" }] };
+    }
+
+    const errors = validateOpenTradeMonitoringUpdate(update);
+    if (errors.length > 0) return { ok: false, errors };
+
+    const now = new Date().toISOString();
+    const updated: OptionsTrade = { ...trade, updatedAt: now };
+
+    if (update.underlyingPriceUsd !== undefined) {
+      updated.underlyingPriceUsd = update.underlyingPriceUsd ?? undefined;
+      updated.underlyingPriceUpdatedAt =
+        update.underlyingPriceUsd != null ? now : undefined;
+    }
+    if (update.currentValueUsd !== undefined) {
+      updated.currentValueUsd = update.currentValueUsd ?? undefined;
+      updated.currentValueUpdatedAt =
+        update.currentValueUsd != null ? now : undefined;
+    }
+    if (update.currentShortPutDelta !== undefined) {
+      updated.currentShortPutDelta = update.currentShortPutDelta ?? undefined;
+    }
+    if (update.currentShortCallDelta !== undefined) {
+      updated.currentShortCallDelta = update.currentShortCallDelta ?? undefined;
+    }
+    if (update.currentPutSideDelta !== undefined) {
+      updated.currentPutSideDelta = update.currentPutSideDelta ?? undefined;
+    }
+    if (update.currentCallSideDelta !== undefined) {
+      updated.currentCallSideDelta = update.currentCallSideDelta ?? undefined;
+    }
+
+    this.tradeRepo.update(updated);
+    return { ok: true, trade: updated };
   }
 
   closeTrade(id: string, draft: CloseTradeDraft): OptionsMutationResult {

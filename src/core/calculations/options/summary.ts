@@ -66,6 +66,9 @@ import {
   deriveDteStatus,
   summarizeActionRequiredOpenRisk,
 } from "./dte-status";
+import {
+  buildOpenTradeDashboardMetrics,
+} from "./open-trade-dashboard";
 
 export interface OptionsScannerPriceContext {
   watchlist: WatchlistEntry[];
@@ -81,6 +84,12 @@ export function buildOpenTradeRows(
 ): OptionsOpenTradeRow[] {
   const scanPriceMap = buildScannerScanPriceMap(
     scannerPriceContext?.latestScannerRun?.results ?? []
+  );
+  const scanIndicatorsMap = new Map(
+    (scannerPriceContext?.latestScannerRun?.results ?? []).map((result) => [
+      normalizeTicker(result.ticker),
+      result.indicators,
+    ])
   );
   const candlesByTicker = indexUsDailyCandlesByTicker(
     scannerPriceContext?.dailyCandles ?? []
@@ -109,8 +118,9 @@ export function buildOpenTradeRows(
           ? { userLegUsd: null, clientLegUsd: null }
           : splitForTrade(trade, unrealizedPlUsd);
       const ticker = normalizeTicker(trade.underlying);
+      const scannerIndicators = scanIndicatorsMap.get(ticker) ?? null;
 
-      return {
+      const rowBase = {
         trade,
         spreadMetrics: buildVerticalSpreadMetricsFromTrade(effectiveTrade),
         ironCondorMetrics: buildIronCondorMetricsFromTrade(effectiveTrade),
@@ -136,6 +146,12 @@ export function buildOpenTradeRows(
         daysToExpiration: dte,
         dteStatus: deriveDteStatus(dte),
         strategyDisplay: formatOptionsStrategy(trade.strategy, trade.strategyLabel),
+        scannerIndicators,
+      };
+
+      return {
+        ...rowBase,
+        dashboard: buildOpenTradeDashboardMetrics(rowBase, scannerIndicators),
       };
     });
 
