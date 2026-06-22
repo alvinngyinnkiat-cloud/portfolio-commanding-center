@@ -22,7 +22,7 @@ function resultWithEligibility(
     market: "US",
     currentPrice: 220,
     priceAsOf: "2026-06-12",
-    indicators: {} as ScannerTickerResult["indicators"],
+    indicators: { atr14: 20 } as ScannerTickerResult["indicators"],
     structure: {
       primarySupport: 200,
       primaryResistance: 250,
@@ -76,9 +76,9 @@ describe("buildRankings", () => {
     const results = [
       resultWithEligibility("V", "ironCondor", [], true, {
         currentPrice: 280,
+        indicators: { atr14: 7 } as ScannerTickerResult["indicators"],
         structure: {
-          primarySupport: 260,
-          primaryResistance: 320,
+          icMidZone: { low: 317.16, high: 331.19 },
         } as ScannerTickerResult["structure"],
       }),
     ];
@@ -90,7 +90,7 @@ describe("buildRankings", () => {
       width: 15,
       targetPremium: 3.75,
       maxRiskUsd: 1500,
-      trade: "180/195 + 400/415",
+      trade: "285/300 + 349/364",
     });
   });
 });

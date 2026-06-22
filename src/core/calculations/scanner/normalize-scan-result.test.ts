@@ -6,8 +6,8 @@ import { buildRankings } from "./ranking";
 function ironCondorResult(
   ticker: string,
   currentPrice: number,
-  primarySupport: number,
-  primaryResistance: number
+  icMidZone: { low: number; high: number },
+  atr14 = 20
 ): ScannerTickerResult {
   return {
     ticker,
@@ -17,11 +17,11 @@ function ironCondorResult(
     priceAsOf: "2026-06-14",
     indicators: {
       avgPrice: currentPrice,
+      atr14,
     } as ScannerTickerResult["indicators"],
     structure: {
-      primarySupport,
-      primaryResistance,
-      midPrice: (primarySupport + primaryResistance) / 2,
+      icMidZone,
+      midPrice: (icMidZone.low + icMidZone.high) / 2,
     } as ScannerTickerResult["structure"],
     strategies: {
       bullPut: { eligible: false, checklist: [], passReasons: [], failReasons: [] },
@@ -41,9 +41,9 @@ function ironCondorResult(
 
 describe("normalizeScannerScanRun", () => {
   it("rebuilds iron condor suggested trades from persisted results", () => {
-    const amzn = ironCondorResult("AMZN", 220, 200, 260);
-    const rddt = ironCondorResult("RDDT", 145, 120, 180);
-    const visa = ironCondorResult("V", 280, 260, 320);
+    const amzn = ironCondorResult("AMZN", 220, { low: 200, high: 260 });
+    const rddt = ironCondorResult("RDDT", 145, { low: 120, high: 180 });
+    const visa = ironCondorResult("V", 280, { low: 317.16, high: 331.19 }, 7);
 
     const staleRun = {
       id: "run-1",
@@ -81,7 +81,7 @@ describe("normalizeScannerScanRun", () => {
 
     const amznEntry = ironCondor.find((entry) => entry.ticker === "AMZN");
     expect(amznEntry).toMatchObject({
-      trade: "140/150 + 325/335",
+      trade: "140/150 + 310/320",
       width: 10,
       targetPremium: 2.5,
       maxRiskUsd: 1000,
@@ -89,7 +89,7 @@ describe("normalizeScannerScanRun", () => {
 
     const rddtEntry = ironCondor.find((entry) => entry.ticker === "RDDT");
     expect(rddtEntry).toMatchObject({
-      trade: "80/90 + 225/235",
+      trade: "60/70 + 230/240",
       width: 10,
       targetPremium: 2.5,
       maxRiskUsd: 1000,
@@ -97,7 +97,7 @@ describe("normalizeScannerScanRun", () => {
 
     const visaEntry = ironCondor.find((entry) => entry.ticker === "V");
     expect(visaEntry).toMatchObject({
-      trade: "180/195 + 400/415",
+      trade: "285/300 + 349/364",
       width: 15,
       targetPremium: 3.75,
       maxRiskUsd: 1500,
@@ -107,9 +107,11 @@ describe("normalizeScannerScanRun", () => {
 
 describe("buildRankings iron condor candidates", () => {
   it("calculates suggested trades for all three strategy tables", () => {
-    const amzn = ironCondorResult("AMZN", 220, 200, 260);
+    const amzn = ironCondorResult("AMZN", 220, { low: 200, high: 260 });
     amzn.strategies.bullPut.eligible = true;
     amzn.strategies.bearCall.eligible = true;
+    amzn.structure.primarySupport = 200;
+    amzn.structure.primaryResistance = 260;
 
     const rankings = buildRankings([amzn]);
 
@@ -123,11 +125,11 @@ describe("buildRankings iron condor candidates", () => {
     expect(rankings.bearCall[0]).toMatchObject({
       ticker: "AMZN",
       width: 10,
-      trade: "325 / 335",
+      trade: "310 / 320",
     });
     expect(rankings.ironCondor[0]).toMatchObject({
       ticker: "AMZN",
-      trade: "140/150 + 325/335",
+      trade: "140/150 + 310/320",
     });
   });
 });

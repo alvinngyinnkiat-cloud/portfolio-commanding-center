@@ -5,6 +5,8 @@ export interface SuggestedTradeInput {
   currentPrice: number | null;
   weightedSupport: number | null;
   weightedResistance: number | null;
+  adjustedMidZone: { low: number; high: number } | null;
+  atr14: number | null;
 }
 
 export interface SuggestedTradeResult {
@@ -32,20 +34,41 @@ export function calculateSuggestedMaxRisk(width: number): number {
 
 export function calculateSellPutStrikes(
   weightedSupport: number,
+  atr14: number,
   width: number
 ): { sellPut: number; buyPut: number } {
-  const sellPut = Math.round(weightedSupport * 0.75);
+  const sellPut = Math.round(weightedSupport - 2.5 * atr14);
   const buyPut = sellPut - width;
   return { sellPut, buyPut };
 }
 
 export function calculateSellCallStrikes(
   weightedResistance: number,
+  atr14: number,
   width: number
 ): { sellCall: number; buyCall: number } {
-  const sellCall = Math.round(weightedResistance * 1.25);
+  const sellCall = Math.round(weightedResistance + 2.5 * atr14);
   const buyCall = sellCall + width;
   return { sellCall, buyCall };
+}
+
+/** Iron condor — strikes buffered from Adjusted Mid Zone bounds. */
+export function calculateIronCondorStrikes(
+  adjustedMidZoneLow: number,
+  adjustedMidZoneHigh: number,
+  atr14: number,
+  width: number
+): {
+  sellPut: number;
+  buyPut: number;
+  sellCall: number;
+  buyCall: number;
+} {
+  const sellPut = Math.round(adjustedMidZoneLow - 2.5 * atr14);
+  const buyPut = sellPut - width;
+  const sellCall = Math.round(adjustedMidZoneHigh + 2.5 * atr14);
+  const buyCall = sellCall + width;
+  return { sellPut, buyPut, sellCall, buyCall };
 }
 
 export function formatSellPutTradeDisplay(sellPut: number, buyPut: number): string {
@@ -120,6 +143,26 @@ export function resolveWeightedResistance(row: ScannerTickerResult): number | nu
   );
 }
 
+export function resolveAtr14(row: ScannerTickerResult): number | null {
+  const atr14 = row.indicators?.atr14;
+  return atr14 != null && Number.isFinite(atr14) ? atr14 : null;
+}
+
+export function resolveAdjustedMidZone(
+  row: ScannerTickerResult
+): { low: number; high: number } | null {
+  const zone = row.structure?.icMidZone;
+  if (
+    zone?.low != null &&
+    zone?.high != null &&
+    Number.isFinite(zone.low) &&
+    Number.isFinite(zone.high)
+  ) {
+    return { low: zone.low, high: zone.high };
+  }
+  return null;
+}
+
 export function buildSuggestedTradeFromResult(
   row: ScannerTickerResult,
   strategy: ScannerStrategy
@@ -129,6 +172,8 @@ export function buildSuggestedTradeFromResult(
     currentPrice: resolveSuggestedTradePrice(row),
     weightedSupport: resolveWeightedSupport(row),
     weightedResistance: resolveWeightedResistance(row),
+    adjustedMidZone: resolveAdjustedMidZone(row),
+    atr14: resolveAtr14(row),
   });
 }
 
@@ -148,11 +193,12 @@ export function buildSuggestedTrade(input: SuggestedTradeInput): SuggestedTradeR
   }
 
   if (input.strategy === "bullPut") {
-    if (input.weightedSupport == null) {
+    if (input.weightedSupport == null || input.atr14 == null) {
       return { tradeDisplay: "—", width, targetPremium, maxRiskUsd };
     }
     const { sellPut, buyPut } = calculateSellPutStrikes(
       input.weightedSupport,
+      input.atr14,
       width
     );
     return {
@@ -164,11 +210,12 @@ export function buildSuggestedTrade(input: SuggestedTradeInput): SuggestedTradeR
   }
 
   if (input.strategy === "bearCall") {
-    if (input.weightedResistance == null) {
+    if (input.weightedResistance == null || input.atr14 == null) {
       return { tradeDisplay: "—", width, targetPremium, maxRiskUsd };
     }
     const { sellCall, buyCall } = calculateSellCallStrikes(
       input.weightedResistance,
+      input.atr14,
       width
     );
     return {
@@ -179,19 +226,23 @@ export function buildSuggestedTrade(input: SuggestedTradeInput): SuggestedTradeR
     };
   }
 
-  if (input.weightedSupport == null || input.weightedResistance == null) {
+  if (input.adjustedMidZone == null || input.atr14 == null) {
     return { tradeDisplay: "—", width, targetPremium, maxRiskUsd };
   }
 
-  const putSide = calculateSellPutStrikes(input.weightedSupport, width);
-  const callSide = calculateSellCallStrikes(input.weightedResistance, width);
+  const icStrikes = calculateIronCondorStrikes(
+    input.adjustedMidZone.low,
+    input.adjustedMidZone.high,
+    input.atr14,
+    width
+  );
 
   return {
     tradeDisplay: formatIronCondorTradeDisplay(
-      putSide.buyPut,
-      putSide.sellPut,
-      callSide.sellCall,
-      callSide.buyCall
+      icStrikes.buyPut,
+      icStrikes.sellPut,
+      icStrikes.sellCall,
+      icStrikes.buyCall
     ),
     width,
     targetPremium,
