@@ -7,6 +7,8 @@ import type {
   DeltaSideHealth,
   IronCondorBreakevenDisplay,
   OpenTradeDashboardMetrics,
+  OpenTradeHealthCategory,
+  OpenTradeHealthSummary,
   OptionsOpenTradeRow,
   OptionsStrategy,
   OptionsTrade,
@@ -23,6 +25,8 @@ export type {
   DashboardDeltaHealth,
   DashboardTrendHealth,
   IronCondorBreakevenDisplay,
+  OpenTradeHealthCategory,
+  OpenTradeHealthSummary,
   OpenTradeDashboardMetrics,
 } from "@/core/domain/types/options";
 
@@ -113,6 +117,64 @@ export function deriveTradeHealth(
   if (review) return "REVIEW";
 
   return "REVIEW";
+}
+
+export const OPEN_TRADE_HEALTH_THREATENED_DTE_MAX = 7;
+export const OPEN_TRADE_HEALTH_REVIEW_DTE_MIN = 8;
+export const OPEN_TRADE_HEALTH_REVIEW_DTE_MAX = 14;
+export const OPEN_TRADE_HEALTH_REVIEW_BE_MAX = -2.5;
+
+/**
+ * Open-trades tab health bucket — one category per trade.
+ * Priority: Threatened → Review → Healthy.
+ */
+export function classifyOpenTradeHealthCategory(
+  dte: number,
+  breakevenDistancePct: number | null
+): OpenTradeHealthCategory {
+  if (dte <= OPEN_TRADE_HEALTH_THREATENED_DTE_MAX) return "threatened";
+
+  if (
+    dte >= OPEN_TRADE_HEALTH_REVIEW_DTE_MIN &&
+    dte <= OPEN_TRADE_HEALTH_REVIEW_DTE_MAX &&
+    breakevenDistancePct != null &&
+    breakevenDistancePct <= OPEN_TRADE_HEALTH_REVIEW_BE_MAX
+  ) {
+    return "review";
+  }
+
+  return "healthy";
+}
+
+export function classifyOpenTradeRowHealthCategory(
+  row: OptionsOpenTradeRow
+): OpenTradeHealthCategory {
+  return classifyOpenTradeHealthCategory(
+    row.daysToExpiration,
+    row.dashboard.breakevenDistancePct
+  );
+}
+
+export function summarizeOpenTradeHealthCategories(
+  rows: OptionsOpenTradeRow[]
+): OpenTradeHealthSummary {
+  let threatenedCount = 0;
+  let reviewCount = 0;
+  let healthyCount = 0;
+
+  for (const row of rows) {
+    const category = classifyOpenTradeRowHealthCategory(row);
+    if (category === "threatened") threatenedCount += 1;
+    else if (category === "review") reviewCount += 1;
+    else healthyCount += 1;
+  }
+
+  return {
+    threatenedCount,
+    reviewCount,
+    healthyCount,
+    totalCount: rows.length,
+  };
 }
 
 export function calculateUnrealizedPlPercent(

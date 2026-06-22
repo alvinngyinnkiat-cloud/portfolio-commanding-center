@@ -68,6 +68,16 @@ export interface IronCondorBreakevenDisplay {
   closestSide: "put" | "call";
 }
 
+/** Module 5 open-trades tab health filter — separate from per-trade dashboard Trade Health. */
+export type OpenTradeHealthCategory = "threatened" | "review" | "healthy";
+
+export interface OpenTradeHealthSummary {
+  threatenedCount: number;
+  reviewCount: number;
+  healthyCount: number;
+  totalCount: number;
+}
+
 export interface OpenTradeDashboardMetrics {
   dte: number;
   dteStatus: DashboardDteStatus;

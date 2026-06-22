@@ -1,11 +1,16 @@
 "use client";
 
-import { useMemo } from "react";
-import type { OptionsOpenTradeRow } from "@/core/domain/types/options";
+import { useMemo, useState } from "react";
+import type {
+  OpenTradeHealthCategory,
+  OptionsOpenTradeRow,
+} from "@/core/domain/types/options";
 import {
+  classifyOpenTradeRowHealthCategory,
   compareOpenTradesByDte,
   summarizeOpenTradesHeader,
   summarizeOpenTradesOwnership,
+  summarizeOpenTradeHealthCategories,
 } from "@/core/calculations/options";
 import { formatUsd } from "@/shared/lib/format";
 import { Button } from "@/shared/components/ui/Button";
@@ -13,6 +18,7 @@ import { SummaryCard } from "@/shared/components/ui/SummaryCard";
 import { plTrend } from "./options-utils";
 import { usePortfolio } from "@/context/PortfolioContext";
 import { OpenTradeDashboardCard } from "./OpenTradeDashboardCard";
+import { TradeHealthSummaryCards } from "./TradeHealthSummaryCards";
 
 function SectionSummaryStrip({
   items,
@@ -46,9 +52,20 @@ function SectionSummaryStrip({
   );
 }
 
+function filterRowsByHealth(
+  rows: OptionsOpenTradeRow[],
+  filter: OpenTradeHealthCategory | null
+): OptionsOpenTradeRow[] {
+  if (filter == null) return rows;
+  return rows.filter(
+    (row) => classifyOpenTradeRowHealthCategory(row) === filter
+  );
+}
+
 function OpenTradesList({
   rows,
   emptyMessage,
+  filteredEmptyMessage,
   showSplit,
   onEdit,
   onClose,
@@ -57,6 +74,7 @@ function OpenTradesList({
 }: {
   rows: OptionsOpenTradeRow[];
   emptyMessage: string;
+  filteredEmptyMessage?: string;
   showSplit: boolean;
   onEdit: (row: OptionsOpenTradeRow) => void;
   onClose: (row: OptionsOpenTradeRow) => void;
@@ -66,7 +84,7 @@ function OpenTradesList({
   if (rows.length === 0) {
     return (
       <p className="rounded-2xl border border-surface-border/80 bg-surface-card/60 px-4 py-8 text-center text-slate-500">
-        {emptyMessage}
+        {filteredEmptyMessage ?? emptyMessage}
       </p>
     );
   }
@@ -99,21 +117,34 @@ export function OpenTradesTab({
 }) {
   const { optionsData, services, refresh } = usePortfolio();
   const rows = optionsData?.openRows ?? [];
+  const [healthFilter, setHealthFilter] = useState<OpenTradeHealthCategory | null>(
+    null
+  );
 
-  const personalRows = useMemo(
-    () =>
-      rows
-        .filter((row) => row.trade.tradeType === "personal")
-        .sort(compareOpenTradesByDte),
+  const sortedRows = useMemo(
+    () => [...rows].sort(compareOpenTradesByDte),
     [rows]
   );
 
-  const sharedRows = useMemo(
+  const healthSummary = useMemo(
+    () => summarizeOpenTradeHealthCategories(sortedRows),
+    [sortedRows]
+  );
+
+  const filteredRows = useMemo(
+    () => filterRowsByHealth(sortedRows, healthFilter),
+    [sortedRows, healthFilter]
+  );
+
+  const personalRows = useMemo(
     () =>
-      rows
-        .filter((row) => row.trade.tradeType === "shared")
-        .sort(compareOpenTradesByDte),
-    [rows]
+      filteredRows.filter((row) => row.trade.tradeType === "personal"),
+    [filteredRows]
+  );
+
+  const sharedRows = useMemo(
+    () => filteredRows.filter((row) => row.trade.tradeType === "shared"),
+    [filteredRows]
   );
 
   const personalSummary = useMemo(
@@ -139,11 +170,43 @@ export function OpenTradesTab({
   const formatUnrealized = (value: number | null) =>
     value != null ? formatUsd(value) : "—";
 
+  const filterLabel =
+    healthFilter === "threatened"
+      ? "threatened"
+      : healthFilter === "review"
+        ? "review"
+        : healthFilter === "healthy"
+          ? "healthy"
+          : null;
+
+  const filteredEmptyMessage =
+    filterLabel != null
+      ? `No ${filterLabel} trades in this section.`
+      : undefined;
+
   return (
     <div className="min-w-0 space-y-8">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <Button onClick={onOpenNew}>+ Open Trade</Button>
+        {healthFilter != null && (
+          <button
+            type="button"
+            onClick={() => setHealthFilter(null)}
+            className="text-sm text-slate-400 underline-offset-2 hover:text-white hover:underline"
+          >
+            Clear health filter
+          </button>
+        )}
       </div>
+
+      <section className="min-w-0 space-y-3">
+        <h2 className="text-lg font-semibold text-white">Trade Health</h2>
+        <TradeHealthSummaryCards
+          summary={healthSummary}
+          activeFilter={healthFilter}
+          onFilterChange={setHealthFilter}
+        />
+      </section>
 
       <section className="min-w-0 space-y-4">
         <h2 className="text-lg font-semibold text-white">Personal Open Trades</h2>
@@ -168,6 +231,7 @@ export function OpenTradesTab({
         <OpenTradesList
           rows={personalRows}
           emptyMessage="No personal open trades."
+          filteredEmptyMessage={filteredEmptyMessage}
           showSplit={false}
           onEdit={onEdit}
           onClose={onClose}
@@ -209,6 +273,7 @@ export function OpenTradesTab({
         <OpenTradesList
           rows={sharedRows}
           emptyMessage="No shared open trades."
+          filteredEmptyMessage={filteredEmptyMessage}
           showSplit
           onEdit={onEdit}
           onClose={onClose}

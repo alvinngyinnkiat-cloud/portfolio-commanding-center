@@ -14,6 +14,8 @@ import {
   buildTrendHealth,
   calculateUnrealizedPlPercent,
   calculateRiskUsedPercent,
+  classifyOpenTradeHealthCategory,
+  summarizeOpenTradeHealthCategories,
 } from "./open-trade-dashboard";
 
 describe("open-trade-dashboard", () => {
@@ -195,6 +197,49 @@ describe("open-trade-dashboard", () => {
       expect(calculateRiskUsedPercent(-280.6, 798.08)).toBeCloseTo(35.2, 0);
       expect(calculateRiskUsedPercent(105.25, 201.5)).toBeCloseTo(52.2, 0);
       expect(calculateRiskUsedPercent(null, 500)).toBeNull();
+    });
+  });
+
+  describe("classifyOpenTradeHealthCategory", () => {
+    it("classifies threatened when DTE <= 7 regardless of breakeven", () => {
+      expect(classifyOpenTradeHealthCategory(5, 2)).toBe("threatened");
+      expect(classifyOpenTradeHealthCategory(3, -5)).toBe("threatened");
+      expect(classifyOpenTradeHealthCategory(7, 10)).toBe("threatened");
+    });
+
+    it("classifies review when DTE 8-14 and breakeven <= -2.5%", () => {
+      expect(classifyOpenTradeHealthCategory(12, -3)).toBe("review");
+      expect(classifyOpenTradeHealthCategory(10, -4)).toBe("review");
+      expect(classifyOpenTradeHealthCategory(8, -2.5)).toBe("review");
+    });
+
+    it("classifies healthy for remaining cases", () => {
+      expect(classifyOpenTradeHealthCategory(10, -1)).toBe("healthy");
+      expect(classifyOpenTradeHealthCategory(20, -10)).toBe("healthy");
+      expect(classifyOpenTradeHealthCategory(45, 5)).toBe("healthy");
+      expect(classifyOpenTradeHealthCategory(12, null)).toBe("healthy");
+    });
+
+    it("sums to total open trades", () => {
+      const cases = [
+        [5, 2],
+        [3, -5],
+        [12, -3],
+        [10, -4],
+        [10, -1],
+        [20, -10],
+        [45, 5],
+      ] as const;
+      let threatened = 0;
+      let review = 0;
+      let healthy = 0;
+      for (const [dte, be] of cases) {
+        const cat = classifyOpenTradeHealthCategory(dte, be);
+        if (cat === "threatened") threatened += 1;
+        else if (cat === "review") review += 1;
+        else healthy += 1;
+      }
+      expect(threatened + review + healthy).toBe(cases.length);
     });
   });
 });
