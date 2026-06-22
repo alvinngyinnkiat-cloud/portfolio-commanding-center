@@ -8,7 +8,7 @@ import type {
 
 } from "@/core/domain/types/scanner";
 
-import { buildSuggestedTrade } from "./suggested-trade";
+import { buildSuggestedTradeFromResult } from "./suggested-trade";
 
 
 
@@ -53,18 +53,7 @@ function rankStrategy(
     .slice(0, 5)
 
     .map((row, index) => {
-
-      const suggested = buildSuggestedTrade({
-
-        strategy,
-
-        currentPrice: row.currentPrice,
-
-        weightedSupport: row.structure.primarySupport,
-
-        weightedResistance: row.structure.primaryResistance,
-
-      });
+      const suggested = buildSuggestedTradeFromResult(row, strategy);
 
       return {
 

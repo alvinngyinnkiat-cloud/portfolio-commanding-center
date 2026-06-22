@@ -1,4 +1,4 @@
-import type { ScannerStrategy } from "@/core/domain/types/scanner";
+import type { ScannerStrategy, ScannerTickerResult } from "@/core/domain/types/scanner";
 
 export interface SuggestedTradeInput {
   strategy: ScannerStrategy;
@@ -66,6 +66,70 @@ export function formatIronCondorTradeDisplay(
   buyCall: number
 ): string {
   return `${buyPut}/${sellPut} + ${sellCall}/${buyCall}`;
+}
+
+function computeWeightedSupport(
+  dailySupport: number | null,
+  weeklySupport: number | null
+): number | null {
+  if (dailySupport != null && weeklySupport != null) {
+    return dailySupport * 0.25 + weeklySupport * 0.75;
+  }
+  return null;
+}
+
+function computeWeightedResistance(
+  dailyResistance: number | null,
+  weeklyResistance: number | null
+): number | null {
+  if (dailyResistance != null && weeklyResistance != null) {
+    return dailyResistance * 0.25 + weeklyResistance * 0.75;
+  }
+  return null;
+}
+
+export function resolveSuggestedTradePrice(row: ScannerTickerResult): number | null {
+  if (row.currentPrice != null && Number.isFinite(row.currentPrice)) {
+    return row.currentPrice;
+  }
+  if (row.indicators.avgPrice != null && Number.isFinite(row.indicators.avgPrice)) {
+    return row.indicators.avgPrice;
+  }
+  if (row.structure.midPrice != null && Number.isFinite(row.structure.midPrice)) {
+    return row.structure.midPrice;
+  }
+  return null;
+}
+
+export function resolveWeightedSupport(row: ScannerTickerResult): number | null {
+  const { structure } = row;
+  if (structure.primarySupport != null) {
+    return structure.primarySupport;
+  }
+  return computeWeightedSupport(structure.dailySupport, structure.weeklySupport);
+}
+
+export function resolveWeightedResistance(row: ScannerTickerResult): number | null {
+  const { structure } = row;
+  if (structure.primaryResistance != null) {
+    return structure.primaryResistance;
+  }
+  return computeWeightedResistance(
+    structure.dailyResistance,
+    structure.weeklyResistance
+  );
+}
+
+export function buildSuggestedTradeFromResult(
+  row: ScannerTickerResult,
+  strategy: ScannerStrategy
+): SuggestedTradeResult {
+  return buildSuggestedTrade({
+    strategy,
+    currentPrice: resolveSuggestedTradePrice(row),
+    weightedSupport: resolveWeightedSupport(row),
+    weightedResistance: resolveWeightedResistance(row),
+  });
 }
 
 export function buildSuggestedTrade(input: SuggestedTradeInput): SuggestedTradeResult {

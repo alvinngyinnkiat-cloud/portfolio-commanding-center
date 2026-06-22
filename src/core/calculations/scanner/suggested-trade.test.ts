@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   buildSuggestedTrade,
+  buildSuggestedTradeFromResult,
   calculateSellCallStrikes,
   calculateSellPutStrikes,
   calculateSuggestedMaxRisk,
@@ -109,5 +110,29 @@ describe("buildSuggestedTrade", () => {
 
     expect(result.width).toBe(5);
     expect(result.tradeDisplay).toBe("—");
+  });
+
+  it("derives weighted support from daily and weekly when primary is missing", () => {
+    const result = buildSuggestedTradeFromResult(
+      {
+        ticker: "V",
+        currentPrice: null,
+        indicators: { avgPrice: 280 },
+        structure: {
+          dailySupport: 250,
+          weeklySupport: 270,
+          primarySupport: null,
+          dailyResistance: 310,
+          weeklyResistance: 330,
+          primaryResistance: null,
+        },
+      } as never,
+      "ironCondor"
+    );
+
+    expect(result.width).toBe(15);
+    expect(result.tradeDisplay).toBe("184/199 + 406/421");
+    expect(result.targetPremium).toBe(3.75);
+    expect(result.maxRiskUsd).toBe(1500);
   });
 });
