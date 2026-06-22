@@ -478,6 +478,7 @@ class CachedOptionsSettingsRepository implements OptionsSettingsRepository {
   }
   save(settings: Parameters<OptionsSettingsRepository["save"]>[0]) {
     this.manager.getCache().optionsSettings = normalizeOptionsSettings(settings);
+    this.manager.persistOptionsSettingsLocalBackup();
     this.manager.queueSettingsSync();
   }
 }

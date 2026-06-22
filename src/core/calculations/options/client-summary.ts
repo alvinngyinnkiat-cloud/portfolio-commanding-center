@@ -34,7 +34,7 @@ export function buildOptionsClientSummary(
   const returnPercent =
     startingCapitalUsd > 0
       ? ((clientEquityUsd - startingCapitalUsd) / startingCapitalUsd) * 100
-      : 0;
+      : null;
 
   let openSharedRiskUsd = 0;
   for (const row of sharedOpen) {

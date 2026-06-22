@@ -68,4 +68,14 @@ describe("buildOptionsClientSummary", () => {
     expect(summary.clientEquityUsd).toBe(3000);
     expect(summary.returnPercent).toBe(0);
   });
+
+  it("returns null return percent when starting capital is zero", () => {
+    const summary = buildOptionsClientSummary(
+      { ...DEFAULT_OPTIONS_SETTINGS, clientStartingCapitalUsd: 0, clientName: "" },
+      [],
+      []
+    );
+
+    expect(summary.returnPercent).toBeNull();
+  });
 });

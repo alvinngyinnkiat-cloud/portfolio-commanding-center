@@ -118,7 +118,7 @@ export interface OptionsClientSummary {
   clientRealizedPlUsd: number;
   clientUnrealizedPlUsd: number | null;
   clientEquityUsd: number;
-  returnPercent: number;
+  returnPercent: number | null;
   openSharedTradeCount: number;
   openSharedRiskUsd: number;
 }

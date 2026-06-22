@@ -65,9 +65,17 @@ function ClientSummaryCards() {
         />
         <SummaryCard
           label="Return"
-          value={formatSignedPercent(summary.returnPercent, 2)}
+          value={
+            summary.returnPercent != null
+              ? formatSignedPercent(summary.returnPercent, 2)
+              : "N/A"
+          }
           subValue="(Equity − starting) ÷ starting"
-          trend={plTrend(summary.returnPercent)}
+          trend={
+            summary.returnPercent != null
+              ? plTrend(summary.returnPercent)
+              : "neutral"
+          }
         />
         <SummaryCard
           label="Open Shared Trades"

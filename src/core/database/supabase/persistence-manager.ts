@@ -37,6 +37,11 @@ import { normalizeCryptoHoldings } from "@/core/calculations/crypto/normalize";
 import { normalizeCryptoTrades } from "@/core/calculations/crypto/trade-normalize";
 import { normalizeStockTransactions } from "@/core/calculations/stocks/transaction-normalize";
 import { coerceNumber } from "@/shared/lib/coerce-number";
+import {
+  DEFAULT_OPTIONS_SETTINGS,
+  isUnsetOptionsSettings,
+  normalizeOptionsSettings,
+} from "@/core/domain/defaults-options";
 import { STORAGE_KEYS } from "../local/storage-keys";
 import { readJson, writeJson } from "../local/local-storage";
 import {
@@ -105,6 +110,7 @@ export class PersistenceManager {
     if (!isSupabaseConfigured()) {
       this.cache = exportLocalStorageCache();
       this.reconcileCryptoHoldingsWithTrades();
+      this.reconcileOptionsSettings();
       this.status = "local";
       return;
     }
@@ -113,6 +119,7 @@ export class PersistenceManager {
     if (!this.client) {
       this.cache = exportLocalStorageCache();
       this.reconcileCryptoHoldingsWithTrades();
+      this.reconcileOptionsSettings();
       this.status = "local";
       return;
     }
@@ -141,11 +148,13 @@ export class PersistenceManager {
       await this.applyCryptoTradesMigrationIfNeeded();
       this.reconcileCryptoHoldingsWithTrades();
       this.cache = normalizeCache(this.cache);
+      this.reconcileOptionsSettings();
     } catch (error) {
       logPersistenceError("bootstrap failed — falling back to local cache", error);
       this.lastWarning = `Cloud persistence unavailable (${formatPersistenceError(error)}). Loaded local data instead.`;
       this.cache = exportLocalStorageCache();
       this.reconcileCryptoHoldingsWithTrades();
+      this.reconcileOptionsSettings();
       this.status = "local";
       this.client = getSupabaseClient();
       this.cryptoTradesSyncAvailable = false;
@@ -284,6 +293,37 @@ export class PersistenceManager {
     } catch (error) {
       logPersistenceError("server bootstrap failed", error);
       throw error;
+    }
+  }
+
+  /** Mirror options client settings to localStorage so refresh survives stale cloud cache. */
+  persistOptionsSettingsLocalBackup(): void {
+    if (typeof window === "undefined") return;
+    writeJson(STORAGE_KEYS.optionsSettings, this.cache.optionsSettings);
+  }
+
+  /** Merge local options settings or defaults when cloud cache is empty/unset. */
+  reconcileOptionsSettings(): void {
+    if (typeof window !== "undefined") {
+      const local = normalizeOptionsSettings(
+        readJson(STORAGE_KEYS.optionsSettings, DEFAULT_OPTIONS_SETTINGS)
+      );
+      if (
+        isUnsetOptionsSettings(this.cache.optionsSettings) &&
+        !isUnsetOptionsSettings(local)
+      ) {
+        this.cache.optionsSettings = local;
+      }
+    }
+
+    const normalized = normalizeOptionsSettings(this.cache.optionsSettings);
+    const changed =
+      JSON.stringify(normalized) !== JSON.stringify(this.cache.optionsSettings);
+    this.cache.optionsSettings = normalized;
+    this.persistOptionsSettingsLocalBackup();
+
+    if (changed && this.client) {
+      this.queueSettingsSync();
     }
   }
 
