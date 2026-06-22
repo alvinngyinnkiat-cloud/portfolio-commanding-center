@@ -10,7 +10,7 @@ import {
   getRemainingContracts,
   supportsOpenTradeDashboard,
 } from "@/core/calculations/options";
-import { formatTradeStrikes } from "@/core/calculations/options/helpers";
+import { formatTradeCardDetails } from "@/core/calculations/options/helpers";
 import { formatUsd } from "@/shared/lib/format";
 import { Button } from "@/shared/components/ui/Button";
 import { usePortfolio } from "@/context/PortfolioContext";
@@ -198,24 +198,22 @@ export function OpenTradeDashboardCard({
     });
   };
 
-  const readOnlySnapshot = useMemo(
-    () => [
-      {
-        label: "Entry Credit",
-        value:
-          dashboard.entryCreditUsd != null
-            ? formatUsd(dashboard.entryCreditUsd)
-            : "—",
-      },
-      {
-        label: "Breakeven",
-        value:
-          dashboard.ironCondorBreakeven != null
-            ? `${formatUsd(dashboard.ironCondorBreakeven.lowerBreakevenUsd)} / ${formatUsd(dashboard.ironCondorBreakeven.upperBreakevenUsd)}`
-            : dashboard.breakevenPriceUsd != null
-              ? formatUsd(dashboard.breakevenPriceUsd)
-              : "—",
-      },
+  const readOnlySnapshot = useMemo(() => {
+    const breakevenValue =
+      dashboard.ironCondorBreakeven != null
+        ? `${formatUsd(dashboard.ironCondorBreakeven.lowerBreakevenUsd)} / ${formatUsd(dashboard.ironCondorBreakeven.upperBreakevenUsd)}`
+        : dashboard.breakevenPriceUsd != null
+          ? formatUsd(dashboard.breakevenPriceUsd)
+          : "—";
+
+    const openingDeltaValue =
+      trade.strategy === "bullPut" || trade.strategy === "buyPut"
+        ? trade.openingShortPutDelta
+        : trade.strategy === "bearCall" || trade.strategy === "buyCall"
+          ? trade.openingShortCallDelta
+          : null;
+
+    const commonTail = [
       { label: "Opened", value: formatOptionsTradeDate(trade.openDate) },
       {
         label: "Expiry",
@@ -232,9 +230,47 @@ export function OpenTradeDashboardCard({
             ? `${formatUsd(trade.openingSma50)} / ${formatUsd(trade.openingSma200)}`
             : "—",
       },
-    ],
-    [dashboard, trade]
-  );
+    ];
+
+    if (dashboard.isDebit) {
+      const maxProfitValue =
+        dashboard.maxProfitDisplay === "Unlimited"
+          ? "Unlimited"
+          : dashboard.maxProfitDisplay != null
+            ? formatUsd(parseFloat(dashboard.maxProfitDisplay))
+            : "—";
+
+      return [
+        {
+          label: "Premium Paid",
+          value:
+            dashboard.premiumPaidUsd != null
+              ? formatUsd(dashboard.premiumPaidUsd)
+              : "—",
+        },
+        { label: "Max Risk", value: formatUsd(dashboard.maxRiskUsd) },
+        { label: "Max Profit", value: maxProfitValue },
+        { label: "Breakeven", value: breakevenValue },
+        {
+          label: "Opening Delta",
+          value: openingDeltaValue != null ? formatDelta(openingDeltaValue) : "—",
+        },
+        ...commonTail,
+      ];
+    }
+
+    return [
+      {
+        label: "Entry Credit",
+        value:
+          dashboard.entryCreditUsd != null
+            ? formatUsd(dashboard.entryCreditUsd)
+            : "—",
+      },
+      { label: "Breakeven", value: breakevenValue },
+      ...commonTail,
+    ];
+  }, [dashboard, trade]);
 
   const showDashboard = supportsOpenTradeDashboard(trade.strategy);
 
@@ -260,7 +296,13 @@ export function OpenTradeDashboardCard({
               </span>
             )}
           </div>
-          <p className="text-xs text-slate-500">{formatTradeStrikes(trade)}</p>
+          <div className="space-y-0.5">
+            {formatTradeCardDetails(trade).map((line) => (
+              <p key={line} className="text-xs text-slate-500">
+                {line}
+              </p>
+            ))}
+          </div>
         </div>
         <div className="flex flex-wrap gap-1">
           <Button size="sm" variant="ghost" onClick={() => onEdit(row)}>
@@ -301,6 +343,20 @@ export function OpenTradeDashboardCard({
                       : { currentShortCallDelta: v }
                   )
                 }
+              />
+            )}
+            {trade.strategy === "buyCall" && (
+              <InlineNumberInput
+                label="Current Delta"
+                value={trade.currentShortCallDelta}
+                onSave={(v) => saveMonitoring({ currentShortCallDelta: v })}
+              />
+            )}
+            {trade.strategy === "buyPut" && (
+              <InlineNumberInput
+                label="Current Delta"
+                value={trade.currentShortPutDelta}
+                onSave={(v) => saveMonitoring({ currentShortPutDelta: v })}
               />
             )}
             {trade.strategy === "ironCondor" && (
@@ -414,6 +470,14 @@ export function OpenTradeDashboardCard({
                 ? `(${formatSignedPercent(dashboard.unrealizedPlPct, 1)})`
                 : ""}
             </p>
+            <p className="text-xs text-slate-500">
+              Current MV{" "}
+              <span className="text-slate-300">
+                {trade.currentValueUsd != null
+                  ? formatUsd(trade.currentValueUsd)
+                  : "—"}
+              </span>
+            </p>
             <p className="pt-1 text-xs text-slate-500">
               Max Risk{" "}
               <span className="text-slate-300">
@@ -471,7 +535,7 @@ export function OpenTradeDashboardCard({
         </div>
       ) : (
         <p className="text-sm text-slate-500">
-          Risk dashboard available for bull put, bear call, and iron condor strategies.
+          Risk dashboard is not available for this strategy type.
         </p>
       )}
 

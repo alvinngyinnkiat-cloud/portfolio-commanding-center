@@ -4,7 +4,12 @@ import type {
   OptionsTrade,
   OptionsVerticalSpreadMetrics,
 } from "@/core/domain/types/options";
-import { getTradeTotalRealizedPlUsd } from "./contract-tracking";
+import { formatUsd } from "@/shared/lib/format";
+import {
+  allocateOpenAmountsForContracts,
+  getRemainingContracts,
+  getTradeTotalRealizedPlUsd,
+} from "./contract-tracking";
 import {
   calculateIronCondorMetrics,
   isIronCondorStrategy,
@@ -125,4 +130,22 @@ export function formatTradeStrikes(trade: OptionsTrade): string {
   }
 
   return "—";
+}
+
+/** Labeled header lines for open trade dashboard cards — no bare numbers. */
+export function formatTradeCardDetails(trade: OptionsTrade): string[] {
+  const remaining = getRemainingContracts(trade);
+
+  if (trade.strategy === "buyCall" || trade.strategy === "buyPut") {
+    const { openPremiumUsd } = allocateOpenAmountsForContracts(trade, remaining);
+    const lines: string[] = [];
+    if (trade.longStrikeUsd != null) {
+      lines.push(`Strike: ${trade.longStrikeUsd}`);
+    }
+    lines.push(`Premium Paid: ${formatUsd(openPremiumUsd)}`);
+    lines.push(`Contracts: ${remaining}`);
+    return lines;
+  }
+
+  return [formatTradeStrikes(trade)];
 }

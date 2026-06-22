@@ -71,6 +71,14 @@ export function calculateDebitOptionMetrics(
   };
 }
 
+export function calculateBuyPutMaxProfitUsd(
+  strikeUsd: number,
+  openPremiumUsd: number,
+  contracts: number
+): number {
+  return strikeUsd * CONTRACT_MULTIPLIER * contracts - openPremiumUsd;
+}
+
 export function validateDebitOptionStrike(
   strategy: DebitOptionStrategy,
   strikeUsd: number

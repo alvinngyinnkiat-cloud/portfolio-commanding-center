@@ -12,8 +12,11 @@ import {
   deriveTradeHealth,
   buildDeltaHealth,
   buildTrendHealth,
+  buildOpenTradeDashboardMetrics,
   calculateUnrealizedPlPercent,
   calculateRiskUsedPercent,
+  calculateDebitRiskUsedPercent,
+  supportsOpenTradeDashboard,
   classifyOpenTradeHealthCategory,
   summarizeOpenTradeHealthCategories,
 } from "./open-trade-dashboard";
@@ -197,6 +200,94 @@ describe("open-trade-dashboard", () => {
       expect(calculateRiskUsedPercent(-280.6, 798.08)).toBeCloseTo(35.2, 0);
       expect(calculateRiskUsedPercent(105.25, 201.5)).toBeCloseTo(52.2, 0);
       expect(calculateRiskUsedPercent(null, 500)).toBeNull();
+    });
+  });
+
+  describe("calculateDebitRiskUsedPercent", () => {
+    it("returns zero when P/L is positive or flat", () => {
+      expect(calculateDebitRiskUsedPercent(120, 500)).toBe(0);
+      expect(calculateDebitRiskUsedPercent(0, 500)).toBe(0);
+    });
+
+    it("returns loss over max risk when underwater", () => {
+      expect(calculateDebitRiskUsedPercent(-125, 500)).toBe(25);
+    });
+  });
+
+  describe("supportsOpenTradeDashboard", () => {
+    it("includes buy call and buy put", () => {
+      expect(supportsOpenTradeDashboard("buyCall")).toBe(true);
+      expect(supportsOpenTradeDashboard("buyPut")).toBe(true);
+    });
+
+    it("excludes naked and custom strategies", () => {
+      expect(supportsOpenTradeDashboard("sellPut")).toBe(false);
+      expect(supportsOpenTradeDashboard("sellCall")).toBe(false);
+      expect(supportsOpenTradeDashboard("custom")).toBe(false);
+    });
+  });
+
+  describe("buildDeltaHealth for debit strategies", () => {
+    it("tracks long call delta on buy call", () => {
+      const trade = {
+        strategy: "buyCall",
+        openingShortCallDelta: 0.45,
+        currentShortCallDelta: 0.62,
+      } as OptionsTrade;
+      const health = buildDeltaHealth(trade);
+      expect(health?.callSide?.riskDirection).toBe("increasing");
+    });
+
+    it("tracks long put delta on buy put", () => {
+      const trade = {
+        strategy: "buyPut",
+        openingShortPutDelta: -0.35,
+        currentShortPutDelta: -0.52,
+      } as OptionsTrade;
+      const health = buildDeltaHealth(trade);
+      expect(health?.putSide?.riskDirection).toBe("increasing");
+    });
+  });
+
+  describe("buildOpenTradeDashboardMetrics for buy call", () => {
+    it("uses bull-put-style breakeven distance and debit economics", () => {
+      const trade = {
+        id: "t1",
+        strategy: "buyCall",
+        status: "open",
+        contracts: 2,
+        longStrikeUsd: 120,
+        openPremiumUsd: 600,
+        openFeesUsd: 2,
+        maxRiskUsd: 602,
+        expirationDate: "2026-07-18",
+        underlyingPriceUsd: 125,
+        entryValueUsd: 600,
+        currentValueUsd: 720,
+      } as OptionsTrade;
+
+      const row = {
+        trade,
+        daysToExpiration: 20,
+        unrealizedPlUsd: 120,
+        tradeEconomics: {
+          breakevenUsd: 123,
+          maxRiskUsd: 602,
+          maxProfitUsd: null,
+        },
+        spreadMetrics: null,
+        ironCondorMetrics: null,
+        underlyingPrice: { priceUsd: null },
+      };
+
+      const metrics = buildOpenTradeDashboardMetrics(row);
+      expect(metrics.supportsDashboard).toBe(true);
+      expect(metrics.isDebit).toBe(true);
+      expect(metrics.premiumPaidUsd).toBe(600);
+      expect(metrics.maxProfitDisplay).toBe("Unlimited");
+      expect(metrics.breakevenPriceUsd).toBe(123);
+      expect(metrics.breakevenDistancePct).toBeCloseTo(1.63, 1);
+      expect(metrics.riskUsedPct).toBe(0);
     });
   });
 

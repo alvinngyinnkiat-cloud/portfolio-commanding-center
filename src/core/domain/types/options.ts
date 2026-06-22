@@ -96,6 +96,10 @@ export interface OpenTradeDashboardMetrics {
   deltaHealth: DashboardDeltaHealth | null;
   trendHealth: DashboardTrendHealth | null;
   entryCreditUsd: number | null;
+  /** Debit strategies — premium paid (remaining contracts). */
+  premiumPaidUsd: number | null;
+  maxProfitDisplay: string | null;
+  isDebit: boolean;
   supportsDashboard: boolean;
 }
 

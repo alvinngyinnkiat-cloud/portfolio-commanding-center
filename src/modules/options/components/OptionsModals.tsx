@@ -287,7 +287,9 @@ export function OpenTradeModal({
   const isDashboardStrategy =
     form.strategy === "bullPut" ||
     form.strategy === "bearCall" ||
-    form.strategy === "ironCondor";
+    form.strategy === "ironCondor" ||
+    form.strategy === "buyCall" ||
+    form.strategy === "buyPut";
   const showOpeningSnapshot = !editTrade && isDashboardStrategy;
   const showOpeningSnapshotReadOnly = !!editTrade && isDashboardStrategy;
 
@@ -1054,6 +1056,28 @@ export function OpenTradeModal({
                   }
                 />
               )}
+              {form.strategy === "buyCall" && (
+                <Input
+                  label="Opening Delta"
+                  type="number"
+                  step="any"
+                  value={form.openingShortCallDelta}
+                  onChange={(e) =>
+                    setForm((p) => ({ ...p, openingShortCallDelta: e.target.value }))
+                  }
+                />
+              )}
+              {form.strategy === "buyPut" && (
+                <Input
+                  label="Opening Delta"
+                  type="number"
+                  step="any"
+                  value={form.openingShortPutDelta}
+                  onChange={(e) =>
+                    setForm((p) => ({ ...p, openingShortPutDelta: e.target.value }))
+                  }
+                />
+              )}
               {form.strategy === "ironCondor" && (
                 <>
                   <Input
@@ -1118,6 +1142,12 @@ export function OpenTradeModal({
             )}
             {form.strategy === "bearCall" && (
               <p>Opening Delta: {form.openingShortCallDelta || "—"}</p>
+            )}
+            {form.strategy === "buyCall" && (
+              <p>Opening Delta: {form.openingShortCallDelta || "—"}</p>
+            )}
+            {form.strategy === "buyPut" && (
+              <p>Opening Delta: {form.openingShortPutDelta || "—"}</p>
             )}
             {form.strategy === "ironCondor" && (
               <>

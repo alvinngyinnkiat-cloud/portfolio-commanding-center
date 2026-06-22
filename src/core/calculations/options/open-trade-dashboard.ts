@@ -14,7 +14,9 @@ import type {
   OptionsTrade,
 } from "@/core/domain/types/options";
 import type { ScannerIndicators } from "@/core/domain/types/scanner";
-import { scaleMaxRiskForRemaining } from "./contract-tracking";
+import { scaleMaxRiskForRemaining, tradeForRemainingContracts } from "./contract-tracking";
+import { calculateBuyPutMaxProfitUsd } from "./debit-option";
+import { isDebitStrategy } from "./strategy-kind";
 
 export type {
   DashboardBreakevenStatus,
@@ -34,6 +36,8 @@ const DASHBOARD_STRATEGIES = new Set<OptionsStrategy>([
   "bullPut",
   "bearCall",
   "ironCondor",
+  "buyCall",
+  "buyPut",
 ]);
 
 export function supportsOpenTradeDashboard(strategy: OptionsStrategy): boolean {
@@ -193,6 +197,16 @@ export function calculateRiskUsedPercent(
   return (Math.abs(unrealizedPlUsd) / maxRiskUsd) * 100;
 }
 
+/** Debit strategies — loss only, as % of max risk. */
+export function calculateDebitRiskUsedPercent(
+  unrealizedPlUsd: number | null,
+  maxRiskUsd: number
+): number | null {
+  if (unrealizedPlUsd == null || maxRiskUsd <= 0) return null;
+  if (unrealizedPlUsd >= 0) return 0;
+  return (Math.abs(unrealizedPlUsd) / maxRiskUsd) * 100;
+}
+
 export function buildIronCondorBreakevenDisplay(
   currentPriceUsd: number,
   lowerBreakevenUsd: number,
@@ -228,7 +242,7 @@ function resolveBreakevenDashboard(
   row: Omit<OptionsOpenTradeRow, "dashboard">,
   currentPriceUsd: number | null
 ): BreakevenDashboardResult {
-  const { trade, spreadMetrics, ironCondorMetrics } = row;
+  const { trade, spreadMetrics, ironCondorMetrics, tradeEconomics } = row;
 
   if (currentPriceUsd == null) {
     return {
@@ -255,6 +269,28 @@ function resolveBreakevenDashboard(
       breakevenDistancePct: calculateBearCallBreakevenDistancePct(
         currentPriceUsd,
         spreadMetrics.breakevenUsd
+      ),
+      ironCondorBreakeven: null,
+    };
+  }
+
+  if (trade.strategy === "buyCall" && tradeEconomics?.breakevenUsd != null) {
+    return {
+      breakevenPriceUsd: tradeEconomics.breakevenUsd,
+      breakevenDistancePct: calculateBullPutBreakevenDistancePct(
+        currentPriceUsd,
+        tradeEconomics.breakevenUsd
+      ),
+      ironCondorBreakeven: null,
+    };
+  }
+
+  if (trade.strategy === "buyPut" && tradeEconomics?.breakevenUsd != null) {
+    return {
+      breakevenPriceUsd: tradeEconomics.breakevenUsd,
+      breakevenDistancePct: calculateBearCallBreakevenDistancePct(
+        currentPriceUsd,
+        tradeEconomics.breakevenUsd
       ),
       ironCondorBreakeven: null,
     };
@@ -362,6 +398,26 @@ export function buildDeltaHealth(trade: OptionsTrade): DashboardDeltaHealth | nu
     return { putSide, callSide };
   }
 
+  if (trade.strategy === "buyCall") {
+    const callSide = buildDeltaSide(
+      "",
+      trade.openingShortCallDelta,
+      trade.currentShortCallDelta,
+      "call"
+    );
+    return callSide ? { putSide: null, callSide } : null;
+  }
+
+  if (trade.strategy === "buyPut") {
+    const putSide = buildDeltaSide(
+      "",
+      trade.openingShortPutDelta,
+      trade.currentShortPutDelta,
+      "put"
+    );
+    return putSide ? { putSide, callSide: null } : null;
+  }
+
   return null;
 }
 
@@ -428,15 +484,40 @@ export function buildOpenTradeDashboardMetrics(
     : null;
 
   const maxRiskUsd = scaleMaxRiskForRemaining(trade);
+  const isDebit = isDebitStrategy(trade.strategy);
   const unrealizedPlPct = calculateUnrealizedPlPercent(
     unrealizedPlUsd,
     maxRiskUsd
   );
-  const riskUsedPct = calculateRiskUsedPercent(unrealizedPlUsd, maxRiskUsd);
+  const riskUsedPct = isDebit
+    ? calculateDebitRiskUsedPercent(unrealizedPlUsd, maxRiskUsd)
+    : calculateRiskUsedPercent(unrealizedPlUsd, maxRiskUsd);
 
-  const entryCreditUsd = supportsDashboard
-    ? trade.openPremiumUsd - trade.openFeesUsd
-    : null;
+  const effectiveTrade = tradeForRemainingContracts(trade);
+  const entryCreditUsd =
+    supportsDashboard && !isDebit
+      ? effectiveTrade.openPremiumUsd - effectiveTrade.openFeesUsd
+      : null;
+  const premiumPaidUsd =
+    supportsDashboard && isDebit ? effectiveTrade.openPremiumUsd : null;
+
+  let maxProfitDisplay: string | null = null;
+  if (supportsDashboard && isDebit) {
+    if (trade.strategy === "buyCall") {
+      maxProfitDisplay = "Unlimited";
+    } else if (
+      trade.strategy === "buyPut" &&
+      trade.longStrikeUsd != null
+    ) {
+      maxProfitDisplay = String(
+        calculateBuyPutMaxProfitUsd(
+          trade.longStrikeUsd,
+          effectiveTrade.openPremiumUsd,
+          effectiveTrade.contracts
+        )
+      );
+    }
+  }
 
   return {
     dte: daysToExpiration,
@@ -454,6 +535,9 @@ export function buildOpenTradeDashboardMetrics(
     deltaHealth: supportsDashboard ? buildDeltaHealth(trade) : null,
     trendHealth: buildTrendHealth(scannerIndicators),
     entryCreditUsd,
+    premiumPaidUsd,
+    maxProfitDisplay,
+    isDebit,
     supportsDashboard,
   };
 }
