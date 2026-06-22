@@ -6,7 +6,8 @@ function resultWithEligibility(
   ticker: string,
   strategy: "bullPut" | "bearCall" | "ironCondor",
   checklist: Array<{ label: string; passed: boolean; detail: string }>,
-  eligible = true
+  eligible = true,
+  overrides: Partial<ScannerTickerResult> = {}
 ): ScannerTickerResult {
   const emptyStrategy = {
     eligible: false,
@@ -19,10 +20,13 @@ function resultWithEligibility(
     ticker,
     category: "ETF",
     market: "US",
-    currentPrice: 100,
+    currentPrice: 220,
     priceAsOf: "2026-06-12",
     indicators: {} as ScannerTickerResult["indicators"],
-    structure: {} as ScannerTickerResult["structure"],
+    structure: {
+      primarySupport: 200,
+      primaryResistance: 250,
+    } as ScannerTickerResult["structure"],
     strategies: {
       bullPut: emptyStrategy,
       bearCall: emptyStrategy,
@@ -42,59 +46,16 @@ function resultWithEligibility(
     recentCandles: [],
     status: "ok",
     notes: [],
+    ...overrides,
   };
 }
 
 describe("buildRankings", () => {
-  it("ranks eligible tickers alphabetically and builds key reasons", () => {
+  it("ranks eligible tickers alphabetically with suggested trades", () => {
     const results = [
-      resultWithEligibility("MSFT", "bullPut", [
-        { label: "SO Rolling Up", passed: true, detail: "Rolling Up" },
-        { label: "Trend Bullish", passed: true, detail: "Bullish" },
-        {
-          label: "Average Price in Sell Put Zone",
-          passed: true,
-          detail: "290 - 300",
-        },
-        {
-          label: "Average Price > Previous Average Price",
-          passed: true,
-          detail: "298 vs 295",
-        },
-      ]),
-      resultWithEligibility("AAPL", "bullPut", [
-        { label: "SO Rolling Up", passed: true, detail: "Rolling Up" },
-        { label: "Trend Bullish", passed: true, detail: "Bullish" },
-        {
-          label: "Average Price in Sell Put Zone",
-          passed: true,
-          detail: "290 - 300",
-        },
-        {
-          label: "Average Price > Previous Average Price",
-          passed: false,
-          detail: "295 vs 298",
-        },
-      ]),
-      resultWithEligibility(
-        "ZZZZ",
-        "bullPut",
-        [
-          { label: "SO Rolling Up", passed: false, detail: "Strong" },
-          { label: "Trend Bullish", passed: true, detail: "Bullish" },
-          {
-            label: "Average Price in Sell Put Zone",
-            passed: true,
-            detail: "290 - 300",
-          },
-          {
-            label: "Average Price > Previous Average Price",
-            passed: true,
-            detail: "298 vs 295",
-          },
-        ],
-        false
-      ),
+      resultWithEligibility("MSFT", "bullPut", []),
+      resultWithEligibility("AAPL", "bullPut", []),
+      resultWithEligibility("ZZZZ", "bullPut", [], false),
     ];
 
     const rankings = buildRankings(results);
@@ -103,10 +64,33 @@ describe("buildRankings", () => {
       "AAPL",
       "MSFT",
     ]);
-    expect(rankings.bullPut[0].strategy).toBe("SELL PUT");
-    expect(rankings.bullPut[0].keyReason).toContain("SO Rolling Up");
-    expect(rankings.bullPut[0].keyReason).not.toContain(
-      "Average Price > Previous Average Price"
-    );
+    expect(rankings.bullPut[0]).toMatchObject({
+      trade: "150 / 140",
+      width: 10,
+      targetPremium: 2.5,
+      maxRiskUsd: 1000,
+    });
+  });
+
+  it("builds iron condor suggested trade format", () => {
+    const results = [
+      resultWithEligibility("V", "ironCondor", [], true, {
+        currentPrice: 280,
+        structure: {
+          primarySupport: 260,
+          primaryResistance: 320,
+        } as ScannerTickerResult["structure"],
+      }),
+    ];
+
+    const rankings = buildRankings(results);
+
+    expect(rankings.ironCondor[0]).toMatchObject({
+      ticker: "V",
+      width: 15,
+      targetPremium: 3.75,
+      maxRiskUsd: 1500,
+      trade: "180/195 + 400/415",
+    });
   });
 });

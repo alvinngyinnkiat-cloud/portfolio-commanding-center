@@ -290,11 +290,14 @@ export interface ScannerRankedEntry {
 
   ticker: string;
 
-  category: ScannerCategory;
+  /** Suggested strike structure — informational only. */
+  trade: string;
 
-  strategy: StrategyOutput;
+  width: number | null;
 
-  keyReason: string;
+  targetPremium: number | null;
+
+  maxRiskUsd: number | null;
 
 }
 

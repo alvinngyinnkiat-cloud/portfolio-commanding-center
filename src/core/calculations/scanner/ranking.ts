@@ -6,13 +6,9 @@ import type {
 
   ScannerTickerResult,
 
-  StrategyOutput,
-
 } from "@/core/domain/types/scanner";
 
-import { buildKeyReason } from "./scoring";
-
-import { strategyKeyToOutput } from "./main-system-display";
+import { buildSuggestedTrade } from "./suggested-trade";
 
 
 
@@ -48,10 +44,6 @@ function rankStrategy(
 
 ): ScannerRankedEntry[] {
 
-  const output = strategyKeyToOutput(strategy);
-
-
-
   return results
 
     .filter((row) => row.strategies[strategy].eligible)
@@ -60,19 +52,37 @@ function rankStrategy(
 
     .slice(0, 5)
 
-    .map((row, index) => ({
+    .map((row, index) => {
 
-      rank: index + 1,
+      const suggested = buildSuggestedTrade({
 
-      ticker: row.ticker,
+        strategy,
 
-      category: row.category,
+        currentPrice: row.currentPrice,
 
-      strategy: output,
+        weightedSupport: row.structure.primarySupport,
 
-      keyReason: buildKeyReason(row.strategies[strategy].checklist),
+        weightedResistance: row.structure.primaryResistance,
 
-    }));
+      });
+
+      return {
+
+        rank: index + 1,
+
+        ticker: row.ticker,
+
+        trade: suggested.tradeDisplay,
+
+        width: suggested.width,
+
+        targetPremium: suggested.targetPremium,
+
+        maxRiskUsd: suggested.maxRiskUsd,
+
+      };
+
+    });
 
 }
 
