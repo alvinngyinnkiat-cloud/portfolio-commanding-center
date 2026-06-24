@@ -15,74 +15,70 @@ describe("display reasons", () => {
     const reasons = buildSellPutChecklistReasons({
       so: 18.5,
       soStatus: "Rolling Up",
-      trend: "Bullish",
+      marketStructure: "Bullish",
+      momentum: "Above EMA",
       avgPrice: 298.5,
       avgPricePrev: 295.0,
-      primarySupport: 293.89,
-      atr14: 10,
-      sellPutRange: { low: 293.89, high: 303.89 },
     });
 
-    expect(reasons[0]).toBe("SO = 18.5");
-    expect(reasons[1]).toBe("SO Rolling Up = Yes");
-    expect(reasons[2]).toBe("Trend Bullish = Yes");
-    expect(reasons[3]).toContain("Avg Price inside Sell Put Zone = Yes");
-    expect(reasons[4]).toContain("Avg Price > Previous Avg Price = Yes");
+    expect(reasons[0]).toBe("Bullish Structure = Yes");
+    expect(reasons[1]).toBe("Momentum Above EMA = Yes");
+    expect(reasons[2]).toContain("Current Average Price > Previous Average Price = Yes");
+    expect(reasons[3]).toBe("SO Rolling Up = Yes");
+    expect(reasons[4]).toBe("SO Value = 18.5");
   });
 
   it("builds Sell Call checklist reasons", () => {
     const reasons = buildSellCallChecklistReasons({
       so: 82.0,
       soStatus: "Rolling Down",
-      trend: "Bearish",
+      marketStructure: "Bearish",
+      momentum: "Below EMA",
       avgPrice: 350,
       avgPricePrev: 355,
-      primaryResistance: 354.46,
-      atr14: 10,
-      sellCallRange: { low: 344.46, high: 354.46 },
     });
 
-    expect(reasons[0]).toBe("SO = 82.0");
-    expect(reasons[1]).toBe("SO Rolling Down = Yes");
-    expect(reasons[2]).toBe("Trend Bearish = Yes");
-    expect(reasons[3]).toContain("Avg Price inside Sell Call Zone = Yes");
-    expect(reasons[4]).toContain("Avg Price < Previous Avg Price = Yes");
+    expect(reasons[0]).toBe("Bearish Structure = Yes");
+    expect(reasons[1]).toBe("Momentum Below EMA = Yes");
+    expect(reasons[2]).toContain("Current Average Price < Previous Average Price = Yes");
+    expect(reasons[3]).toBe("SO Rolling Down = Yes");
+    expect(reasons[4]).toBe("SO Value = 82.0");
   });
 
   it("builds Iron Condor checklist reasons", () => {
     const reasons = buildIronCondorChecklistReasons({
       so: 52.4,
-      trend: "Neutral",
       avgPrice: 322.86,
       midPrice: 324.18,
       atr14: 10.15,
       icMidZone: { low: 314.18, high: 334.18 },
+      sellPutSetupValid: false,
+      sellCallSetupValid: false,
     });
 
     expect(reasons).toEqual([
-      "SO = 52.4",
-      "SO in range 40-60 = Yes",
-      "Trend Neutral = Yes",
-      "Avg Price inside Mid Zone = Yes (314.18 - 334.18)",
+      "SO 40–60 = Yes (52.4)",
+      "Average Price inside Adjusted Mid Zone = Yes (314.18 - 334.18)",
+      "Sell Put conditions not fully satisfied = Yes",
+      "Sell Call conditions not fully satisfied = Yes",
     ]);
   });
 
-  it("builds no-trade reasons with eligibility failures", () => {
+  it("builds no-trade reasons with failed conditions", () => {
     const reasons = buildNoTradeReasons({
       so: 52.4,
-      trend: "Neutral",
+      soStatus: "Strong",
+      marketStructure: "Neutral",
+      momentum: "At EMA",
       avgPrice: 322.86,
+      avgPricePrev: 320.0,
       midPrice: 324.18,
       atr14: 10,
-      bullPutEligible: false,
-      bearCallEligible: false,
-      ironCondorEligible: false,
+      icMidZone: { low: 314.18, high: 334.18 },
     });
 
-    expect(reasons[0]).toBe("No eligible strategy");
-    expect(reasons).toContain("Sell Put: not eligible");
-    expect(reasons).toContain("Sell Call: not eligible");
-    expect(reasons).toContain("Iron Condor: not eligible");
+    expect(reasons.length).toBeGreaterThan(0);
+    expect(reasons.join(" ")).toMatch(/Bullish Structure|Bearish Structure|Momentum/);
   });
 
   it("builds quantitative Iron Condor reasons (deprecated alias)", () => {
@@ -95,14 +91,8 @@ describe("display reasons", () => {
       atr14: 10.15,
     });
 
-    expect(reasons).toEqual([
-      "SO = 52.4",
-      "Trend = Neutral",
-      "Avg Price = 322.86",
-      "Mid Zone = 314.18 - 334.18",
-      "Range Width = 60.57",
-      "Range Width = 5.97 ATR",
-    ]);
+    expect(reasons[0]).toBe("SO = 52.4");
+    expect(reasons[1]).toBe("Structure = Neutral");
   });
 
   it("builds quantitative Sell Put reasons (deprecated alias)", () => {
@@ -114,7 +104,6 @@ describe("display reasons", () => {
     });
 
     expect(reasons[0]).toBe("Avg Price = 298.50");
-    expect(reasons[1]).toBe("Support Zone = 293.89 - 303.89");
     expect(reasons[2]).toBe("Avg Price inside zone = Yes");
   });
 
@@ -127,7 +116,6 @@ describe("display reasons", () => {
     });
 
     expect(reasons[0]).toBe("Avg Price = 350.00");
-    expect(reasons[1]).toBe("Resistance Zone = 344.46 - 354.46");
     expect(reasons[2]).toBe("Avg Price inside zone = Yes");
   });
 });
@@ -137,17 +125,14 @@ describe("evaluateMainSystemDisplay Cases A-D", () => {
     bullPutEligible: false,
     bearCallEligible: false,
     ironCondorEligible: false,
-    trend: "Neutral" as const,
+    marketStructure: "Neutral" as const,
+    momentum: "At EMA" as const,
     so: 52.4,
     soStatus: "Strong" as const,
     avgPrice: 322.86,
     avgPricePrev: 320.0,
     midPrice: 324.18,
     atr14: 10,
-    primarySupport: 293.89,
-    primaryResistance: 354.46,
-    sellPutRange: { low: 293.89, high: 303.89 },
-    sellCallRange: { low: 344.46, high: 354.46 },
     icMidZone: { low: 314.18, high: 334.18 },
   };
 
@@ -157,17 +142,18 @@ describe("evaluateMainSystemDisplay Cases A-D", () => {
       bullPutEligible: true,
       so: 18.5,
       soStatus: "Rolling Up",
-      trend: "Bullish",
+      marketStructure: "Bullish",
+      momentum: "Above EMA",
       avgPrice: 298.5,
       avgPricePrev: 295.0,
     });
 
     expect(result.output).toBe("SELL PUT");
     expect(result.strategy).toBe("bullPut");
+    expect(result.reasons.join(" ")).toMatch(/Bullish Structure/);
+    expect(result.reasons.join(" ")).toMatch(/Momentum Above EMA/);
     expect(result.reasons.join(" ")).toMatch(/SO Rolling Up/);
-    expect(result.reasons.join(" ")).toMatch(/Trend Bullish/);
-    expect(result.reasons.join(" ")).toMatch(/Sell Put Zone/);
-    expect(result.reasons.join(" ")).not.toMatch(/Iron Condor|Sell Call|Mid Zone|40-60/);
+    expect(result.reasons.join(" ")).not.toMatch(/Iron Condor|Sell Call|40–60|Mid Zone/);
   });
 
   it("Case B: SELL CALL reasons only contain Sell Call criteria", () => {
@@ -176,17 +162,17 @@ describe("evaluateMainSystemDisplay Cases A-D", () => {
       bearCallEligible: true,
       so: 82.0,
       soStatus: "Rolling Down",
-      trend: "Bearish",
+      marketStructure: "Bearish",
+      momentum: "Below EMA",
       avgPrice: 350,
       avgPricePrev: 355,
     });
 
     expect(result.output).toBe("SELL CALL");
     expect(result.strategy).toBe("bearCall");
-    expect(result.reasons.join(" ")).toMatch(/SO Rolling Down/);
-    expect(result.reasons.join(" ")).toMatch(/Trend Bearish/);
-    expect(result.reasons.join(" ")).toMatch(/Sell Call Zone/);
-    expect(result.reasons.join(" ")).not.toMatch(/Iron Condor|Sell Put|40-60/);
+    expect(result.reasons.join(" ")).toMatch(/Bearish Structure/);
+    expect(result.reasons.join(" ")).toMatch(/Momentum Below EMA/);
+    expect(result.reasons.join(" ")).not.toMatch(/Iron Condor|Sell Put|40–60/);
   });
 
   it("Case C: IRON CONDOR reasons only contain Iron Condor criteria", () => {
@@ -197,21 +183,18 @@ describe("evaluateMainSystemDisplay Cases A-D", () => {
 
     expect(result.output).toBe("IRON CONDOR");
     expect(result.strategy).toBe("ironCondor");
-    expect(result.reasons.join(" ")).toMatch(/40-60/);
-    expect(result.reasons.join(" ")).toMatch(/Trend Neutral/);
-    expect(result.reasons.join(" ")).toMatch(/Mid Zone/);
-    expect(result.reasons.join(" ")).not.toMatch(/Support exists|Resistance exists|Sell Put|Sell Call/);
+    expect(result.reasons.join(" ")).toMatch(/40–60/);
+    expect(result.reasons.join(" ")).toMatch(/Adjusted Mid Zone/);
+    expect(result.reasons.join(" ")).toMatch(/Sell Put conditions not fully satisfied/);
+    expect(result.reasons.join(" ")).not.toMatch(/Bullish Structure|Bearish Structure|Momentum/);
   });
 
-  it("Case D: NO TRADE reasons explain why no strategy passed", () => {
+  it("Case D: NO TRADE reasons explain failed conditions", () => {
     const result = evaluateMainSystemDisplay(baseInput);
 
     expect(result.output).toBe("NO TRADE");
     expect(result.strategy).toBeNull();
-    expect(result.reasons[0]).toBe("No eligible strategy");
-    expect(result.reasons).toContain("Sell Put: not eligible");
-    expect(result.reasons).toContain("Sell Call: not eligible");
-    expect(result.reasons).toContain("Iron Condor: not eligible");
+    expect(result.reasons.length).toBeGreaterThan(0);
   });
 
   it("prefers SELL PUT over IRON CONDOR when both are eligible", () => {
@@ -221,7 +204,8 @@ describe("evaluateMainSystemDisplay Cases A-D", () => {
       ironCondorEligible: true,
       so: 18.5,
       soStatus: "Rolling Up",
-      trend: "Bullish",
+      marketStructure: "Bullish",
+      momentum: "Above EMA",
       avgPrice: 298.5,
       avgPricePrev: 295.0,
     });

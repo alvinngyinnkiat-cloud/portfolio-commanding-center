@@ -90,7 +90,7 @@ export function buildTradeReasons(
 
       so: indicators.so,
 
-      trend: indicators.trend,
+      trend: indicators.marketStructure,
 
       avgPrice: indicators.avgPrice,
 

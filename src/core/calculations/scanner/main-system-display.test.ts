@@ -31,6 +31,8 @@ function baseResult(
       avgPricePrev: 320,
       emaDiff: 1,
       emaDiffPct: 1,
+      marketStructure: "Neutral",
+      momentum: "At EMA",
       trend: "Neutral",
       trendQualityScore: 10,
     },
@@ -89,7 +91,7 @@ describe("reconcileMainSystemFromResult", () => {
 
     expect(reconciled.output).toBe("IRON CONDOR");
     expect(reconciled.strategy).toBe("ironCondor");
-    expect(reconciled.reasons.join(" ")).toMatch(/40-60/);
+    expect(reconciled.reasons.join(" ")).toMatch(/40–60|40-60/);
     expect(reconciled.reasons.join(" ")).not.toMatch(/Iron Condor|Near Mid Price|Support Defined/);
     expect(reconciled.reasons.join(" ")).not.toMatch(/Sell Put Zone/);
   });

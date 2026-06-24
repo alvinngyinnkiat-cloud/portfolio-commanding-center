@@ -3,6 +3,7 @@ import {
   getUsMarketDateString,
   isUsCashSessionClosed,
 } from "./us-market-date";
+import { deriveMarketStructure, deriveMomentum } from "./structure-momentum";
 
 export interface OhlcBar {
   date: string;
@@ -340,6 +341,8 @@ export function computeIndicators(
   high: number | null;
   low: number | null;
   avgPrice: number | null;
+  marketStructure: "Bullish" | "Bearish" | "Neutral";
+  momentum: "Above EMA" | "Below EMA" | "At EMA";
   trend: "Bullish" | "Bearish" | "Neutral";
   trendQualityBullPut: number;
   trendQualityBearCall: number;
@@ -353,6 +356,9 @@ export function computeIndicators(
   const sma50Val = sma(closes, 50);
   const sma200Val = sma(closes, 200);
   const price = currentPrice ?? last?.close ?? null;
+  const avgPrice = last ? (last.high + last.low) / 2 : null;
+  const marketStructure = deriveMarketStructure(ema20, sma50Val, sma200Val);
+  const momentum = deriveMomentum(avgPrice, ema20);
 
   return {
     ema20,
@@ -365,8 +371,10 @@ export function computeIndicators(
     soDebug: stochastic.debug,
     high: last?.high ?? null,
     low: last?.low ?? null,
-    avgPrice: last ? (last.high + last.low) / 2 : null,
-    trend: deriveTrend(price, ema20, sma50Val, sma200Val),
+    avgPrice,
+    marketStructure,
+    momentum,
+    trend: marketStructure,
     trendQualityBullPut: scoreTrendQualityBullPut(price, ema20, sma50Val, sma200Val),
     trendQualityBearCall: scoreTrendQualityBearCall(price, ema20, sma50Val, sma200Val),
   };

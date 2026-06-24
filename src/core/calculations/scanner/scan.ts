@@ -19,6 +19,10 @@ import {
 } from "./ema-strategy";
 import { evaluateMainSystemDisplay } from "./main-system-display";
 import {
+  deriveMarketStructure,
+  deriveMomentum,
+} from "./structure-momentum";
+import {
   computeAvgPricePrev,
   computeEma20Prev,
   computeEmaDiff,
@@ -102,31 +106,36 @@ export function scanTicker(input: ScanTickerInput): ScannerTickerResult {
     indicatorValues.ema20
   );
   const soStatus = deriveSoStatus(indicatorValues.so, indicatorValues.soPrev);
+  const marketStructure = deriveMarketStructure(
+    indicatorValues.ema20,
+    indicatorValues.sma50,
+    indicatorValues.sma200
+  );
+  const momentum = deriveMomentum(indicatorValues.avgPrice, indicatorValues.ema20);
 
   const bullPut = scoreBullPut({
     soStatus,
-    trend: indicatorValues.trend,
+    marketStructure,
+    momentum,
     avgPrice: indicatorValues.avgPrice,
     avgPricePrev,
-    primarySupport: structure.primarySupport,
-    atr14: indicatorValues.atr14,
-    sellPutRange: structure.sellPutRange,
   });
 
   const bearCall = scoreBearCall({
     soStatus,
-    trend: indicatorValues.trend,
+    marketStructure,
+    momentum,
     avgPrice: indicatorValues.avgPrice,
     avgPricePrev,
-    primaryResistance: structure.primaryResistance,
-    atr14: indicatorValues.atr14,
-    sellCallRange: structure.sellCallRange,
   });
 
   const ironCondor = scoreIronCondor({
     so: indicatorValues.so,
-    trend: indicatorValues.trend,
+    marketStructure,
+    momentum,
+    soStatus,
     avgPrice: indicatorValues.avgPrice,
+    avgPricePrev,
     midPrice: structure.midPrice,
     atr14: indicatorValues.atr14,
     icMidZone: structure.icMidZone,
@@ -140,7 +149,8 @@ export function scanTicker(input: ScanTickerInput): ScannerTickerResult {
     so: indicatorValues.so,
     soPrev: indicatorValues.soPrev,
     soStatus,
-    trend: indicatorValues.trend,
+    marketStructure,
+    momentum,
     avgPrice: indicatorValues.avgPrice,
     avgPricePrev,
     ema20: indicatorValues.ema20,
@@ -155,17 +165,14 @@ export function scanTicker(input: ScanTickerInput): ScannerTickerResult {
     bullPutEligible: bullPut.eligible,
     bearCallEligible: bearCall.eligible,
     ironCondorEligible: ironCondor.eligible,
-    trend: indicatorValues.trend,
+    marketStructure,
+    momentum,
     so: indicatorValues.so,
     soStatus,
     avgPrice: indicatorValues.avgPrice,
     avgPricePrev,
     midPrice: structure.midPrice,
     atr14: indicatorValues.atr14,
-    primarySupport: structure.primarySupport,
-    primaryResistance: structure.primaryResistance,
-    sellPutRange: structure.sellPutRange,
-    sellCallRange: structure.sellCallRange,
     icMidZone: structure.icMidZone,
   });
 
@@ -195,7 +202,9 @@ export function scanTicker(input: ScanTickerInput): ScannerTickerResult {
       avgPricePrev,
       emaDiff,
       emaDiffPct,
-      trend: indicatorValues.trend,
+      marketStructure,
+      momentum,
+      trend: marketStructure,
       trendQualityScore: Math.max(
         indicatorValues.trendQualityBullPut,
         indicatorValues.trendQualityBearCall
@@ -254,6 +263,8 @@ function incompleteResult(
       avgPricePrev: null,
       emaDiff: null,
       emaDiffPct: null,
+      marketStructure: "Neutral",
+      momentum: "At EMA",
       trend: "Neutral",
       trendQualityScore: 0,
     },

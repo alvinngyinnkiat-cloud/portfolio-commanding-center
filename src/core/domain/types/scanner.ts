@@ -20,6 +20,10 @@ export type ScannerTrend = "Bullish" | "Bearish" | "Neutral";
 
 
 
+export type ScannerMomentum = "Above EMA" | "Below EMA" | "At EMA";
+
+
+
 export type SoStatus = "Rolling Up" | "Strong" | "Rolling Down";
 
 export interface StochasticSoDebug {
@@ -224,6 +228,13 @@ export interface ScannerIndicators {
 
   emaDiffPct: number | null;
 
+  /** EMA/SMA stack classification — price-independent. */
+  marketStructure: ScannerTrend;
+
+  /** Average price position relative to EMA20. */
+  momentum: ScannerMomentum;
+
+  /** @deprecated Use marketStructure — kept for persisted scan compatibility. */
   trend: ScannerTrend;
 
   trendQualityScore: number;

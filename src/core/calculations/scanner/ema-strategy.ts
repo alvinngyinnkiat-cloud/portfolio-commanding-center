@@ -1,15 +1,10 @@
 import type {
-
   EmaStrategyCheck,
-
   EmaStrategyResult,
-
+  ScannerMomentum,
   ScannerTrend,
-
   SoStatus,
-
   StrategyOutput,
-
 } from "@/core/domain/types/scanner";
 
 
@@ -131,67 +126,39 @@ function fmt(value: number | null, digits = 2): string {
 
 
 const PUT_LABELS = [
-
   "SO Rolling Up",
-
-  "Trend Bullish",
-
+  "Bullish Structure",
+  "Momentum Above EMA",
   "Average Price in Sell Put Zone",
-
   "Average Price > Previous Average Price",
-
   "EMA Difference Rule Passed",
-
   "EMA20 Rising",
-
 ] as const;
-
-
 
 const CALL_LABELS = [
-
   "SO Rolling Down",
-
-  "Trend Bearish",
-
+  "Bearish Structure",
+  "Momentum Below EMA",
   "Average Price in Sell Call Zone",
-
   "Average Price < Previous Average Price",
-
   "EMA Difference Rule Passed",
-
   "EMA20 Falling",
-
 ] as const;
 
-
-
 export function evaluateEmaStrategy(input: {
-
   so: number | null;
-
   soPrev: number | null;
-
   soStatus: SoStatus;
-
-  trend: ScannerTrend;
-
+  marketStructure: ScannerTrend;
+  momentum: ScannerMomentum;
   avgPrice: number | null;
-
   avgPricePrev: number | null;
-
   ema20: number | null;
-
   ema20Prev: number | null;
-
   emaDiffPct: number | null;
-
   primarySupport: number | null;
-
   primaryResistance: number | null;
-
   atr14: number | null;
-
 }): EmaStrategyResult {
 
   const emaDiffPassedPut =
@@ -227,23 +194,24 @@ export function evaluateEmaStrategy(input: {
     },
 
     {
-
-      label: "Trend Bullish",
-
-      passed: input.trend === "Bullish",
-
-      detail: input.trend,
-
+      label: "Bullish Structure",
+      passed: input.marketStructure === "Bullish",
+      detail: input.marketStructure,
     },
-
     {
-
-      label: "Trend Bearish",
-
-      passed: input.trend === "Bearish",
-
-      detail: input.trend,
-
+      label: "Bearish Structure",
+      passed: input.marketStructure === "Bearish",
+      detail: input.marketStructure,
+    },
+    {
+      label: "Momentum Above EMA",
+      passed: input.momentum === "Above EMA",
+      detail: input.momentum,
+    },
+    {
+      label: "Momentum Below EMA",
+      passed: input.momentum === "Below EMA",
+      detail: input.momentum,
     },
 
     {
@@ -490,26 +458,21 @@ export function evaluateEmaStrategy(input: {
 
   const failReasons: string[] = [];
 
-  if (input.trend === "Neutral") {
-
-    failReasons.push("Trend not Bullish or Bearish");
-
+  if (input.marketStructure === "Neutral") {
+    failReasons.push("Structure not Bullish or Bearish");
   } else if (!putChecklist[1].passed && !callChecklist[1].passed) {
-
-    failReasons.push(`Trend is ${input.trend}`);
-
+    failReasons.push(`Structure is ${input.marketStructure}`);
   }
-
   if (!putChecklist[2].passed && !callChecklist[2].passed) {
-
-    failReasons.push("Average Price outside Sell Put and Sell Call zones");
-
+    failReasons.push(
+      `Momentum is ${input.momentum} — need Above EMA for puts or Below EMA for calls`
+    );
   }
-
+  if (!putChecklist[3].passed && !callChecklist[3].passed) {
+    failReasons.push("Average Price outside Sell Put and Sell Call zones");
+  }
   if (!putChecklist[0].passed && !callChecklist[0].passed) {
-
     failReasons.push(`SO Status: ${input.soStatus}`);
-
   }
 
   if (failReasons.length === 0) {

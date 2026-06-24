@@ -44,11 +44,14 @@ describe("computeStructure", () => {
 });
 
 describe("scoreIronCondor", () => {
-  it("passes when average price is within 1 ATR of mid price", () => {
+  it("passes when SO is mid-range, price in mid zone, and directional setups fail", () => {
     const result = scoreIronCondor({
       so: 50,
-      trend: "Neutral",
+      marketStructure: "Bullish",
+      momentum: "Below EMA",
+      soStatus: "Strong",
       avgPrice: 100,
+      avgPricePrev: 101,
       midPrice: 102,
       atr14: 5,
       icMidZone: { low: 97, high: 107 },

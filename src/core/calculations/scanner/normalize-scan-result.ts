@@ -1,12 +1,14 @@
 import type {
   EmaStrategyResult,
   MainSystemDisplay,
+  ScannerMomentum,
   ScannerScanRun,
   ScannerTickerResult,
   ScannerTrend,
 } from "@/core/domain/types/scanner";
 import { buildRankings } from "./ranking";
 import { evaluateMainSystemDisplay } from "./main-system-display";
+import { deriveMarketStructure, deriveMomentum } from "./structure-momentum";
 
 const EMPTY_EMA: EmaStrategyResult = {
   output: "NO TRADE",
@@ -25,6 +27,29 @@ function normalizeTrend(value: ScannerTrend | "Mixed" | undefined): ScannerTrend
     return "Neutral";
   }
   return value;
+}
+
+function normalizeMomentum(
+  value: ScannerMomentum | undefined,
+  avgPrice: number | null,
+  ema20: number | null
+): ScannerMomentum {
+  if (value) {
+    return value;
+  }
+  return deriveMomentum(avgPrice, ema20);
+}
+
+function normalizeMarketStructure(
+  value: ScannerTrend | undefined,
+  ema20: number | null,
+  sma50: number | null,
+  sma200: number | null
+): ScannerTrend {
+  if (value) {
+    return normalizeTrend(value);
+  }
+  return deriveMarketStructure(ema20, sma50, sma200);
 }
 
 export function reconcileMainSystemFromResult(
@@ -49,21 +74,30 @@ export function reconcileMainSystemFromResult(
     return EMPTY_MAIN;
   }
 
+  const marketStructure = normalizeMarketStructure(
+    raw.indicators.marketStructure ?? raw.indicators.trend,
+    raw.indicators.ema20,
+    raw.indicators.sma50,
+    raw.indicators.sma200
+  );
+  const momentum = normalizeMomentum(
+    raw.indicators.momentum,
+    raw.indicators.avgPrice,
+    raw.indicators.ema20
+  );
+
   return evaluateMainSystemDisplay({
     bullPutEligible: raw.strategies.bullPut.eligible,
     bearCallEligible: raw.strategies.bearCall.eligible,
     ironCondorEligible: raw.strategies.ironCondor.eligible,
-    trend: raw.indicators.trend,
+    marketStructure,
+    momentum,
     so: raw.indicators.so,
     soStatus: raw.indicators.soStatus,
     avgPrice: raw.indicators.avgPrice,
     avgPricePrev: raw.indicators.avgPricePrev,
     midPrice: raw.structure?.midPrice ?? null,
     atr14: raw.indicators.atr14,
-    primarySupport: raw.structure?.primarySupport ?? null,
-    primaryResistance: raw.structure?.primaryResistance ?? null,
-    sellPutRange: raw.structure?.sellPutRange ?? null,
-    sellCallRange: raw.structure?.sellCallRange ?? null,
     icMidZone: raw.structure?.icMidZone ?? null,
   });
 }
@@ -95,13 +129,24 @@ function normalizeStructure(
 
 function normalizeTicker(raw: ScannerTickerResult): ScannerTickerResult {
   const structure = normalizeStructure(raw.structure);
+  const ema20 = raw.indicators?.ema20 ?? null;
+  const sma50 = raw.indicators?.sma50 ?? null;
+  const sma200 = raw.indicators?.sma200 ?? null;
+  const avgPrice = raw.indicators?.avgPrice ?? null;
+  const marketStructure = normalizeMarketStructure(
+    raw.indicators?.marketStructure ?? raw.indicators?.trend,
+    ema20,
+    sma50,
+    sma200
+  );
+  const momentum = normalizeMomentum(raw.indicators?.momentum, avgPrice, ema20);
   const indicators = {
-    ema20: raw.indicators?.ema20 ?? null,
+    ema20,
     ema20Prev: raw.indicators?.ema20Prev ?? null,
-    sma50: raw.indicators?.sma50 ?? null,
+    sma50,
     sma50Prev: raw.indicators?.sma50Prev ?? null,
     sma50SlopePct: raw.indicators?.sma50SlopePct ?? null,
-    sma200: raw.indicators?.sma200 ?? null,
+    sma200,
     sma200Prev: raw.indicators?.sma200Prev ?? null,
     atr14: raw.indicators?.atr14 ?? null,
     so: raw.indicators?.so ?? null,
@@ -109,11 +154,13 @@ function normalizeTicker(raw: ScannerTickerResult): ScannerTickerResult {
     soStatus: raw.indicators?.soStatus ?? "Rolling Down",
     high: raw.indicators?.high ?? null,
     low: raw.indicators?.low ?? null,
-    avgPrice: raw.indicators?.avgPrice ?? null,
+    avgPrice,
     avgPricePrev: raw.indicators?.avgPricePrev ?? null,
     emaDiff: raw.indicators?.emaDiff ?? null,
     emaDiffPct: raw.indicators?.emaDiffPct ?? null,
-    trend: normalizeTrend(raw.indicators?.trend),
+    marketStructure,
+    momentum,
+    trend: marketStructure,
     trendQualityScore: raw.indicators?.trendQualityScore ?? 0,
   };
   const mainSystem = reconcileMainSystemFromResult({

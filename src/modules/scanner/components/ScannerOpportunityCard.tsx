@@ -6,7 +6,9 @@ import type {
   StrategyOutput,
 } from "@/core/domain/types/scanner";
 import { STRATEGY_LABELS, STRATEGY_OUTPUT_LABELS } from "@/core/domain/types/scanner";
+import { buildSuggestedTradeFromResult } from "@/core/calculations/scanner/suggested-trade";
 import { Card } from "@/shared/components/ui/Card";
+import { formatUsd } from "@/shared/lib/format";
 import { FiveDayCandlestickChart } from "./FiveDayCandlestickChart";
 import { ChevronDown, ChevronUp } from "lucide-react";
 
@@ -39,18 +41,9 @@ export function ScannerOpportunityCard({ result }: ScannerOpportunityCardProps) 
           </button>
         </div>
 
-        <div className="grid min-w-0 gap-4 lg:grid-cols-3 lg:gap-5">
-          <LeftColumn result={result} />
-          <StrategyColumn
-            title="20 EMA Strategy"
-            output={result.emaStrategy.output}
-            reasons={result.emaStrategy.reasons}
-          />
-          <StrategyColumn
-            title="Main System"
-            output={result.mainSystem.output}
-            reasons={result.mainSystem.reasons}
-          />
+        <div className="grid min-w-0 gap-4 lg:grid-cols-2 lg:gap-5">
+          <ChartColumn result={result} />
+          <MainStrategyPanel result={result} />
         </div>
 
         {expanded && <ExpandedDetails result={result} />}
@@ -59,7 +52,7 @@ export function ScannerOpportunityCard({ result }: ScannerOpportunityCardProps) 
   );
 }
 
-function LeftColumn({ result }: { result: ScannerTickerResult }) {
+function ChartColumn({ result }: { result: ScannerTickerResult }) {
   const { structure, indicators } = result;
 
   return (
@@ -76,91 +69,183 @@ function LeftColumn({ result }: { result: ScannerTickerResult }) {
         sellCallZone={structure.sellCallRange}
         icMidZone={resolveAdjustedMidZone(structure, indicators.atr14)}
       />
-
-      <div className="grid min-w-0 grid-cols-2 gap-2 text-sm sm:gap-3">
-        <Metric label="Weighted Support" value={formatNum(structure.primarySupport)} />
-        <Metric
-          label="Weighted Resistance"
-          value={formatNum(structure.primaryResistance)}
-        />
-        <Metric
-          label="Adjusted Mid Zone"
-          value={formatAdjustedMidZone(structure, indicators.atr14)}
-        />
-        <Metric label="SO Value" value={formatNum(indicators.so, 2)} />
-        <Metric label="SO Status" value={indicators.soStatus} />
-        <Metric label="Trend" value={indicators.trend} />
-        <Metric label="Average Price" value={formatNum(indicators.avgPrice)} />
-      </div>
     </div>
   );
 }
 
-function StrategyColumn({
-  title,
-  output,
-  reasons,
-}: {
-  title: string;
-  output: StrategyOutput;
-  reasons: string[];
-}) {
+function MainStrategyPanel({ result }: { result: ScannerTickerResult }) {
+  const { indicators, mainSystem } = result;
+  const output = mainSystem.output;
+  const reasons = getMainCardReasons(result);
+
   return (
     <div className="flex min-w-0 flex-col rounded-xl border border-surface-border/70 bg-surface/30 p-4">
       <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-        {title}
+        Main System
       </p>
       <div
         className={`mt-4 block w-full rounded-xl border px-4 py-4 text-center text-2xl font-extrabold tracking-wide sm:text-3xl ${OUTPUT_STYLES[output]}`}
       >
         {STRATEGY_OUTPUT_LABELS[output]}
       </div>
+
+      <div className="mt-4 grid min-w-0 grid-cols-2 gap-2 text-sm sm:grid-cols-3 sm:gap-3">
+        <Metric label="Structure" value={indicators.marketStructure} />
+        <Metric label="Momentum" value={indicators.momentum} />
+        <Metric label="SO Value" value={formatNum(indicators.so, 2)} />
+        <Metric label="SO Status" value={indicators.soStatus} />
+        <Metric label="Average Price" value={formatNum(indicators.avgPrice)} />
+      </div>
+
       <ul className="mt-4 space-y-1.5">
-        {reasons.length === 0 ? (
-          <li className="text-xs text-slate-500">No reasons available</li>
-        ) : (
-          reasons.map((reason) => (
-            <li
-              key={reason}
-              className="flex gap-2 text-xs text-slate-400 before:shrink-0 before:content-['•']"
-            >
-              {reason}
-            </li>
-          ))
-        )}
+        {reasons.map((reason) => (
+          <li
+            key={reason}
+            className="flex gap-2 text-xs text-slate-400 before:shrink-0 before:content-['•']"
+          >
+            {reason}
+          </li>
+        ))}
       </ul>
     </div>
   );
+}
+
+function getMainCardReasons(result: ScannerTickerResult): string[] {
+  const { mainSystem } = result;
+
+  if (mainSystem.output === "NO TRADE") {
+    return formatNoTradeMainCardReasons(result);
+  }
+
+  if (mainSystem.reasons.length > 0) {
+    return mainSystem.reasons;
+  }
+
+  return buildFallbackMainCardReasons(result);
+}
+
+function formatNoTradeMainCardReasons(result: ScannerTickerResult): string[] {
+  const { indicators, mainSystem } = result;
+  const seen = new Set<string>();
+  const reasons: string[] = [];
+
+  const add = (line: string) => {
+    if (!seen.has(line)) {
+      seen.add(line);
+      reasons.push(line);
+    }
+  };
+
+  for (const reason of mainSystem.reasons) {
+    const simplified = simplifyNoTradeReason(reason, indicators);
+    if (simplified) {
+      add(simplified);
+    }
+  }
+
+  if (reasons.length === 0) {
+    add(`Structure ${indicators.marketStructure}`);
+    add(`Momentum ${indicators.momentum}`);
+    if (indicators.soStatus !== "Rolling Up") {
+      add("SO not Rolling Up");
+    }
+    if (indicators.soStatus !== "Rolling Down") {
+      add("SO not Rolling Down");
+    }
+  }
+
+  return reasons.slice(0, 6);
+}
+
+function simplifyNoTradeReason(
+  reason: string,
+  indicators: ScannerTickerResult["indicators"]
+): string | null {
+  if (reason.includes("Bullish Structure = No")) {
+    return `Structure ${indicators.marketStructure}`;
+  }
+  if (reason.includes("Bearish Structure = No")) {
+    return `Structure ${indicators.marketStructure}`;
+  }
+  if (reason.includes("Momentum Above EMA = No")) {
+    return `Momentum ${indicators.momentum}`;
+  }
+  if (reason.includes("Momentum Below EMA = No")) {
+    return `Momentum ${indicators.momentum}`;
+  }
+  if (reason.includes("SO Rolling Up = No")) {
+    return "SO not Rolling Up";
+  }
+  if (reason.includes("SO Rolling Down = No")) {
+    return "SO not Rolling Down";
+  }
+  if (reason.includes("SO 40–60 = No") || reason.includes("SO 40-60 = No")) {
+    return "SO outside 40–60";
+  }
+  if (reason.includes("Adjusted Mid Zone = No")) {
+    return "Average Price outside Adjusted Mid Zone";
+  }
+  if (reason.includes("Current Average Price > Previous Average Price = No")) {
+    return "Average Price not rising";
+  }
+  if (reason.includes("Current Average Price < Previous Average Price = No")) {
+    return "Average Price not falling";
+  }
+  if (reason.includes("Sell Put conditions not fully satisfied = No")) {
+    return null;
+  }
+  if (reason.includes("Sell Call conditions not fully satisfied = No")) {
+    return null;
+  }
+  return reason;
+}
+
+function buildFallbackMainCardReasons(result: ScannerTickerResult): string[] {
+  const { indicators } = result;
+  return [
+    `Structure ${indicators.marketStructure}`,
+    `Momentum ${indicators.momentum}`,
+    `SO Status: ${indicators.soStatus}`,
+    `SO Value: ${formatNum(indicators.so, 2)}`,
+  ];
 }
 
 function ExpandedDetails({ result }: { result: ScannerTickerResult }) {
   const { structure, indicators } = result;
   const soDebug = indicators.soDebug;
   const atrDebug = indicators.atrDebug;
+  const suggestedTrade =
+    result.mainSystem.strategy != null
+      ? buildSuggestedTradeFromResult(result, result.mainSystem.strategy)
+      : null;
 
   return (
     <div className="space-y-5 border-t border-surface-border/60 pt-5">
       <DetailSection title="SO Validation">
         <DetailGrid
           items={[
-            ["SO Settings", "Stochastic 10 / 3 · Daily Close · completed sessions"],
-            ["Session Date", soDebug?.sessionDate ?? "—"],
             ["Current SO", formatNum(indicators.so, 2)],
             ["Previous SO", formatNum(indicators.soPrev, 2)],
             ["SO Status", indicators.soStatus],
-            ["Lowest Low (10)", formatNum(soDebug?.lowestLow10 ?? null, 2)],
-            ["Highest High (10)", formatNum(soDebug?.highestHigh10 ?? null, 2)],
-            ["Raw %K", formatNum(soDebug?.rawK ?? null, 2)],
-            ["Smoothed %K (3 SMA)", formatNum(soDebug?.smoothedK3 ?? null, 2)],
-            [
-              "Previous Smoothed %K",
-              formatNum(soDebug?.previousSmoothedK3 ?? null, 2),
-            ],
             ["Scanner SO Used", formatNum(soDebug?.scannerSoUsed ?? indicators.so, 2)],
           ]}
         />
         {soDebug && (
           <div className="mt-4 space-y-3">
+            <DetailGrid
+              items={[
+                ["Session Date", soDebug.sessionDate ?? "—"],
+                ["Lowest Low (10)", formatNum(soDebug.lowestLow10, 2)],
+                ["Highest High (10)", formatNum(soDebug.highestHigh10, 2)],
+                ["Raw %K", formatNum(soDebug.rawK, 2)],
+                ["Smoothed %K (3 SMA)", formatNum(soDebug.smoothedK3, 2)],
+                [
+                  "Previous Smoothed %K",
+                  formatNum(soDebug.previousSmoothedK3, 2),
+                ],
+              ]}
+            />
             <SoWindowTable label="Last 10 Highs" values={soDebug.last10Highs} />
             <SoWindowTable label="Last 10 Lows" values={soDebug.last10Lows} />
             <SoWindowTable label="Last 10 Closes" values={soDebug.last10Closes} />
@@ -171,11 +256,9 @@ function ExpandedDetails({ result }: { result: ScannerTickerResult }) {
       <DetailSection title="ATR Validation">
         <DetailGrid
           items={[
-            ["ATR Settings", "ATR 14 · RMA / Wilder · completed daily sessions"],
-            ["Session Date", atrDebug?.sessionDate ?? "—"],
+            ["ATR14", formatNum(indicators.atr14, 2)],
             ["ATR Method", atrDebug?.method ?? "RMA / Wilder"],
             ["Scanner ATR Used", formatNum(atrDebug?.scannerAtrUsed ?? indicators.atr14, 2)],
-            ["ATR14 (card)", formatNum(indicators.atr14, 2)],
           ]}
         />
         {atrDebug && atrDebug.last14TrueRanges.length > 0 && (
@@ -188,7 +271,7 @@ function ExpandedDetails({ result }: { result: ScannerTickerResult }) {
         )}
       </DetailSection>
 
-      <DetailSection title="Structure">
+      <DetailSection title="Market Structure">
         <DetailGrid
           items={[
             ["Daily Support", formatNum(structure.dailySupport)],
@@ -205,13 +288,34 @@ function ExpandedDetails({ result }: { result: ScannerTickerResult }) {
         />
       </DetailSection>
 
+      <DetailSection title="Trend Structure">
+        <DetailGrid
+          items={[
+            ["Structure", indicators.marketStructure],
+            ["Momentum", indicators.momentum],
+          ]}
+        />
+      </DetailSection>
+
       <DetailSection title="Indicators">
         <DetailGrid
           items={[
-            ["ATR14", formatNum(indicators.atr14, 2)],
+            ["Current Average Price", formatNum(indicators.avgPrice)],
+            ["Previous Average Price", formatNum(indicators.avgPricePrev)],
             ["EMA20", formatNum(indicators.ema20)],
             ["SMA50", formatNum(indicators.sma50)],
             ["SMA200", formatNum(indicators.sma200)],
+            ["Market Date Used", result.priceAsOf ?? "—"],
+          ]}
+        />
+      </DetailSection>
+
+      <DetailSection title="Display Only">
+        <p className="mb-3 text-xs text-slate-500">
+          These metrics are for reference only and do not influence strategy decisions.
+        </p>
+        <DetailGrid
+          items={[
             [
               "SMA50 Slope",
               indicators.sma50SlopePct != null
@@ -225,10 +329,6 @@ function ExpandedDetails({ result }: { result: ScannerTickerResult }) {
                 ? `${indicators.emaDiffPct >= 0 ? "+" : ""}${indicators.emaDiffPct.toFixed(2)}%`
                 : "—",
             ],
-            ["Current Average Price", formatNum(indicators.avgPrice)],
-            ["Previous Average Price", formatNum(indicators.avgPricePrev)],
-            ["Current Price", formatNum(result.currentPrice)],
-            ["Market Date Used", result.priceAsOf ?? "—"],
           ]}
         />
       </DetailSection>
@@ -243,28 +343,53 @@ function ExpandedDetails({ result }: { result: ScannerTickerResult }) {
                 : "—",
             ],
             [
+              "Adjusted Mid Zone",
+              formatAdjustedMidZone(structure, indicators.atr14),
+            ],
+            [
               "Sell Call Zone",
               structure.sellCallRange
                 ? `${structure.sellCallRange.low.toFixed(2)} → ${structure.sellCallRange.high.toFixed(2)}`
                 : "—",
             ],
-            [
-              "Adjusted Mid Zone",
-              formatAdjustedMidZone(structure, indicators.atr14),
-            ],
           ]}
         />
       </DetailSection>
 
-      <DetailSection title="20 EMA Strategy — Full Checklist">
+      <DetailSection title="Suggested Trade">
+        {suggestedTrade ? (
+          <DetailGrid
+            items={[
+              ["Strategy", STRATEGY_LABELS[result.mainSystem.strategy!]],
+              ["Trade", suggestedTrade.tradeDisplay],
+              ["Width", suggestedTrade.width != null ? String(suggestedTrade.width) : "—"],
+              [
+                "Target Premium",
+                suggestedTrade.targetPremium != null
+                  ? String(suggestedTrade.targetPremium)
+                  : "—",
+              ],
+              [
+                "Max Risk",
+                suggestedTrade.maxRiskUsd != null
+                  ? formatUsd(suggestedTrade.maxRiskUsd)
+                  : "—",
+              ],
+            ]}
+          />
+        ) : (
+          <p className="text-sm text-slate-500">No eligible strategy — suggested trade unavailable.</p>
+        )}
+      </DetailSection>
+
+      <DetailSection title="20 EMA Checklist">
         <Checklist items={result.emaStrategy.checklist} />
       </DetailSection>
 
       {result.mainSystem.strategy ? (
-        <DetailSection
-          title={`Main System — ${STRATEGY_LABELS[result.mainSystem.strategy]}`}
-        >
+        <DetailSection title="Main System Checklist">
           <p className="mb-3 text-sm text-slate-400">
+            {STRATEGY_LABELS[result.mainSystem.strategy]} —{" "}
             {result.strategies[result.mainSystem.strategy].eligible
               ? "Eligible"
               : "Not eligible"}
@@ -274,29 +399,17 @@ function ExpandedDetails({ result }: { result: ScannerTickerResult }) {
           />
         </DetailSection>
       ) : (
-        <>
-          <DetailSection title="Main System — No Trade">
-            <ul className="list-disc space-y-1 pl-5 text-sm text-slate-400">
-              {result.mainSystem.reasons.map((reason) => (
-                <li key={reason}>{reason}</li>
-              ))}
-            </ul>
-          </DetailSection>
-
+        <DetailSection title="Main System Checklist">
+          <p className="mb-3 text-sm text-slate-400">No eligible strategy</p>
           {(["bullPut", "bearCall", "ironCondor"] as const).map((strategy) => (
-            <DetailSection
-              key={strategy}
-              title={`Main System — ${STRATEGY_LABELS[strategy]}`}
-            >
-              <p className="mb-3 text-sm text-slate-400">
-                {result.strategies[strategy].eligible
-                  ? "Eligible"
-                  : "Not eligible"}
+            <div key={strategy} className="mb-4 last:mb-0">
+              <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                {STRATEGY_LABELS[strategy]}
               </p>
               <Checklist items={result.strategies[strategy].checklist} />
-            </DetailSection>
+            </div>
           ))}
-        </>
+        </DetailSection>
       )}
 
       {result.notes.length > 0 && (
@@ -364,11 +477,25 @@ function DetailGrid({ items }: { items: Array<[string, string]> }) {
   );
 }
 
+const LEGACY_TREND_LABELS: Record<string, string> = {
+  "Trend Bullish": "Bullish Structure",
+  "Trend Bearish": "Bearish Structure",
+  "Trend Neutral": "Neutral Structure",
+};
+
+function normalizeChecklistLabel(label: string): string {
+  return LEGACY_TREND_LABELS[label] ?? label;
+}
+
 function Checklist({
   items,
 }: {
   items: Array<{ label: string; passed: boolean; detail: string }>;
 }) {
+  if (items.length === 0) {
+    return <p className="text-sm text-slate-500">No checklist items available.</p>;
+  }
+
   return (
     <div className="space-y-2">
       {items.map((item) => (
@@ -377,7 +504,7 @@ function Checklist({
           className="flex flex-wrap items-center justify-between gap-2 rounded-lg bg-surface/50 px-3 py-2 text-sm"
         >
           <span className="text-slate-300">
-            {item.passed ? "✓" : "✗"} {item.label}
+            {item.passed ? "✓" : "✗"} {normalizeChecklistLabel(item.label)}
           </span>
           <span className="text-slate-400">{item.detail}</span>
         </div>
