@@ -164,6 +164,9 @@ export interface EmaStrategyCheck {
 
   detail: string;
 
+  /** When true, item is displayed for context only and does not affect eligibility. */
+  informationOnly?: boolean;
+
 }
 
 

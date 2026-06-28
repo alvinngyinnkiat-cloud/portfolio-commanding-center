@@ -146,15 +146,11 @@ export function scanTicker(input: ScanTickerInput): ScannerTickerResult {
   const bestSetup = pickBestSetup(strategies);
 
   const emaStrategy = evaluateEmaStrategy({
-    so: indicatorValues.so,
-    soPrev: indicatorValues.soPrev,
     soStatus,
-    marketStructure,
-    momentum,
     avgPrice: indicatorValues.avgPrice,
     avgPricePrev,
     ema20: indicatorValues.ema20,
-    ema20Prev,
+    sma200: indicatorValues.sma200,
     emaDiffPct,
     primarySupport: structure.primarySupport,
     primaryResistance: structure.primaryResistance,

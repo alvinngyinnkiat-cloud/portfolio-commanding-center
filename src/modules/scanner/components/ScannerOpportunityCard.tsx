@@ -7,6 +7,7 @@ import type {
 } from "@/core/domain/types/scanner";
 import { STRATEGY_LABELS, STRATEGY_OUTPUT_LABELS } from "@/core/domain/types/scanner";
 import { buildSuggestedTradeFromResult } from "@/core/calculations/scanner/suggested-trade";
+import { buildEmaSuggestedTrade } from "@/core/calculations/scanner/ema-suggested-trade";
 import { Card } from "@/shared/components/ui/Card";
 import { formatUsd } from "@/shared/lib/format";
 import { FiveDayCandlestickChart } from "./FiveDayCandlestickChart";
@@ -41,8 +42,9 @@ export function ScannerOpportunityCard({ result }: ScannerOpportunityCardProps) 
           </button>
         </div>
 
-        <div className="grid min-w-0 gap-4 lg:grid-cols-2 lg:gap-5">
+        <div className="grid min-w-0 gap-4 lg:grid-cols-3 lg:gap-5">
           <ChartColumn result={result} />
+          <EarlyReversalPanel result={result} />
           <MainStrategyPanel result={result} />
         </div>
 
@@ -79,25 +81,20 @@ function MainStrategyPanel({ result }: { result: ScannerTickerResult }) {
   const reasons = getMainCardReasons(result);
 
   return (
-    <div className="flex min-w-0 flex-col rounded-xl border border-surface-border/70 bg-surface/30 p-4">
-      <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-        Main System
-      </p>
-      <div
-        className={`mt-4 block w-full rounded-xl border px-4 py-4 text-center text-2xl font-extrabold tracking-wide sm:text-3xl ${OUTPUT_STYLES[output]}`}
-      >
-        {STRATEGY_OUTPUT_LABELS[output]}
-      </div>
-
-      <div className="mt-4 grid min-w-0 grid-cols-2 gap-2 text-sm sm:grid-cols-3 sm:gap-3">
-        <Metric label="Structure" value={indicators.marketStructure} />
-        <Metric label="Momentum" value={indicators.momentum} />
-        <Metric label="SO Value" value={formatNum(indicators.so, 2)} />
-        <Metric label="SO Status" value={indicators.soStatus} />
-        <Metric label="Average Price" value={formatNum(indicators.avgPrice)} />
-      </div>
-
-      <ul className="mt-4 space-y-1.5">
+    <StrategyPanel
+      title="Main System"
+      output={output}
+      metrics={
+        <>
+          <Metric label="Structure" value={indicators.marketStructure} />
+          <Metric label="Momentum" value={indicators.momentum} />
+          <Metric label="SO Value" value={formatNum(indicators.so, 2)} />
+          <Metric label="SO Status" value={indicators.soStatus} />
+          <Metric label="Average Price" value={formatNum(indicators.avgPrice)} />
+        </>
+      }
+    >
+      <ul className="space-y-1.5">
         {reasons.map((reason) => (
           <li
             key={reason}
@@ -107,6 +104,96 @@ function MainStrategyPanel({ result }: { result: ScannerTickerResult }) {
           </li>
         ))}
       </ul>
+    </StrategyPanel>
+  );
+}
+
+function EarlyReversalPanel({ result }: { result: ScannerTickerResult }) {
+  const { emaStrategy, indicators } = result;
+  const emaTrade = buildEmaSuggestedTrade({
+    output: emaStrategy.output,
+    ema20: indicators.ema20,
+    atr14: indicators.atr14,
+    currentPrice: result.currentPrice,
+  });
+
+  const emaDiffDisplay =
+    indicators.emaDiffPct != null
+      ? `${indicators.emaDiffPct >= 0 ? "+" : ""}${indicators.emaDiffPct.toFixed(2)}%`
+      : "—";
+
+  return (
+    <StrategyPanel
+      title="20 EMA Early Reversal"
+      output={emaStrategy.output}
+      metrics={
+        <>
+          <Metric label="EMA20" value={formatNum(indicators.ema20)} />
+          <Metric label="Average Price" value={formatNum(indicators.avgPrice)} />
+          <Metric label="SMA200" value={formatNum(indicators.sma200)} />
+          <Metric label="SO Status" value={indicators.soStatus} />
+          <Metric label="EMA Difference" value={emaDiffDisplay} />
+        </>
+      }
+    >
+      <Checklist items={emaStrategy.checklist} compact />
+
+      {emaStrategy.reasons.length > 0 && emaStrategy.output === "NO TRADE" && (
+        <ul className="mt-3 space-y-1.5">
+          {emaStrategy.reasons.map((reason) => (
+            <li
+              key={reason}
+              className="flex gap-2 text-xs text-slate-400 before:shrink-0 before:content-['•']"
+            >
+              {reason}
+            </li>
+          ))}
+        </ul>
+      )}
+
+      {emaStrategy.output !== "NO TRADE" && emaStrategy.output !== "IRON CONDOR" && (
+        <div className="mt-3 rounded-lg border border-surface-border/50 bg-surface/40 px-3 py-2 text-xs text-slate-400">
+          <p className="font-medium text-slate-300">Suggested Trade</p>
+          <p className="mt-1 tabular-nums">
+            {emaTrade.shortStrike} / {emaTrade.longStrike}
+            {emaTrade.width != null ? ` · Width ${emaTrade.width}` : ""}
+            {emaTrade.estimatedPremium != null
+              ? ` · Premium ${emaTrade.estimatedPremium}`
+              : ""}
+          </p>
+        </div>
+      )}
+    </StrategyPanel>
+  );
+}
+
+function StrategyPanel({
+  title,
+  output,
+  metrics,
+  children,
+}: {
+  title: string;
+  output: StrategyOutput;
+  metrics: ReactNode;
+  children: ReactNode;
+}) {
+  return (
+    <div className="flex min-w-0 flex-col rounded-xl border border-surface-border/70 bg-surface/30 p-4">
+      <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+        {title}
+      </p>
+      <div
+        className={`mt-4 block w-full rounded-xl border px-4 py-4 text-center text-xl font-extrabold tracking-wide sm:text-2xl ${OUTPUT_STYLES[output]}`}
+      >
+        {STRATEGY_OUTPUT_LABELS[output]}
+      </div>
+
+      <div className="mt-4 grid min-w-0 grid-cols-2 gap-2 text-sm sm:gap-3">
+        {metrics}
+      </div>
+
+      <div className="mt-4 min-w-0">{children}</div>
     </div>
   );
 }
@@ -356,7 +443,7 @@ function ExpandedDetails({ result }: { result: ScannerTickerResult }) {
         />
       </DetailSection>
 
-      <DetailSection title="Suggested Trade">
+      <DetailSection title="Suggested Trade (Main System)">
         {suggestedTrade ? (
           <DetailGrid
             items={[
@@ -380,10 +467,6 @@ function ExpandedDetails({ result }: { result: ScannerTickerResult }) {
         ) : (
           <p className="text-sm text-slate-500">No eligible strategy — suggested trade unavailable.</p>
         )}
-      </DetailSection>
-
-      <DetailSection title="20 EMA Checklist">
-        <Checklist items={result.emaStrategy.checklist} />
       </DetailSection>
 
       {result.mainSystem.strategy ? (
@@ -412,6 +495,10 @@ function ExpandedDetails({ result }: { result: ScannerTickerResult }) {
         </DetailSection>
       )}
 
+      <DetailSection title="Suggested Trade (20 EMA Early Reversal)">
+        <EmaSuggestedTradeDetails result={result} />
+      </DetailSection>
+
       {result.notes.length > 0 && (
         <DetailSection title="Notes">
           <ul className="list-disc space-y-1 pl-5 text-sm text-slate-400">
@@ -422,6 +509,40 @@ function ExpandedDetails({ result }: { result: ScannerTickerResult }) {
         </DetailSection>
       )}
     </div>
+  );
+}
+
+function EmaSuggestedTradeDetails({ result }: { result: ScannerTickerResult }) {
+  const { emaStrategy, indicators } = result;
+  const emaTrade = buildEmaSuggestedTrade({
+    output: emaStrategy.output,
+    ema20: indicators.ema20,
+    atr14: indicators.atr14,
+    currentPrice: result.currentPrice,
+  });
+
+  if (emaStrategy.output === "NO TRADE" || emaStrategy.output === "IRON CONDOR") {
+    return (
+      <p className="text-sm text-slate-500">
+        No early reversal signal — suggested trade unavailable.
+      </p>
+    );
+  }
+
+  return (
+    <DetailGrid
+      items={[
+        ["EMA20", formatNum(emaTrade.ema20)],
+        ["ATR14", formatNum(emaTrade.atr14)],
+        ["Short Strike", emaTrade.shortStrike != null ? String(emaTrade.shortStrike) : "—"],
+        ["Long Strike", emaTrade.longStrike != null ? String(emaTrade.longStrike) : "—"],
+        ["Width", emaTrade.width != null ? String(emaTrade.width) : "—"],
+        [
+          "Estimated Premium",
+          emaTrade.estimatedPremium != null ? String(emaTrade.estimatedPremium) : "—",
+        ],
+      ]}
+    />
   );
 }
 
@@ -489,24 +610,42 @@ function normalizeChecklistLabel(label: string): string {
 
 function Checklist({
   items,
+  compact = false,
 }: {
-  items: Array<{ label: string; passed: boolean; detail: string }>;
+  items: Array<{
+    label: string;
+    passed: boolean;
+    detail: string;
+    informationOnly?: boolean;
+  }>;
+  compact?: boolean;
 }) {
   if (items.length === 0) {
     return <p className="text-sm text-slate-500">No checklist items available.</p>;
   }
 
+  const textSize = compact ? "text-xs" : "text-sm";
+  const padding = compact ? "px-2 py-1.5" : "px-3 py-2";
+
   return (
-    <div className="space-y-2">
+    <div className="space-y-1.5">
       {items.map((item) => (
         <div
           key={item.label}
-          className="flex flex-wrap items-center justify-between gap-2 rounded-lg bg-surface/50 px-3 py-2 text-sm"
+          className={`flex flex-wrap items-center justify-between gap-2 rounded-lg bg-surface/50 ${padding} ${textSize}`}
         >
-          <span className="text-slate-300">
-            {item.passed ? "✓" : "✗"} {normalizeChecklistLabel(item.label)}
+          <span className="min-w-0 text-slate-300">
+            {item.informationOnly ? (
+              <>
+                {item.passed ? "✓" : "○"} {normalizeChecklistLabel(item.label)}
+              </>
+            ) : (
+              <>
+                {item.passed ? "✓" : "✗"} {normalizeChecklistLabel(item.label)}
+              </>
+            )}
           </span>
-          <span className="text-slate-400">{item.detail}</span>
+          <span className="shrink-0 text-right text-slate-400">{item.detail}</span>
         </div>
       ))}
     </div>

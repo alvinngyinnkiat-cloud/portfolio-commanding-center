@@ -1,536 +1,290 @@
 import type {
   EmaStrategyCheck,
   EmaStrategyResult,
-  ScannerMomentum,
-  ScannerTrend,
   SoStatus,
   StrategyOutput,
 } from "@/core/domain/types/scanner";
 
-
-
 export type { StrategyOutput, SoStatus };
 
-
-
 export function deriveSoStatus(
-
   so: number | null,
-
   soPrev: number | null
-
 ): SoStatus {
-
   if (so == null || soPrev == null) {
-
     return "Strong";
-
   }
-
   if (soPrev < 25 && so > soPrev) {
-
     return "Rolling Up";
-
   }
-
   if (soPrev > 75 && so < soPrev) {
-
     return "Rolling Down";
-
   }
-
   return "Strong";
-
 }
-
-
 
 function isInSellPutZone(
-
   avgPrice: number | null,
-
   support: number | null,
-
   atr14: number | null
-
 ): boolean {
-
   if (avgPrice == null || support == null || atr14 == null) {
-
     return false;
-
   }
-
   return avgPrice >= support && avgPrice <= support + atr14;
-
 }
-
-
 
 function isInSellCallZone(
-
   avgPrice: number | null,
-
   resistance: number | null,
-
   atr14: number | null
-
 ): boolean {
-
   if (avgPrice == null || resistance == null || atr14 == null) {
-
     return false;
-
   }
-
   return avgPrice >= resistance - atr14 && avgPrice <= resistance;
-
 }
-
-
 
 function isInMidZone(
-
   avgPrice: number | null,
-
   midPrice: number | null,
-
   atr14: number | null
-
 ): boolean {
-
   if (avgPrice == null || midPrice == null || atr14 == null) {
-
     return false;
-
   }
-
   return Math.abs(avgPrice - midPrice) <= atr14;
-
 }
-
-
 
 function fmt(value: number | null, digits = 2): string {
-
   if (value == null || !Number.isFinite(value)) {
-
     return "—";
-
   }
-
   return value.toFixed(digits);
-
 }
 
+/** Fresh Reversal 0%–+2.5% OR Extreme Reversal below -7.5%. */
+export function emaDiffRulePassesPut(emaDiffPct: number | null): boolean {
+  if (emaDiffPct == null) {
+    return false;
+  }
+  return (emaDiffPct >= 0 && emaDiffPct <= 2.5) || emaDiffPct < -7.5;
+}
 
+/** Fresh Reversal 0% to -2.5% OR Extreme Reversal above +7.5%. */
+export function emaDiffRulePassesCall(emaDiffPct: number | null): boolean {
+  if (emaDiffPct == null) {
+    return false;
+  }
+  return (emaDiffPct <= 0 && emaDiffPct >= -2.5) || emaDiffPct > 7.5;
+}
 
-const PUT_LABELS = [
-  "SO Rolling Up",
-  "Bullish Structure",
-  "Momentum Above EMA",
-  "Average Price in Sell Put Zone",
-  "Average Price > Previous Average Price",
-  "EMA Difference Rule Passed",
-  "EMA20 Rising",
-] as const;
+function formatEmaDiffDetail(
+  emaDiffPct: number | null,
+  side: "put" | "call"
+): string {
+  if (emaDiffPct == null) {
+    return "—";
+  }
+  const signed = `${emaDiffPct >= 0 ? "+" : ""}${emaDiffPct.toFixed(2)}%`;
+  if (side === "put") {
+    if (emaDiffPct >= 0 && emaDiffPct <= 2.5) {
+      return `${signed} (Fresh Reversal Zone)`;
+    }
+    if (emaDiffPct < -7.5) {
+      return `${signed} (Extreme Reversal Zone)`;
+    }
+    return signed;
+  }
+  if (emaDiffPct <= 0 && emaDiffPct >= -2.5) {
+    return `${signed} (Fresh Reversal Zone)`;
+  }
+  if (emaDiffPct > 7.5) {
+    return `${signed} (Extreme Reversal Zone)`;
+  }
+  return signed;
+}
 
-const CALL_LABELS = [
-  "SO Rolling Down",
-  "Bearish Structure",
-  "Momentum Below EMA",
-  "Average Price in Sell Call Zone",
-  "Average Price < Previous Average Price",
-  "EMA Difference Rule Passed",
-  "EMA20 Falling",
-] as const;
+const ZONE_STATUS_LABEL = "Zone Status (Information Only)";
 
-export function evaluateEmaStrategy(input: {
-  so: number | null;
-  soPrev: number | null;
+function buildPutChecklist(input: {
   soStatus: SoStatus;
-  marketStructure: ScannerTrend;
-  momentum: ScannerMomentum;
   avgPrice: number | null;
   avgPricePrev: number | null;
   ema20: number | null;
-  ema20Prev: number | null;
+  sma200: number | null;
+  emaDiffPct: number | null;
+  primarySupport: number | null;
+  atr14: number | null;
+}): EmaStrategyCheck[] {
+  const insidePutZone = isInSellPutZone(
+    input.avgPrice,
+    input.primarySupport,
+    input.atr14
+  );
+
+  return [
+    {
+      label: "Average Price vs EMA20",
+      passed:
+        input.avgPrice != null &&
+        input.ema20 != null &&
+        input.avgPrice > input.ema20,
+      detail: `${fmt(input.avgPrice)} vs ${fmt(input.ema20)}`,
+    },
+    {
+      label: "Current vs Previous Average Price",
+      passed:
+        input.avgPrice != null &&
+        input.avgPricePrev != null &&
+        input.avgPrice > input.avgPricePrev,
+      detail: `${fmt(input.avgPrice)} vs ${fmt(input.avgPricePrev)}`,
+    },
+    {
+      label: "SO Status",
+      passed: input.soStatus === "Rolling Up",
+      detail: input.soStatus,
+    },
+    {
+      label: "Average Price vs SMA200",
+      passed:
+        input.avgPrice != null &&
+        input.sma200 != null &&
+        input.avgPrice > input.sma200,
+      detail: `${fmt(input.avgPrice)} vs ${fmt(input.sma200)}`,
+    },
+    {
+      label: "EMA Difference",
+      passed: emaDiffRulePassesPut(input.emaDiffPct),
+      detail: formatEmaDiffDetail(input.emaDiffPct, "put"),
+    },
+    {
+      label: ZONE_STATUS_LABEL,
+      passed: insidePutZone,
+      detail: insidePutZone ? "Inside Sell Put Zone" : "Outside Sell Put Zone",
+      informationOnly: true,
+    },
+  ];
+}
+
+function buildCallChecklist(input: {
+  soStatus: SoStatus;
+  avgPrice: number | null;
+  avgPricePrev: number | null;
+  ema20: number | null;
+  sma200: number | null;
+  emaDiffPct: number | null;
+  primaryResistance: number | null;
+  atr14: number | null;
+}): EmaStrategyCheck[] {
+  const insideCallZone = isInSellCallZone(
+    input.avgPrice,
+    input.primaryResistance,
+    input.atr14
+  );
+
+  return [
+    {
+      label: "Average Price vs EMA20",
+      passed:
+        input.avgPrice != null &&
+        input.ema20 != null &&
+        input.avgPrice < input.ema20,
+      detail: `${fmt(input.avgPrice)} vs ${fmt(input.ema20)}`,
+    },
+    {
+      label: "Current vs Previous Average Price",
+      passed:
+        input.avgPrice != null &&
+        input.avgPricePrev != null &&
+        input.avgPrice < input.avgPricePrev,
+      detail: `${fmt(input.avgPrice)} vs ${fmt(input.avgPricePrev)}`,
+    },
+    {
+      label: "SO Status",
+      passed: input.soStatus === "Rolling Down",
+      detail: input.soStatus,
+    },
+    {
+      label: "Average Price vs SMA200",
+      passed:
+        input.avgPrice != null &&
+        input.sma200 != null &&
+        input.avgPrice < input.sma200,
+      detail: `${fmt(input.avgPrice)} vs ${fmt(input.sma200)}`,
+    },
+    {
+      label: "EMA Difference",
+      passed: emaDiffRulePassesCall(input.emaDiffPct),
+      detail: formatEmaDiffDetail(input.emaDiffPct, "call"),
+    },
+    {
+      label: ZONE_STATUS_LABEL,
+      passed: insideCallZone,
+      detail: insideCallZone ? "Inside Sell Call Zone" : "Outside Sell Call Zone",
+      informationOnly: true,
+    },
+  ];
+}
+
+function isEligible(checklist: EmaStrategyCheck[]): boolean {
+  return checklist
+    .filter((item) => !item.informationOnly)
+    .every((item) => item.passed);
+}
+
+function buildFailReasons(checklist: EmaStrategyCheck[]): string[] {
+  return checklist
+    .filter((item) => !item.informationOnly && !item.passed)
+    .map((item) => `${item.label}: ${item.detail}`);
+}
+
+export function evaluateEmaStrategy(input: {
+  soStatus: SoStatus;
+  avgPrice: number | null;
+  avgPricePrev: number | null;
+  ema20: number | null;
+  sma200: number | null;
   emaDiffPct: number | null;
   primarySupport: number | null;
   primaryResistance: number | null;
   atr14: number | null;
 }): EmaStrategyResult {
+  const putChecklist = buildPutChecklist(input);
+  const callChecklist = buildCallChecklist(input);
 
-  const emaDiffPassedPut =
-
-    input.emaDiffPct != null && input.emaDiffPct > 0;
-
-  const emaDiffPassedCall =
-
-    input.emaDiffPct != null && input.emaDiffPct < 0;
-
-
-
-  const fullChecklist: EmaStrategyCheck[] = [
-
-    {
-
-      label: "SO Rolling Up",
-
-      passed: input.soStatus === "Rolling Up",
-
-      detail: input.soStatus,
-
-    },
-
-    {
-
-      label: "SO Rolling Down",
-
-      passed: input.soStatus === "Rolling Down",
-
-      detail: input.soStatus,
-
-    },
-
-    {
-      label: "Bullish Structure",
-      passed: input.marketStructure === "Bullish",
-      detail: input.marketStructure,
-    },
-    {
-      label: "Bearish Structure",
-      passed: input.marketStructure === "Bearish",
-      detail: input.marketStructure,
-    },
-    {
-      label: "Momentum Above EMA",
-      passed: input.momentum === "Above EMA",
-      detail: input.momentum,
-    },
-    {
-      label: "Momentum Below EMA",
-      passed: input.momentum === "Below EMA",
-      detail: input.momentum,
-    },
-
-    {
-
-      label: "Average Price in Sell Put Zone",
-
-      passed: isInSellPutZone(
-
-        input.avgPrice,
-
-        input.primarySupport,
-
-        input.atr14
-
-      ),
-
-      detail: "Support to Support + 1 ATR",
-
-    },
-
-    {
-
-      label: "Average Price in Sell Call Zone",
-
-      passed: isInSellCallZone(
-
-        input.avgPrice,
-
-        input.primaryResistance,
-
-        input.atr14
-
-      ),
-
-      detail: "Resistance − 1 ATR to Resistance",
-
-    },
-
-    {
-
-      label: "Average Price > Previous Average Price",
-
-      passed:
-
-        input.avgPrice != null &&
-
-        input.avgPricePrev != null &&
-
-        input.avgPrice > input.avgPricePrev,
-
-      detail: `${fmt(input.avgPrice)} vs ${fmt(input.avgPricePrev)}`,
-
-    },
-
-    {
-
-      label: "Average Price < Previous Average Price",
-
-      passed:
-
-        input.avgPrice != null &&
-
-        input.avgPricePrev != null &&
-
-        input.avgPrice < input.avgPricePrev,
-
-      detail: `${fmt(input.avgPrice)} vs ${fmt(input.avgPricePrev)}`,
-
-    },
-
-    {
-
-      label: "EMA Difference Rule Passed",
-
-      passed: emaDiffPassedPut,
-
-      detail:
-
-        input.emaDiffPct != null
-
-          ? `${input.emaDiffPct >= 0 ? "+" : ""}${input.emaDiffPct.toFixed(2)}%`
-
-          : "—",
-
-    },
-
-    {
-
-      label: "EMA20 Rising",
-
-      passed:
-
-        input.ema20 != null &&
-
-        input.ema20Prev != null &&
-
-        input.ema20 > input.ema20Prev,
-
-      detail:
-
-        input.ema20 != null && input.ema20Prev != null
-
-          ? `${input.ema20Prev.toFixed(2)} → ${input.ema20.toFixed(2)}`
-
-          : "EMA20 unavailable",
-
-    },
-
-    {
-
-      label: "EMA20 Falling",
-
-      passed:
-
-        input.ema20 != null &&
-
-        input.ema20Prev != null &&
-
-        input.ema20 < input.ema20Prev,
-
-      detail:
-
-        input.ema20 != null && input.ema20Prev != null
-
-          ? `${input.ema20Prev.toFixed(2)} → ${input.ema20.toFixed(2)}`
-
-          : "EMA20 unavailable",
-
-    },
-
-  ];
-
-
-
-  const putChecklist = filterChecklist(fullChecklist, PUT_LABELS).map((item) =>
-
-    item.label === "EMA Difference Rule Passed"
-
-      ? {
-
-          ...item,
-
-          passed: emaDiffPassedPut,
-
-          detail:
-
-            input.emaDiffPct != null
-
-              ? `${input.emaDiffPct >= 0 ? "+" : ""}${input.emaDiffPct.toFixed(2)}%`
-
-              : "—",
-
-        }
-
-      : item
-
-  );
-
-
-
-  const callChecklist = filterChecklist(fullChecklist, [
-
-    ...CALL_LABELS.slice(0, 4),
-
-    "EMA Difference Rule Passed",
-
-    "EMA20 Falling",
-
-  ]).map((item) =>
-
-    item.label === "EMA Difference Rule Passed"
-
-      ? {
-
-          ...item,
-
-          passed: emaDiffPassedCall,
-
-          detail:
-
-            input.emaDiffPct != null
-
-              ? `${input.emaDiffPct.toFixed(2)}%`
-
-              : "—",
-
-        }
-
-      : item
-
-  );
-
-
-
-  const putEligible = putChecklist.every((item) => item.passed);
-
-  const callEligible = callChecklist.every((item) => item.passed);
-
-
-
-  if (putEligible) {
-
+  if (isEligible(putChecklist)) {
     return {
-
       output: "SELL PUT",
-
       reasons: putChecklist
-
-        .filter((item) => item.passed)
-
-        .map((item) => item.label)
-
-        .slice(0, 5),
-
+        .filter((item) => !item.informationOnly && item.passed)
+        .map((item) => item.label),
       checklist: putChecklist,
-
     };
-
   }
 
-
-
-  if (callEligible) {
-
+  if (isEligible(callChecklist)) {
     return {
-
       output: "SELL CALL",
-
       reasons: callChecklist
-
-        .filter((item) => item.passed)
-
-        .map((item) => item.label)
-
-        .slice(0, 5),
-
+        .filter((item) => !item.informationOnly && item.passed)
+        .map((item) => item.label),
       checklist: callChecklist,
-
     };
-
   }
 
+  const displayChecklist =
+    input.avgPrice != null && input.ema20 != null && input.avgPrice >= input.ema20
+      ? putChecklist
+      : callChecklist;
 
-
-  const failReasons: string[] = [];
-
-  if (input.marketStructure === "Neutral") {
-    failReasons.push("Structure not Bullish or Bearish");
-  } else if (!putChecklist[1].passed && !callChecklist[1].passed) {
-    failReasons.push(`Structure is ${input.marketStructure}`);
-  }
-  if (!putChecklist[2].passed && !callChecklist[2].passed) {
-    failReasons.push(
-      `Momentum is ${input.momentum} — need Above EMA for puts or Below EMA for calls`
-    );
-  }
-  if (!putChecklist[3].passed && !callChecklist[3].passed) {
-    failReasons.push("Average Price outside Sell Put and Sell Call zones");
-  }
-  if (!putChecklist[0].passed && !callChecklist[0].passed) {
-    failReasons.push(`SO Status: ${input.soStatus}`);
-  }
-
-  if (failReasons.length === 0) {
-
-    failReasons.push("EMA setup conditions not met");
-
-  }
-
-
+  const failReasons = buildFailReasons(displayChecklist);
 
   return {
-
     output: "NO TRADE",
-
-    reasons: failReasons.slice(0, 5),
-
-    checklist: fullChecklist.filter(
-
-      (item) =>
-
-        PUT_LABELS.includes(item.label as (typeof PUT_LABELS)[number]) ||
-
-        CALL_LABELS.includes(item.label as (typeof CALL_LABELS)[number])
-
-    ),
-
+    reasons: failReasons.length > 0 ? failReasons.slice(0, 5) : ["Early reversal conditions not met"],
+    checklist: displayChecklist,
   };
-
 }
-
-
-
-function filterChecklist(
-
-  checklist: EmaStrategyCheck[],
-
-  labels: readonly string[]
-
-): EmaStrategyCheck[] {
-
-  return labels.map((label) => {
-
-    const item = checklist.find((entry) => entry.label === label);
-
-    if (!item) {
-
-      return { label, passed: false, detail: "—" };
-
-    }
-
-    return item;
-
-  });
-
-}
-
-
 
 export { isInMidZone, isInSellPutZone, isInSellCallZone };
-
-

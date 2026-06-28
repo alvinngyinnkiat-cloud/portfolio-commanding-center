@@ -64,7 +64,7 @@ const SYSTEM_OPTIONS: Array<{ value: SystemFilter; label: string }> = [
 
   { value: "all", label: "All Systems" },
 
-  { value: "ema20", label: "20 EMA System" },
+  { value: "ema20", label: "20 EMA Early Reversal" },
 
   { value: "main", label: "Main System" },
 
