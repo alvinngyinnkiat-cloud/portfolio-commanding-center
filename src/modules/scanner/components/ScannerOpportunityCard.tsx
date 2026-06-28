@@ -122,6 +122,14 @@ function EarlyReversalPanel({ result }: { result: ScannerTickerResult }) {
       ? `${indicators.emaDiffPct >= 0 ? "+" : ""}${indicators.emaDiffPct.toFixed(2)}%`
       : "—";
 
+  const primaryRow = emaStrategy.checklist.find(
+    (item) => item.primaryStrategy != null
+  );
+  const requiredChecklist = emaStrategy.checklist.filter(
+    (item) => !item.informationOnly
+  );
+  const marketContext = emaStrategy.marketContext ?? [];
+
   return (
     <StrategyPanel
       title="20 EMA Early Reversal"
@@ -136,7 +144,43 @@ function EarlyReversalPanel({ result }: { result: ScannerTickerResult }) {
         </>
       }
     >
-      <Checklist items={emaStrategy.checklist} compact />
+      {primaryRow && (
+        <div className="mb-3">
+          <Checklist items={[primaryRow]} compact />
+        </div>
+      )}
+
+      <p className="mb-2 text-[10px] font-semibold uppercase tracking-wide text-slate-500">
+        Required Checklist
+      </p>
+      <Checklist items={requiredChecklist} compact />
+
+      {marketContext.length > 0 && (
+        <div className="mt-4 border-t border-surface-border/40 pt-3">
+          <p className="mb-2 text-[10px] font-semibold uppercase tracking-wide text-slate-500">
+            Market Context / Information Only
+          </p>
+          <Checklist items={marketContext} compact />
+        </div>
+      )}
+
+      {emaStrategy.confidence != null && emaStrategy.contextNote && (
+        <div className="mt-3 rounded-lg border border-surface-border/50 bg-surface/40 px-3 py-2 text-xs">
+          <p className="font-medium text-slate-300">
+            Confidence:{" "}
+            <span
+              className={
+                emaStrategy.confidence === "High"
+                  ? "text-accent-green"
+                  : "text-yellow-400"
+              }
+            >
+              {emaStrategy.confidence}
+            </span>
+          </p>
+          <p className="mt-1 text-slate-400">{emaStrategy.contextNote}</p>
+        </div>
+      )}
 
       {emaStrategy.reasons.length > 0 && emaStrategy.output === "NO TRADE" && (
         <ul className="mt-3 space-y-1.5">

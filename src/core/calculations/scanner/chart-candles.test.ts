@@ -49,6 +49,7 @@ describe("evaluateEmaStrategy primary row", () => {
       ema20: 100,
       sma200: 95,
       emaDiffPct: 1.8,
+      marketStructure: "Bullish",
       primarySupport: 80,
       primaryResistance: 120,
       atr14: 5,

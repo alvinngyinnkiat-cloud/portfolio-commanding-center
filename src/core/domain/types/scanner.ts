@@ -191,6 +191,15 @@ export interface EmaStrategyResult {
 
   checklist: EmaStrategyCheck[];
 
+  /** Long-term context rows — do not affect signal eligibility. */
+  marketContext?: EmaStrategyCheck[];
+
+  /** SMA200-aligned confidence when output is SELL PUT or SELL CALL. */
+  confidence?: "High" | "Medium" | null;
+
+  /** Human-readable SMA200 context for the active signal. */
+  contextNote?: string | null;
+
 }
 
 

@@ -153,6 +153,7 @@ export function scanTicker(input: ScanTickerInput): ScannerTickerResult {
     ema20: indicatorValues.ema20,
     sma200: indicatorValues.sma200,
     emaDiffPct,
+    marketStructure,
     primarySupport: structure.primarySupport,
     primaryResistance: structure.primaryResistance,
     atr14: indicatorValues.atr14,
