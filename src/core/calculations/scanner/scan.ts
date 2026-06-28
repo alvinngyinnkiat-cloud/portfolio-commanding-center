@@ -17,6 +17,7 @@ import {
   deriveSoStatus,
   evaluateEmaStrategy,
 } from "./ema-strategy";
+import { buildRecentChartCandles } from "./chart-candles";
 import { evaluateMainSystemDisplay } from "./main-system-display";
 import {
   deriveMarketStructure,
@@ -213,7 +214,7 @@ export function scanTicker(input: ScanTickerInput): ScannerTickerResult {
     bestSetup,
     tradable: mainSystem.output !== "NO TRADE",
     tradeReasons: [],
-    recentCandles: dailyBars.slice(-5),
+    recentCandles: buildRecentChartCandles(dailyBars),
     status: "ok",
     notes,
   };

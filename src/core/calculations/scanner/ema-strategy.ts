@@ -4,6 +4,7 @@ import type {
   SoStatus,
   StrategyOutput,
 } from "@/core/domain/types/scanner";
+import { derivePrimarySuggestedStrategy } from "./chart-candles";
 
 export type { StrategyOutput, SoStatus };
 
@@ -105,7 +106,24 @@ function formatEmaDiffDetail(
   return signed;
 }
 
-const ZONE_STATUS_LABEL = "Zone Status (Information Only)";
+const PRIMARY_STRATEGY_LABEL = "Primary Suggested Strategy";
+
+function buildPrimarySuggestedStrategyRow(input: {
+  avgPrice: number | null;
+  ema20: number | null;
+}): EmaStrategyCheck {
+  const strategy = derivePrimarySuggestedStrategy(input.avgPrice, input.ema20);
+  const comparison = `${fmt(input.avgPrice)} vs ${fmt(input.ema20)}`;
+
+  return {
+    label: PRIMARY_STRATEGY_LABEL,
+    passed: strategy != null,
+    detail: strategy ?? "—",
+    informationOnly: true,
+    primaryStrategy: strategy ?? undefined,
+    comparisonDetail: comparison,
+  };
+}
 
 function buildPutChecklist(input: {
   soStatus: SoStatus;
@@ -114,16 +132,9 @@ function buildPutChecklist(input: {
   ema20: number | null;
   sma200: number | null;
   emaDiffPct: number | null;
-  primarySupport: number | null;
-  atr14: number | null;
 }): EmaStrategyCheck[] {
-  const insidePutZone = isInSellPutZone(
-    input.avgPrice,
-    input.primarySupport,
-    input.atr14
-  );
-
   return [
+    buildPrimarySuggestedStrategyRow(input),
     {
       label: "Average Price vs EMA20",
       passed:
@@ -158,12 +169,6 @@ function buildPutChecklist(input: {
       passed: emaDiffRulePassesPut(input.emaDiffPct),
       detail: formatEmaDiffDetail(input.emaDiffPct, "put"),
     },
-    {
-      label: ZONE_STATUS_LABEL,
-      passed: insidePutZone,
-      detail: insidePutZone ? "Inside Sell Put Zone" : "Outside Sell Put Zone",
-      informationOnly: true,
-    },
   ];
 }
 
@@ -174,16 +179,9 @@ function buildCallChecklist(input: {
   ema20: number | null;
   sma200: number | null;
   emaDiffPct: number | null;
-  primaryResistance: number | null;
-  atr14: number | null;
 }): EmaStrategyCheck[] {
-  const insideCallZone = isInSellCallZone(
-    input.avgPrice,
-    input.primaryResistance,
-    input.atr14
-  );
-
   return [
+    buildPrimarySuggestedStrategyRow(input),
     {
       label: "Average Price vs EMA20",
       passed:
@@ -217,12 +215,6 @@ function buildCallChecklist(input: {
       label: "EMA Difference",
       passed: emaDiffRulePassesCall(input.emaDiffPct),
       detail: formatEmaDiffDetail(input.emaDiffPct, "call"),
-    },
-    {
-      label: ZONE_STATUS_LABEL,
-      passed: insideCallZone,
-      detail: insideCallZone ? "Inside Sell Call Zone" : "Outside Sell Call Zone",
-      informationOnly: true,
     },
   ];
 }

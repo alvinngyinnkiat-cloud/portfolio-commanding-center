@@ -29,6 +29,11 @@ export function FiveDayCandlestickChart({
   const chartWidth = width - padding.left - padding.right;
   const chartHeight = height - padding.top - padding.bottom;
 
+  const avgSeries = candles.map(
+    (bar) => bar.avgPrice ?? (bar.high + bar.low) / 2
+  );
+  const emaSeries = candles.map((bar) => bar.ema20 ?? null);
+
   const zoneLevels = [
     sellPutZone?.low,
     sellPutZone?.high,
@@ -37,6 +42,8 @@ export function FiveDayCandlestickChart({
     icMidZone?.low,
     icMidZone?.high,
     avgPrice,
+    ...avgSeries,
+    ...emaSeries.filter((value): value is number => value != null),
   ].filter((value): value is number => value != null);
 
   const priceMin = Math.min(...candles.map((bar) => bar.low), ...zoneLevels);
@@ -47,6 +54,18 @@ export function FiveDayCandlestickChart({
   const toY = (price: number) =>
     padding.top + ((priceMax - price) / range) * chartHeight;
 
+  const toX = (index: number) => padding.left + index * xStep + xStep / 2;
+
+  const avgPoints = avgSeries
+    .map((value, index) => (value != null ? `${toX(index)},${toY(value)}` : null))
+    .filter((point): point is string => point != null)
+    .join(" ");
+
+  const emaPoints = emaSeries
+    .map((value, index) => (value != null ? `${toX(index)},${toY(value)}` : null))
+    .filter((point): point is string => point != null)
+    .join(" ");
+
   return (
     <div className="w-full overflow-hidden">
       <svg
@@ -54,7 +73,7 @@ export function FiveDayCandlestickChart({
         className="h-44 w-full"
         preserveAspectRatio="xMidYMid meet"
         role="img"
-        aria-label="Five day candlestick chart with zones"
+        aria-label="Five day candlestick chart with zones, average price, and EMA20"
       >
         {sellPutZone && (
           <ZoneBand
@@ -82,7 +101,7 @@ export function FiveDayCandlestickChart({
         )}
 
         {candles.map((bar, index) => {
-          const x = padding.left + index * xStep + xStep / 2;
+          const x = toX(index);
           const bodyTop = toY(Math.max(bar.open, bar.close));
           const bodyBottom = toY(Math.min(bar.open, bar.close));
           const bodyHeight = Math.max(bodyBottom - bodyTop, 2);
@@ -110,29 +129,47 @@ export function FiveDayCandlestickChart({
           );
         })}
 
-        {avgPrice != null && (
-          <>
-            <line
-              x1={padding.left}
-              x2={width - padding.right}
-              y1={toY(avgPrice)}
-              y2={toY(avgPrice)}
-              stroke="#38bdf8"
-              strokeWidth={1.5}
-              strokeDasharray="3 2"
-            />
+        {avgPoints.length > 0 && (
+          <polyline
+            points={avgPoints}
+            fill="none"
+            stroke="#38bdf8"
+            strokeWidth={1.5}
+            strokeDasharray="4 3"
+            strokeLinejoin="round"
+            strokeLinecap="round"
+          />
+        )}
+
+        {emaPoints.length > 0 && (
+          <polyline
+            points={emaPoints}
+            fill="none"
+            stroke="#c084fc"
+            strokeWidth={2}
+            strokeLinejoin="round"
+            strokeLinecap="round"
+          />
+        )}
+
+        {emaSeries.map((value, index) =>
+          value != null ? (
             <circle
-              cx={width - padding.right - 4}
-              cy={toY(avgPrice)}
-              r={3}
-              fill="#38bdf8"
+              key={`ema-${candles[index].date}`}
+              cx={toX(index)}
+              cy={toY(value)}
+              r={2.5}
+              fill="#c084fc"
             />
-          </>
+          ) : null
         )}
       </svg>
       <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-[10px] text-slate-500">
         <span>
-          <span className="text-sky-400">●</span> Avg Price
+          <span className="text-sky-400">---</span> Avg Price
+        </span>
+        <span>
+          <span className="text-purple-400">—</span> EMA20
         </span>
         <span>
           <span className="text-accent-green">░</span> Put Zone

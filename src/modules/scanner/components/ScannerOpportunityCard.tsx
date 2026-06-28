@@ -617,6 +617,8 @@ function Checklist({
     passed: boolean;
     detail: string;
     informationOnly?: boolean;
+    primaryStrategy?: "SELL PUT" | "SELL CALL" | "NEUTRAL";
+    comparisonDetail?: string;
   }>;
   compact?: boolean;
 }) {
@@ -635,7 +637,12 @@ function Checklist({
           className={`flex flex-wrap items-center justify-between gap-2 rounded-lg bg-surface/50 ${padding} ${textSize}`}
         >
           <span className="min-w-0 text-slate-300">
-            {item.informationOnly ? (
+            {item.primaryStrategy != null ? (
+              <>
+                ○ {normalizeChecklistLabel(item.label)}:{" "}
+                <span className="font-medium text-white">{item.primaryStrategy}</span>
+              </>
+            ) : item.informationOnly ? (
               <>
                 {item.passed ? "✓" : "○"} {normalizeChecklistLabel(item.label)}
               </>
@@ -645,7 +652,9 @@ function Checklist({
               </>
             )}
           </span>
-          <span className="shrink-0 text-right text-slate-400">{item.detail}</span>
+          <span className="shrink-0 text-right text-slate-400">
+            {item.comparisonDetail ?? item.detail}
+          </span>
         </div>
       ))}
     </div>

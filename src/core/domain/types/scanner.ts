@@ -124,6 +124,12 @@ export interface ScannerCandleBar {
 
   close: number;
 
+  /** Session average price (high + low) / 2 — chart display. */
+  avgPrice?: number | null;
+
+  /** EMA20 at session close — chart display. */
+  ema20?: number | null;
+
 }
 
 
@@ -166,6 +172,12 @@ export interface EmaStrategyCheck {
 
   /** When true, item is displayed for context only and does not affect eligibility. */
   informationOnly?: boolean;
+
+  /** Primary suggestion derived from Average Price vs EMA20 only. */
+  primaryStrategy?: "SELL PUT" | "SELL CALL" | "NEUTRAL";
+
+  /** Price comparison shown on the right for primary strategy row. */
+  comparisonDetail?: string;
 
 }
 

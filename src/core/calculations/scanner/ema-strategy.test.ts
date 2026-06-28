@@ -68,22 +68,16 @@ describe("evaluateEmaStrategy — Module 4.3 QA", () => {
 
     expect(result.output).toBe("SELL PUT");
     expect(result.checklist.map((item) => item.label)).toEqual([
+      "Primary Suggested Strategy",
       "Average Price vs EMA20",
       "Current vs Previous Average Price",
       "SO Status",
       "Average Price vs SMA200",
       "EMA Difference",
-      "Zone Status (Information Only)",
     ]);
-
-    const zoneItem = result.checklist.find(
-      (item) => item.label === "Zone Status (Information Only)"
-    );
-    expect(zoneItem?.detail).toBe("Outside Sell Put Zone");
-    expect(zoneItem?.informationOnly).toBe(true);
   });
 
-  it("Case B: SELL CALL inside Sell Call Zone when all reversal rules pass", () => {
+  it("Case B: SELL CALL when all reversal rules pass", () => {
     const result = evaluateEmaStrategy({
       soStatus: "Rolling Down",
       avgPrice: 98,
@@ -97,11 +91,7 @@ describe("evaluateEmaStrategy — Module 4.3 QA", () => {
     });
 
     expect(result.output).toBe("SELL CALL");
-
-    const zoneItem = result.checklist.find(
-      (item) => item.label === "Zone Status (Information Only)"
-    );
-    expect(zoneItem?.detail).toBe("Inside Sell Call Zone");
+    expect(result.checklist[0].primaryStrategy).toBe("SELL CALL");
   });
 
   it("never outputs Iron Condor", () => {
@@ -134,11 +124,6 @@ describe("evaluateEmaStrategy — Module 4.3 QA", () => {
     });
 
     expect(result.output).toBe("SELL PUT");
-    const zoneItem = result.checklist.find(
-      (item) => item.label === "Zone Status (Information Only)"
-    );
-    expect(zoneItem?.passed).toBe(false);
-    expect(zoneItem?.detail).toBe("Outside Sell Put Zone");
   });
 });
 
