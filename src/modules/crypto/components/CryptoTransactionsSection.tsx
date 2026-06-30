@@ -2,6 +2,7 @@
 
 import { useMemo, useRef, useState } from "react";
 import { usePortfolio } from "@/context/PortfolioContext";
+import { useCryptoSave } from "@/modules/crypto/lib/crypto-save-context";
 import type { CryptoTrade, CryptoTradeType } from "@/core/domain/types";
 import {
   rebuildHoldingsFromTrades,
@@ -14,7 +15,6 @@ import { compareDateDescWithCreatedAt } from "@/shared/lib/sort";
 import { Input } from "@/shared/components/ui/Input";
 import { Select } from "@/shared/components/ui/Select";
 import { Button } from "@/shared/components/ui/Button";
-import { persistCryptoTradeChanges } from "@/modules/crypto/lib/persist-crypto-changes";
 
 function toCryptoTradeDraft(trade: CryptoTrade): CryptoTradeDraft {
   return {
@@ -28,13 +28,17 @@ function toCryptoTradeDraft(trade: CryptoTrade): CryptoTradeDraft {
 }
 
 export function CryptoTransactionsSection() {
-  const { cryptoData, services, refresh } = usePortfolio();
+  const { cryptoData, services } = usePortfolio();
+  const { commitCryptoChange, status: saveStatus, error: saveError } =
+    useCryptoSave();
   const formRef = useRef<HTMLDivElement>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState<CryptoTradeDraft | null>(null);
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
-  const [saveError, setSaveError] = useState<string | null>(null);
-  const [saving, setSaving] = useState(false);
+  const [localError, setLocalError] = useState<string | null>(null);
+  const [actionInFlight, setActionInFlight] = useState(false);
+
+  const isSaving = actionInFlight || saveStatus === "saving";
 
   const transactions = useMemo(
     () =>
@@ -68,23 +72,23 @@ export function CryptoTransactionsSection() {
     setEditingId(null);
     setForm(null);
     setFormErrors({});
-    setSaveError(null);
+    setLocalError(null);
   };
 
   const handleEdit = (trade: CryptoTrade) => {
     setEditingId(trade.id);
     setForm(toCryptoTradeDraft(trade));
     setFormErrors({});
-    setSaveError(null);
+    setLocalError(null);
     formRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
   };
 
   const handleSave = async () => {
-    if (!services?.cryptoTrades || !form || !editingId || saving) return;
+    if (!services?.cryptoTrades || !form || !editingId || isSaving) return;
 
     const result = validateCryptoTradeDraft(form, holdingsForValidation);
     if (!result.valid) {
-      setSaveError(null);
+      setLocalError(null);
       setFormErrors(
         Object.fromEntries(
           Object.entries(result.errors).map(([key, value]) => [key, value ?? ""])
@@ -93,68 +97,53 @@ export function CryptoTransactionsSection() {
       return;
     }
 
-    setSaving(true);
-    setSaveError(null);
+    setActionInFlight(true);
+    setLocalError(null);
 
-    try {
-      const saved = services.cryptoTrades.upsertFromDraft(form, editingId);
-      if (!saved) {
-        setSaveError(
-          "Could not save the transaction. Check all fields and try again."
-        );
-        return;
-      }
+    const { success, error } = await commitCryptoChange(() => {
+      const trade = services.cryptoTrades!.upsertFromDraft(form, editingId);
+      return trade != null;
+    }, { rehydrate: true });
 
-      await persistCryptoTradeChanges();
+    setActionInFlight(false);
+
+    if (success) {
       resetForm();
-      refresh();
-    } catch (error) {
-      setSaveError(
-        error instanceof Error
-          ? error.message
-          : "Failed to save transaction to Supabase."
+    } else {
+      setLocalError(
+        error ??
+          "Could not save the transaction. Check all fields and try again."
       );
-      refresh();
-    } finally {
-      setSaving(false);
     }
   };
 
   const handleDelete = async (trade: CryptoTrade) => {
-    if (!services?.cryptoTrades || saving) return;
+    if (!services?.cryptoTrades || isSaving) return;
 
     const label = `${trade.type} ${trade.assetName} (${formatCryptoTradeDate(trade.date)})`;
     if (!window.confirm(`Delete transaction: ${label}?`)) {
       return;
     }
 
-    setSaving(true);
-    setSaveError(null);
+    setActionInFlight(true);
+    setLocalError(null);
 
-    try {
-      const deleted = services.cryptoTrades.delete(trade.id);
-      if (!deleted) {
-        setSaveError("Could not delete the transaction.");
-        return;
-      }
+    const { success, error } = await commitCryptoChange(() => {
+      return services.cryptoTrades!.delete(trade.id);
+    }, { rehydrate: true });
 
+    setActionInFlight(false);
+
+    if (success) {
       if (editingId === trade.id) {
         resetForm();
       }
-
-      await persistCryptoTradeChanges();
-      refresh();
-    } catch (error) {
-      setSaveError(
-        error instanceof Error
-          ? error.message
-          : "Failed to delete transaction from Supabase."
-      );
-      refresh();
-    } finally {
-      setSaving(false);
+    } else {
+      setLocalError(error ?? "Could not delete the transaction.");
     }
   };
+
+  const displayError = localError ?? (saveStatus === "failed" ? saveError : null);
 
   return (
     <div className="min-w-0 space-y-6">
@@ -229,18 +218,20 @@ export function CryptoTransactionsSection() {
             />
           </div>
           <div className="flex flex-wrap gap-2">
-            <Button onClick={() => void handleSave()} disabled={saving}>
-              {saving ? "Saving…" : "Save Changes"}
+            <Button onClick={() => void handleSave()} disabled={isSaving}>
+              {isSaving ? "Saving…" : "Save Changes"}
             </Button>
             <Button
               variant="secondary"
               onClick={resetForm}
-              disabled={saving}
+              disabled={isSaving}
             >
               Cancel
             </Button>
           </div>
-          {saveError && <p className="text-sm text-accent-red">{saveError}</p>}
+          {displayError && (
+            <p className="text-sm text-accent-red">{displayError}</p>
+          )}
         </div>
       )}
 
@@ -289,7 +280,7 @@ export function CryptoTransactionsSection() {
                         size="sm"
                         variant={editingId === row.id ? "primary" : "secondary"}
                         onClick={() => handleEdit(row)}
-                        disabled={saving}
+                        disabled={isSaving}
                         aria-pressed={editingId === row.id}
                       >
                         Edit
@@ -298,7 +289,7 @@ export function CryptoTransactionsSection() {
                         size="sm"
                         variant="danger"
                         onClick={() => void handleDelete(row)}
-                        disabled={saving}
+                        disabled={isSaving}
                       >
                         Delete
                       </Button>

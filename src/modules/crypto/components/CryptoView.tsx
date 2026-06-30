@@ -8,6 +8,10 @@ import { CryptoHoldingsSection } from "./CryptoHoldingsSection";
 import { CryptoTransactionsSection } from "./CryptoTransactionsSection";
 import { CryptoCashFlowSection } from "./CryptoCashFlowSection";
 import { CryptoAllocationSection } from "./CryptoAllocationSection";
+import {
+  CryptoSaveProvider,
+  CryptoSaveStatusBar,
+} from "@/modules/crypto/lib/crypto-save-context";
 
 function CryptoSkeleton() {
   return (
@@ -34,17 +38,21 @@ export function CryptoView() {
   }
 
   return (
-    <div className="min-w-0 space-y-6 pb-8">
-      <header className="space-y-1">
-        <h1 className="text-2xl font-bold tracking-tight text-white sm:text-3xl">
-          Crypto Tracker
-        </h1>
-        <p className="text-sm text-slate-500">
-          Manual valuations · Cash deployment guide · No price feeds
-        </p>
-      </header>
+    <CryptoSaveProvider>
+      <div className="min-w-0 space-y-6 pb-8">
+        <header className="space-y-3">
+          <div className="space-y-1">
+            <h1 className="text-2xl font-bold tracking-tight text-white sm:text-3xl">
+              Crypto Tracker
+            </h1>
+            <p className="text-sm text-slate-500">
+              Manual valuations · Cash deployment guide · No price feeds
+            </p>
+          </div>
+          <CryptoSaveStatusBar />
+        </header>
 
-      <Tabs
+        <Tabs
         defaultTab="overview"
         items={[
           {
@@ -114,6 +122,7 @@ export function CryptoView() {
           },
         ]}
       />
-    </div>
+      </div>
+    </CryptoSaveProvider>
   );
 }

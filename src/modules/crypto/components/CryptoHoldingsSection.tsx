@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { usePortfolio } from "@/context/PortfolioContext";
+import { useCryptoSave } from "@/modules/crypto/lib/crypto-save-context";
 import type { CryptoHoldingRow, CryptoTradeType } from "@/core/domain/types";
 import {
   validateCryptoHoldingValueDraft,
@@ -10,8 +11,6 @@ import {
 import { formatPercent, formatSgd } from "@/shared/lib/format";
 import { coerceNumber } from "@/shared/lib/coerce-number";
 import { parseIsoDateString, toLocalDateString } from "@/shared/lib/date";
-import { getPersistenceManager } from "@/core/database/supabase";
-import { persistCryptoTradeChanges } from "@/modules/crypto/lib/persist-crypto-changes";
 import { Input } from "@/shared/components/ui/Input";
 import { Select } from "@/shared/components/ui/Select";
 import { Button } from "@/shared/components/ui/Button";
@@ -58,7 +57,7 @@ function CryptoHoldingEditModal({
 }: {
   row: CryptoHoldingRow;
   onClose: () => void;
-  onSave: (currentValueSgd: string, notes: string) => Promise<void>;
+  onSave: (currentValueSgd: string, notes: string) => Promise<boolean>;
 }) {
   const [currentValue, setCurrentValue] = useState(String(row.currentValueSgd));
   const [notes, setNotes] = useState(row.notes ?? "");
@@ -84,8 +83,10 @@ function CryptoHoldingEditModal({
     setSaving(true);
     setError(null);
     try {
-      await onSave(currentValue, notes);
-      onClose();
+      const saved = await onSave(currentValue, notes);
+      if (saved) {
+        onClose();
+      }
     } finally {
       setSaving(false);
     }
@@ -128,17 +129,20 @@ function CryptoHoldingEditModal({
 }
 
 export function CryptoHoldingsSection() {
-  const { cryptoData, services, refresh } = usePortfolio();
+  const { cryptoData, services } = usePortfolio();
+  const { commitCryptoChange, status: saveStatus, error: saveError } =
+    useCryptoSave();
   const [tradeForm, setTradeForm] = useState(emptyTradeForm);
   const [editingRow, setEditingRow] = useState<CryptoHoldingRow | null>(null);
   const [tradeErrors, setTradeErrors] = useState<Record<string, string>>({});
   const [tradeSaveError, setTradeSaveError] = useState<string | null>(null);
-  const [tradeSaving, setTradeSaving] = useState(false);
+  const [actionInFlight, setActionInFlight] = useState(false);
 
   const rows = cryptoData?.rows ?? [];
+  const isSaving = actionInFlight || saveStatus === "saving";
 
   const handleTradeSubmit = async () => {
-    if (!services?.cryptoTrades || tradeSaving) return;
+    if (!services?.cryptoTrades || isSaving) return;
 
     const result = validateCryptoTradeDraft(
       tradeForm,
@@ -162,64 +166,67 @@ export function CryptoHoldingsSection() {
       return;
     }
 
-    setTradeSaving(true);
+    setActionInFlight(true);
     setTradeSaveError(null);
 
-    try {
-      const trade = services.cryptoTrades.upsertFromDraft(tradeForm);
-      if (!trade) {
-        setTradeSaveError(
-          "Could not save the transaction record. Check all fields and try again."
-        );
-        return;
-      }
+    const { success, error } = await commitCryptoChange(() => {
+      const trade = services.cryptoTrades!.upsertFromDraft(tradeForm);
+      return trade != null;
+    }, { rehydrate: true });
 
-      await persistCryptoTradeChanges();
+    setActionInFlight(false);
 
+    if (success) {
       setTradeErrors({});
       setTradeForm(emptyTradeForm());
-      refresh();
-    } catch (error) {
+    } else {
       setTradeSaveError(
-        error instanceof Error
-          ? error.message
-          : "Failed to save transaction to Supabase."
+        error ??
+          "Could not save the transaction record. Check all fields and try again."
       );
-      refresh();
-    } finally {
-      setTradeSaving(false);
     }
   };
 
-  const saveHoldingEdit = async (currentValueSgd: string, notes: string) => {
-    if (!services?.cryptoHoldings || !editingRow) return;
+  const saveHoldingEdit = async (
+    currentValueSgd: string,
+    notes: string
+  ): Promise<boolean> => {
+    if (!services?.cryptoHoldings || !editingRow) return false;
 
-    services.cryptoHoldings.updateValuation(editingRow.id, {
-      currentValueSgd,
-      notes,
-    });
-    await getPersistenceManager()?.drainSyncQueue();
-    refresh();
+    return commitCryptoChange(() => {
+      const updated = services.cryptoHoldings!.updateValuation(editingRow.id, {
+        currentValueSgd,
+        notes,
+      });
+      return updated != null;
+    }, { rehydrate: true }).then(({ success }) => success);
   };
 
   const handleDeleteHolding = async (row: CryptoHoldingRow) => {
-    if (!services?.cryptoTrades || !services?.cryptoHoldings) return;
+    if (!services?.cryptoTrades || !services?.cryptoHoldings || isSaving) return;
     if (!window.confirm(`Delete ${row.assetName} and all related buy/sell records?`)) {
       return;
     }
 
-    const trades = services.cryptoTrades.list();
-    const assetKey = row.assetName.trim().toUpperCase();
-    const remaining = trades.filter(
-      (trade) => trade.assetName.trim().toUpperCase() !== assetKey
-    );
-    services.cryptoTrades.replaceAll(remaining);
-    services.cryptoHoldings.delete(row.id);
-    if (editingRow?.id === row.id) {
-      setEditingRow(null);
+    setActionInFlight(true);
+    const { success, error } = await commitCryptoChange(() => {
+      const trades = services.cryptoTrades!.list();
+      const assetKey = row.assetName.trim().toUpperCase();
+      const remaining = trades.filter(
+        (trade) => trade.assetName.trim().toUpperCase() !== assetKey
+      );
+      services.cryptoTrades!.replaceAll(remaining);
+      services.cryptoHoldings!.delete(row.id);
+      if (editingRow?.id === row.id) {
+        setEditingRow(null);
+      }
+      return true;
+    }, { rehydrate: true });
+    setActionInFlight(false);
+
+    if (!success) {
+      setTradeSaveError(error ?? "Failed to delete holding.");
     }
-    await persistCryptoTradeChanges();
-    refresh();
   };
 
   return (
@@ -284,14 +291,11 @@ export function CryptoHoldingsSection() {
             onChange={(e) => setTradeForm({ ...tradeForm, notes: e.target.value })}
           />
         </div>
-        <Button
-          onClick={() => void handleTradeSubmit()}
-          disabled={tradeSaving}
-        >
-          {tradeSaving ? "Saving…" : "Add Transaction"}
+        <Button onClick={() => void handleTradeSubmit()} disabled={isSaving}>
+          {isSaving ? "Saving…" : "Add Transaction"}
         </Button>
-        {tradeSaveError && (
-          <p className="text-sm text-accent-red">{tradeSaveError}</p>
+        {(tradeSaveError || (saveStatus === "failed" && saveError)) && (
+          <p className="text-sm text-accent-red">{tradeSaveError ?? saveError}</p>
         )}
       </section>
 
@@ -349,6 +353,7 @@ export function CryptoHoldingsSection() {
                         size="sm"
                         variant="ghost"
                         onClick={() => setEditingRow(row)}
+                        disabled={isSaving}
                       >
                         Edit
                       </Button>
@@ -356,6 +361,7 @@ export function CryptoHoldingsSection() {
                         size="sm"
                         variant="danger"
                         onClick={() => void handleDeleteHolding(row)}
+                        disabled={isSaving}
                       >
                         Delete
                       </Button>

@@ -55,16 +55,18 @@ export async function syncStockTransactions(
 
 export async function syncCryptoHoldings(
   client: SupabaseClient,
-  rows: PersistenceCache["cryptoHoldings"]
+  rows: PersistenceCache["cryptoHoldings"],
+  options?: { allowEmpty?: boolean }
 ): Promise<void> {
-  await replaceTable(client, "crypto_transactions", "id", rows);
+  await replaceTable(client, "crypto_transactions", "id", rows, options?.allowEmpty);
 }
 
 export async function syncCryptoTrades(
   client: SupabaseClient,
-  rows: PersistenceCache["cryptoTrades"]
+  rows: PersistenceCache["cryptoTrades"],
+  options?: { allowEmpty?: boolean }
 ): Promise<void> {
-  await replaceTable(client, "crypto_trades", "id", rows);
+  await replaceTable(client, "crypto_trades", "id", rows, options?.allowEmpty);
 }
 
 export async function syncOptionsTrades(

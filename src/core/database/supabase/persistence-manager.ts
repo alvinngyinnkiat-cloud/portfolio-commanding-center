@@ -579,9 +579,11 @@ export class PersistenceManager {
 
   queueCryptoHoldingsSync(): void {
     this.persistCryptoHoldingsLocalBackup();
+    const rows = this.cache.cryptoHoldings;
+    const allowEmpty = rows.length === 0;
     this.enqueueSync(() =>
       this.client
-        ? syncCryptoHoldings(this.client, this.cache.cryptoHoldings)
+        ? syncCryptoHoldings(this.client, rows, { allowEmpty })
         : Promise.resolve()
     );
   }
@@ -594,9 +596,11 @@ export class PersistenceManager {
       );
       return;
     }
+    const rows = this.cache.cryptoTrades;
+    const allowEmpty = rows.length === 0;
     this.enqueueSync(() =>
       this.client
-        ? syncCryptoTrades(this.client, this.cache.cryptoTrades)
+        ? syncCryptoTrades(this.client, rows, { allowEmpty })
         : Promise.resolve()
     );
   }

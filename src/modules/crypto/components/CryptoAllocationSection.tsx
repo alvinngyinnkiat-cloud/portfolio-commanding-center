@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from "recharts";
 import { usePortfolio } from "@/context/PortfolioContext";
+import { useCryptoSave } from "@/modules/crypto/lib/crypto-save-context";
 import type { CryptoAllocationSettings } from "@/core/domain/types";
 import {
   buildCashDeploymentBuckets,
@@ -26,6 +27,8 @@ const COIN_COLORS = [
   "#6366f1",
   "#14b8a6",
 ];
+
+const ALLOCATION_SAVE_DEBOUNCE_MS = 400;
 
 function CashDeploymentGuide({
   availableTradingCashSgd,
@@ -108,15 +111,26 @@ function CashDeploymentGuide({
 }
 
 export function CryptoAllocationSection() {
-  const { cryptoData, services, refresh } = usePortfolio();
+  const { cryptoData, services } = usePortfolio();
+  const { commitCryptoChange } = useCryptoSave();
   const [allocationSettings, setAllocationSettings] =
     useState<CryptoAllocationSettings>(() => services.cryptoAllocation.get());
+  const pendingSaveRef = useRef<CryptoAllocationSettings | null>(null);
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     if (cryptoData?.allocationSettings) {
       setAllocationSettings(cryptoData.allocationSettings);
     }
   }, [cryptoData?.allocationSettings]);
+
+  useEffect(() => {
+    return () => {
+      if (debounceRef.current) {
+        clearTimeout(debounceRef.current);
+      }
+    };
+  }, []);
 
   const rows = cryptoData?.rows ?? [];
   const summary = cryptoData?.summary;
@@ -133,10 +147,25 @@ export function CryptoAllocationSection() {
     [rows]
   );
 
+  const flushAllocationSave = (settings: CryptoAllocationSettings) => {
+    pendingSaveRef.current = settings;
+    if (debounceRef.current) {
+      clearTimeout(debounceRef.current);
+    }
+    debounceRef.current = setTimeout(() => {
+      const next = pendingSaveRef.current;
+      if (!next) return;
+      pendingSaveRef.current = null;
+      void commitCryptoChange(() => {
+        services.cryptoAllocation.save(next);
+        return true;
+      });
+    }, ALLOCATION_SAVE_DEBOUNCE_MS);
+  };
+
   const handleAllocationChange = (settings: CryptoAllocationSettings) => {
     setAllocationSettings(settings);
-    services.cryptoAllocation.save(settings);
-    refresh();
+    flushAllocationSave(settings);
   };
 
   if (!summary) return null;

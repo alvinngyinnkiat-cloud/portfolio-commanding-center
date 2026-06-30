@@ -2,9 +2,9 @@
 
 import { useMemo, useState } from "react";
 import { usePortfolio } from "@/context/PortfolioContext";
+import { useCryptoSave } from "@/modules/crypto/lib/crypto-save-context";
 import type { ContributionTransaction, ContributionType } from "@/core/domain/types";
 import { plTrend } from "@/core/calculations/crypto/summary";
-import { getPersistenceManager } from "@/core/database/supabase";
 import { generateId } from "@/core/database/local/local-storage";
 import { formatDate, formatPercent, formatSgd } from "@/shared/lib/format";
 import { toLocalDateString } from "@/shared/lib/date";
@@ -125,10 +125,16 @@ function DepositHistoryTable({
 }
 
 export function CryptoCashFlowSection() {
-  const { cryptoData, data, services, refresh } = usePortfolio();
+  const { cryptoData, data, services } = usePortfolio();
+  const { commitCryptoChange, status: saveStatus, error: saveError } =
+    useCryptoSave();
   const [depositForm, setDepositForm] = useState<DepositForm>(emptyDepositForm);
   const [editingDepositId, setEditingDepositId] = useState<string | null>(null);
   const [showAllDeposits, setShowAllDeposits] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
+  const [actionInFlight, setActionInFlight] = useState(false);
+
+  const isSaving = actionInFlight || saveStatus === "saving";
 
   const summary = cryptoData?.summary;
 
@@ -154,9 +160,12 @@ export function CryptoCashFlowSection() {
     setDepositForm(emptyDepositForm());
   };
 
-  const handleDepositSubmit = () => {
+  const handleDepositSubmit = async () => {
     const amount = parseFloat(depositForm.amountSgd);
-    if (!amount) return;
+    if (!amount || isSaving) return;
+
+    setActionInFlight(true);
+    setSubmitError(null);
 
     const entry: ContributionTransaction = {
       id: editingDepositId ?? generateId(),
@@ -167,9 +176,18 @@ export function CryptoCashFlowSection() {
       notes: depositForm.notes || undefined,
     };
 
-    services.contributions.upsert(entry);
-    resetDepositForm();
-    refresh();
+    const { success, error } = await commitCryptoChange(() => {
+      services.contributions.upsert(entry);
+      return true;
+    });
+
+    setActionInFlight(false);
+
+    if (success) {
+      resetDepositForm();
+    } else {
+      setSubmitError(error ?? "Failed to save deposit/withdrawal.");
+    }
   };
 
   const handleEditDeposit = (row: ContributionTransaction) => {
@@ -184,11 +202,22 @@ export function CryptoCashFlowSection() {
   };
 
   const handleDeleteDeposit = async (id: string) => {
-    if (!window.confirm("Delete this deposit/withdrawal?")) return;
-    services.contributions.delete(id);
-    if (editingDepositId === id) resetDepositForm();
-    await getPersistenceManager()?.drainSyncQueue();
-    refresh();
+    if (!window.confirm("Delete this deposit/withdrawal?") || isSaving) return;
+
+    setActionInFlight(true);
+    setSubmitError(null);
+
+    const { success, error } = await commitCryptoChange(() => {
+      services.contributions.delete(id);
+      if (editingDepositId === id) resetDepositForm();
+      return true;
+    });
+
+    setActionInFlight(false);
+
+    if (!success) {
+      setSubmitError(error ?? "Failed to delete deposit/withdrawal.");
+    }
   };
 
   if (!summary) return null;
@@ -273,15 +302,22 @@ export function CryptoCashFlowSection() {
           />
         </div>
         <div className="flex gap-2">
-          <Button onClick={handleDepositSubmit}>
-            {editingDepositId ? "Save Changes" : "Add Transaction"}
+          <Button onClick={() => void handleDepositSubmit()} disabled={isSaving}>
+            {isSaving
+              ? "Saving…"
+              : editingDepositId
+                ? "Save Changes"
+                : "Add Transaction"}
           </Button>
           {editingDepositId && (
-            <Button variant="secondary" onClick={resetDepositForm}>
+            <Button variant="secondary" onClick={resetDepositForm} disabled={isSaving}>
               Cancel
             </Button>
           )}
         </div>
+        {(submitError || (saveStatus === "failed" && saveError)) && (
+          <p className="text-sm text-accent-red">{submitError ?? saveError}</p>
+        )}
       </section>
 
       <section className="space-y-4">
