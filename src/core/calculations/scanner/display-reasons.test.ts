@@ -9,6 +9,7 @@ import {
   buildSellPutReasons,
 } from "./display-reasons";
 import { evaluateMainSystemDisplay } from "./main-system-display";
+import { scoreBearCall, scoreBullPut, scoreIronCondor } from "./scoring";
 
 describe("display reasons", () => {
   it("builds Sell Put checklist reasons", () => {
@@ -121,10 +122,47 @@ describe("display reasons", () => {
 });
 
 describe("evaluateMainSystemDisplay Cases A-D", () => {
+  const sellPutRange = { low: 293.89, high: 303.89 };
+  const sellCallRange = { low: 344.46, high: 354.46 };
+  const icMidZone = { low: 314.18, high: 334.18 };
+
+  const baseStrategies = {
+    bullPut: scoreBullPut({
+      soStatus: "Strong",
+      marketStructure: "Neutral",
+      momentum: "At EMA",
+      avgPrice: 322.86,
+      avgPricePrev: 320.0,
+      primarySupport: 293.89,
+      atr14: 10,
+      sellPutRange,
+    }),
+    bearCall: scoreBearCall({
+      soStatus: "Strong",
+      marketStructure: "Neutral",
+      momentum: "At EMA",
+      avgPrice: 322.86,
+      avgPricePrev: 320.0,
+      primaryResistance: 354.46,
+      atr14: 10,
+      sellCallRange,
+    }),
+    ironCondor: scoreIronCondor({
+      so: 52.4,
+      marketStructure: "Neutral",
+      momentum: "At EMA",
+      soStatus: "Strong",
+      avgPrice: 322.86,
+      avgPricePrev: 320.0,
+      midPrice: 324.18,
+      atr14: 10,
+      icMidZone,
+      rangeWidth: 60.57,
+    }),
+  };
+
   const baseInput = {
-    bullPutEligible: false,
-    bearCallEligible: false,
-    ironCondorEligible: false,
+    ...baseStrategies,
     marketStructure: "Neutral" as const,
     momentum: "At EMA" as const,
     so: 52.4,
@@ -133,79 +171,128 @@ describe("evaluateMainSystemDisplay Cases A-D", () => {
     avgPricePrev: 320.0,
     midPrice: 324.18,
     atr14: 10,
-    icMidZone: { low: 314.18, high: 334.18 },
+    icMidZone,
   };
 
-  it("Case A: SELL PUT reasons only contain Sell Put criteria", () => {
-    const result = evaluateMainSystemDisplay({
-      ...baseInput,
-      bullPutEligible: true,
-      so: 18.5,
+  it("Case A: SELL PUT reasons only contain passed Sell Put criteria", () => {
+    const bullPut = scoreBullPut({
       soStatus: "Rolling Up",
       marketStructure: "Bullish",
       momentum: "Above EMA",
+      avgPrice: 298.5,
+      avgPricePrev: 295.0,
+      primarySupport: 293.89,
+      atr14: 10,
+      sellPutRange: { low: 293.89, high: 303.89 },
+    });
+
+    const result = evaluateMainSystemDisplay({
+      ...baseInput,
+      bullPut,
+      marketStructure: "Bullish",
+      momentum: "Above EMA",
+      so: 18.5,
+      soStatus: "Rolling Up",
       avgPrice: 298.5,
       avgPricePrev: 295.0,
     });
 
     expect(result.output).toBe("SELL PUT");
     expect(result.strategy).toBe("bullPut");
-    expect(result.reasons.join(" ")).toMatch(/Bullish Structure/);
-    expect(result.reasons.join(" ")).toMatch(/Momentum Above EMA/);
-    expect(result.reasons.join(" ")).toMatch(/SO Rolling Up/);
-    expect(result.reasons.join(" ")).not.toMatch(/Iron Condor|Sell Call|40–60|Mid Zone/);
+    expect(result.reasons).toContain("Average Price inside Sell Put Zone");
+    expect(result.reasons).not.toEqual(
+      expect.arrayContaining([
+        expect.stringMatching(/Iron Condor|40–60|Mid Zone/),
+      ])
+    );
   });
 
-  it("Case B: SELL CALL reasons only contain Sell Call criteria", () => {
-    const result = evaluateMainSystemDisplay({
-      ...baseInput,
-      bearCallEligible: true,
-      so: 82.0,
+  it("Case B: SELL CALL reasons only contain passed Sell Call criteria", () => {
+    const bearCall = scoreBearCall({
       soStatus: "Rolling Down",
       marketStructure: "Bearish",
       momentum: "Below EMA",
+      avgPrice: 350,
+      avgPricePrev: 355,
+      primaryResistance: 354.46,
+      atr14: 10,
+      sellCallRange: { low: 344.46, high: 354.46 },
+    });
+
+    const result = evaluateMainSystemDisplay({
+      ...baseInput,
+      bearCall,
+      marketStructure: "Bearish",
+      momentum: "Below EMA",
+      so: 82.0,
+      soStatus: "Rolling Down",
       avgPrice: 350,
       avgPricePrev: 355,
     });
 
     expect(result.output).toBe("SELL CALL");
     expect(result.strategy).toBe("bearCall");
-    expect(result.reasons.join(" ")).toMatch(/Bearish Structure/);
-    expect(result.reasons.join(" ")).toMatch(/Momentum Below EMA/);
-    expect(result.reasons.join(" ")).not.toMatch(/Iron Condor|Sell Put|40–60/);
+    expect(result.reasons).toContain("Average Price inside Sell Call Zone");
   });
 
-  it("Case C: IRON CONDOR reasons only contain Iron Condor criteria", () => {
+  it("Case C: IRON CONDOR reasons only contain passed Iron Condor criteria", () => {
     const result = evaluateMainSystemDisplay({
       ...baseInput,
-      ironCondorEligible: true,
+      ironCondor: baseStrategies.ironCondor,
     });
 
     expect(result.output).toBe("IRON CONDOR");
     expect(result.strategy).toBe("ironCondor");
-    expect(result.reasons.join(" ")).toMatch(/40–60/);
+    expect(result.reasons.join(" ")).toMatch(/SO 40-60/);
     expect(result.reasons.join(" ")).toMatch(/Adjusted Mid Zone/);
-    expect(result.reasons.join(" ")).toMatch(/Sell Put conditions not fully satisfied/);
-    expect(result.reasons.join(" ")).not.toMatch(/Bullish Structure|Bearish Structure|Momentum/);
   });
 
-  it("Case D: NO TRADE reasons explain failed conditions", () => {
-    const result = evaluateMainSystemDisplay(baseInput);
+  it("Case D: NO TRADE reasons explain failed conditions only", () => {
+    const result = evaluateMainSystemDisplay({
+      ...baseInput,
+      so: 75,
+      ironCondor: scoreIronCondor({
+        so: 75,
+        marketStructure: "Neutral",
+        momentum: "At EMA",
+        soStatus: "Strong",
+        avgPrice: 322.86,
+        avgPricePrev: 320.0,
+        midPrice: 324.18,
+        atr14: 10,
+        icMidZone,
+        rangeWidth: 60.57,
+      }),
+    });
 
     expect(result.output).toBe("NO TRADE");
     expect(result.strategy).toBeNull();
     expect(result.reasons.length).toBeGreaterThan(0);
+    expect(result.reasons.every((reason) => !reason.includes("= Yes"))).toBe(
+      true
+    );
   });
 
   it("prefers SELL PUT over IRON CONDOR when both are eligible", () => {
-    const result = evaluateMainSystemDisplay({
-      ...baseInput,
-      bullPutEligible: true,
-      ironCondorEligible: true,
-      so: 18.5,
+    const bullPut = scoreBullPut({
       soStatus: "Rolling Up",
       marketStructure: "Bullish",
       momentum: "Above EMA",
+      avgPrice: 298.5,
+      avgPricePrev: 295.0,
+      primarySupport: 293.89,
+      atr14: 10,
+      sellPutRange: { low: 293.89, high: 303.89 },
+    });
+
+    const result = evaluateMainSystemDisplay({
+      ...baseInput,
+      bullPut,
+      ironCondor: baseStrategies.ironCondor,
+      marketStructure: "Bullish",
+      momentum: "Above EMA",
+      so: 18.5,
+      soStatus: "Rolling Up",
       avgPrice: 298.5,
       avgPricePrev: 295.0,
     });

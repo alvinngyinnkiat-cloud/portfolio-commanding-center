@@ -120,6 +120,9 @@ export function scanTicker(input: ScanTickerInput): ScannerTickerResult {
     momentum,
     avgPrice: indicatorValues.avgPrice,
     avgPricePrev,
+    primarySupport: structure.primarySupport,
+    atr14: indicatorValues.atr14,
+    sellPutRange: structure.sellPutRange,
   });
 
   const bearCall = scoreBearCall({
@@ -128,6 +131,9 @@ export function scanTicker(input: ScanTickerInput): ScannerTickerResult {
     momentum,
     avgPrice: indicatorValues.avgPrice,
     avgPricePrev,
+    primaryResistance: structure.primaryResistance,
+    atr14: indicatorValues.atr14,
+    sellCallRange: structure.sellCallRange,
   });
 
   const ironCondor = scoreIronCondor({
@@ -160,9 +166,9 @@ export function scanTicker(input: ScanTickerInput): ScannerTickerResult {
   });
 
   const mainSystem = evaluateMainSystemDisplay({
-    bullPutEligible: bullPut.eligible,
-    bearCallEligible: bearCall.eligible,
-    ironCondorEligible: ironCondor.eligible,
+    bullPut,
+    bearCall,
+    ironCondor,
     marketStructure,
     momentum,
     so: indicatorValues.so,

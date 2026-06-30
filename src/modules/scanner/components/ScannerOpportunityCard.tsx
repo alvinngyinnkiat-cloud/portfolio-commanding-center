@@ -78,7 +78,14 @@ function ChartColumn({ result }: { result: ScannerTickerResult }) {
 function MainStrategyPanel({ result }: { result: ScannerTickerResult }) {
   const { indicators, mainSystem } = result;
   const output = mainSystem.output;
-  const reasons = getMainCardReasons(result);
+  const checklist =
+    mainSystem.strategy != null
+      ? result.strategies[mainSystem.strategy].checklist
+      : indicators.marketStructure === "Bullish"
+        ? result.strategies.bullPut.checklist
+        : indicators.marketStructure === "Bearish"
+          ? result.strategies.bearCall.checklist
+          : result.strategies.ironCondor.checklist;
 
   return (
     <StrategyPanel
@@ -94,16 +101,28 @@ function MainStrategyPanel({ result }: { result: ScannerTickerResult }) {
         </>
       }
     >
-      <ul className="space-y-1.5">
-        {reasons.map((reason) => (
-          <li
-            key={reason}
-            className="flex gap-2 text-xs text-slate-400 before:shrink-0 before:content-['•']"
-          >
-            {reason}
-          </li>
-        ))}
-      </ul>
+      {output === "NO TRADE" && mainSystem.reasons.length > 0 && (
+        <div className="mb-3">
+          <p className="mb-2 text-[10px] font-semibold uppercase tracking-wide text-slate-500">
+            Reasons
+          </p>
+          <ul className="space-y-1.5">
+            {mainSystem.reasons.map((reason) => (
+              <li
+                key={reason}
+                className="flex gap-2 text-xs text-slate-400 before:shrink-0 before:content-['•']"
+              >
+                {reason}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      <p className="mb-2 text-[10px] font-semibold uppercase tracking-wide text-slate-500">
+        Required Checklist
+      </p>
+      <Checklist items={checklist} compact />
     </StrategyPanel>
   );
 }

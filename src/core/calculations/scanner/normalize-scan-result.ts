@@ -9,6 +9,11 @@ import type {
 import { buildRankings } from "./ranking";
 import { evaluateMainSystemDisplay } from "./main-system-display";
 import { deriveMarketStructure, deriveMomentum } from "./structure-momentum";
+import {
+  scoreBearCall,
+  scoreBullPut,
+  scoreIronCondor,
+} from "./scoring";
 
 const EMPTY_EMA: EmaStrategyResult = {
   output: "NO TRADE",
@@ -52,6 +57,57 @@ function normalizeMarketStructure(
   return deriveMarketStructure(ema20, sma50, sma200);
 }
 
+function rescoreStrategies(raw: ScannerTickerResult): ScannerTickerResult["strategies"] {
+  const structure = raw.structure ?? EMPTY_STRUCTURE;
+  const indicators = raw.indicators;
+  const marketStructure = normalizeMarketStructure(
+    indicators.marketStructure ?? indicators.trend,
+    indicators.ema20,
+    indicators.sma50,
+    indicators.sma200
+  );
+  const momentum = normalizeMomentum(
+    indicators.momentum,
+    indicators.avgPrice,
+    indicators.ema20
+  );
+
+  return {
+    bullPut: scoreBullPut({
+      soStatus: indicators.soStatus,
+      marketStructure,
+      momentum,
+      avgPrice: indicators.avgPrice,
+      avgPricePrev: indicators.avgPricePrev,
+      primarySupport: structure.primarySupport,
+      atr14: indicators.atr14,
+      sellPutRange: structure.sellPutRange,
+    }),
+    bearCall: scoreBearCall({
+      soStatus: indicators.soStatus,
+      marketStructure,
+      momentum,
+      avgPrice: indicators.avgPrice,
+      avgPricePrev: indicators.avgPricePrev,
+      primaryResistance: structure.primaryResistance,
+      atr14: indicators.atr14,
+      sellCallRange: structure.sellCallRange,
+    }),
+    ironCondor: scoreIronCondor({
+      so: indicators.so,
+      marketStructure,
+      momentum,
+      soStatus: indicators.soStatus,
+      avgPrice: indicators.avgPrice,
+      avgPricePrev: indicators.avgPricePrev,
+      midPrice: structure.midPrice,
+      atr14: indicators.atr14,
+      icMidZone: structure.icMidZone,
+      rangeWidth: structure.rangeWidth,
+    }),
+  };
+}
+
 export function reconcileMainSystemFromResult(
   raw: ScannerTickerResult
 ): MainSystemDisplay {
@@ -87,9 +143,7 @@ export function reconcileMainSystemFromResult(
   );
 
   return evaluateMainSystemDisplay({
-    bullPutEligible: raw.strategies.bullPut.eligible,
-    bearCallEligible: raw.strategies.bearCall.eligible,
-    ironCondorEligible: raw.strategies.ironCondor.eligible,
+    ...rescoreStrategies(raw),
     marketStructure,
     momentum,
     so: raw.indicators.so,

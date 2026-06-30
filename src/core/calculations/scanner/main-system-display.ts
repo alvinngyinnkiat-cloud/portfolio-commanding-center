@@ -1,24 +1,15 @@
 import type {
   MainSystemDisplay,
   ScannerMomentum,
-  ScannerStrategy,
+  ScannerStrategyResult,
   ScannerTrend,
   SoStatus,
-  StrategyOutput,
 } from "@/core/domain/types/scanner";
-import {
-  buildIronCondorChecklistReasons,
-  buildNoTradeReasons,
-  buildSellCallChecklistReasons,
-  buildSellPutChecklistReasons,
-} from "./display-reasons";
-import {
-  isValidSellCallSetup,
-  isValidSellPutSetup,
-} from "./structure-momentum";
+import type { ScannerStrategy } from "@/core/domain/types/scanner";
+import { failedCheckLabels } from "./zone-checklist";
 
 export function strategyOutputToKey(
-  output: StrategyOutput
+  output: MainSystemDisplay["output"]
 ): ScannerStrategy | null {
   if (output === "SELL PUT") {
     return "bullPut";
@@ -32,7 +23,7 @@ export function strategyOutputToKey(
   return null;
 }
 
-export function strategyKeyToOutput(strategy: ScannerStrategy): StrategyOutput {
+export function strategyKeyToOutput(strategy: ScannerStrategy): MainSystemDisplay["output"] {
   if (strategy === "bullPut") {
     return "SELL PUT";
   }
@@ -42,16 +33,12 @@ export function strategyKeyToOutput(strategy: ScannerStrategy): StrategyOutput {
   return "IRON CONDOR";
 }
 
-const STRATEGY_PRIORITY: ScannerStrategy[] = [
-  "bullPut",
-  "bearCall",
-  "ironCondor",
-];
+const STRATEGY_PRIORITY: ScannerStrategy[] = ["bullPut", "bearCall", "ironCondor"];
 
 export interface MainSystemDecisionInput {
-  bullPutEligible: boolean;
-  bearCallEligible: boolean;
-  ironCondorEligible: boolean;
+  bullPut: ScannerStrategyResult;
+  bearCall: ScannerStrategyResult;
+  ironCondor: ScannerStrategyResult;
   marketStructure: ScannerTrend;
   momentum: ScannerMomentum;
   so: number | null;
@@ -63,73 +50,50 @@ export interface MainSystemDecisionInput {
   icMidZone: { low: number; high: number } | null;
 }
 
+function buildNoTradeReasons(input: MainSystemDecisionInput): string[] {
+  let checklist = input.ironCondor.checklist;
+  if (input.marketStructure === "Bullish") {
+    checklist = input.bullPut.checklist;
+  } else if (input.marketStructure === "Bearish") {
+    checklist = input.bearCall.checklist;
+  }
+  return failedCheckLabels(checklist);
+}
+
+function passedCheckLabels(checklist: MainSystemDecisionInput["bullPut"]["checklist"]): string[] {
+  return checklist.filter((item) => item.passed).map((item) => item.label);
+}
+
 export function evaluateMainSystemDisplay(
   input: MainSystemDecisionInput
 ): MainSystemDisplay {
-  const sellPutSetupValid = isValidSellPutSetup({
-    marketStructure: input.marketStructure,
-    momentum: input.momentum,
-    soStatus: input.soStatus,
-    avgPrice: input.avgPrice,
-    avgPricePrev: input.avgPricePrev,
-  });
-  const sellCallSetupValid = isValidSellCallSetup({
-    marketStructure: input.marketStructure,
-    momentum: input.momentum,
-    soStatus: input.soStatus,
-    avgPrice: input.avgPrice,
-    avgPricePrev: input.avgPricePrev,
-  });
-
   const candidates: Array<{
     strategy: ScannerStrategy;
-    output: StrategyOutput;
+    output: MainSystemDisplay["output"];
     reasons: string[];
   }> = [];
 
-  if (input.bullPutEligible) {
+  if (input.bullPut.eligible) {
     candidates.push({
       strategy: "bullPut",
       output: "SELL PUT",
-      reasons: buildSellPutChecklistReasons({
-        so: input.so,
-        soStatus: input.soStatus,
-        marketStructure: input.marketStructure,
-        momentum: input.momentum,
-        avgPrice: input.avgPrice,
-        avgPricePrev: input.avgPricePrev,
-      }),
+      reasons: passedCheckLabels(input.bullPut.checklist),
     });
   }
 
-  if (input.bearCallEligible) {
+  if (input.bearCall.eligible) {
     candidates.push({
       strategy: "bearCall",
       output: "SELL CALL",
-      reasons: buildSellCallChecklistReasons({
-        so: input.so,
-        soStatus: input.soStatus,
-        marketStructure: input.marketStructure,
-        momentum: input.momentum,
-        avgPrice: input.avgPrice,
-        avgPricePrev: input.avgPricePrev,
-      }),
+      reasons: passedCheckLabels(input.bearCall.checklist),
     });
   }
 
-  if (input.ironCondorEligible) {
+  if (input.ironCondor.eligible) {
     candidates.push({
       strategy: "ironCondor",
       output: "IRON CONDOR",
-      reasons: buildIronCondorChecklistReasons({
-        so: input.so,
-        avgPrice: input.avgPrice,
-        midPrice: input.midPrice,
-        atr14: input.atr14,
-        icMidZone: input.icMidZone,
-        sellPutSetupValid,
-        sellCallSetupValid,
-      }),
+      reasons: passedCheckLabels(input.ironCondor.checklist),
     });
   }
 
@@ -137,17 +101,7 @@ export function evaluateMainSystemDisplay(
     return {
       output: "NO TRADE",
       strategy: null,
-      reasons: buildNoTradeReasons({
-        so: input.so,
-        soStatus: input.soStatus,
-        marketStructure: input.marketStructure,
-        momentum: input.momentum,
-        avgPrice: input.avgPrice,
-        avgPricePrev: input.avgPricePrev,
-        midPrice: input.midPrice,
-        atr14: input.atr14,
-        icMidZone: input.icMidZone,
-      }),
+      reasons: buildNoTradeReasons(input),
     };
   }
 
@@ -156,9 +110,15 @@ export function evaluateMainSystemDisplay(
       candidates.find((candidate) => candidate.strategy === strategy)
     ).find((candidate) => candidate != null) ?? candidates[0];
 
+  const strategyResults = {
+    bullPut: input.bullPut,
+    bearCall: input.bearCall,
+    ironCondor: input.ironCondor,
+  };
+
   return {
     output: winner.output,
     strategy: winner.strategy,
-    reasons: winner.reasons,
+    reasons: passedCheckLabels(strategyResults[winner.strategy].checklist),
   };
 }

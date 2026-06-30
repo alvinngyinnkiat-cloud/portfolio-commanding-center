@@ -5,7 +5,11 @@ import type {
   ScannerTrend,
   SoStatus,
 } from "@/core/domain/types/scanner";
-import { isInMidZone } from "./ema-strategy";
+import {
+  buildMidZoneCheck,
+  buildSellCallZoneCheck,
+  buildSellPutZoneCheck,
+} from "./zone-checklist";
 import {
   isAvgPriceFalling,
   isAvgPriceRising,
@@ -18,13 +22,6 @@ function fmt(value: number | null, digits = 2): string {
     return "—";
   }
   return value.toFixed(digits);
-}
-
-function fmtRange(range: { low: number; high: number } | null): string {
-  if (!range) {
-    return "—";
-  }
-  return `${range.low.toFixed(2)} - ${range.high.toFixed(2)}`;
 }
 
 function buildResult(checklist: RuleCheck[]): ScannerStrategyResult {
@@ -49,6 +46,9 @@ export function scoreBullPut(input: {
   momentum: ScannerMomentum;
   avgPrice: number | null;
   avgPricePrev: number | null;
+  primarySupport: number | null;
+  atr14: number | null;
+  sellPutRange: { low: number; high: number } | null;
 }): ScannerStrategyResult {
   const avgPriceRising = isAvgPriceRising(input.avgPrice, input.avgPricePrev);
 
@@ -73,6 +73,12 @@ export function scoreBullPut(input: {
       passed: input.soStatus === "Rolling Up",
       detail: input.soStatus,
     },
+    buildSellPutZoneCheck({
+      avgPrice: input.avgPrice,
+      primarySupport: input.primarySupport,
+      atr14: input.atr14,
+      sellPutRange: input.sellPutRange,
+    }),
   ];
 
   return buildResult(checklist);
@@ -84,6 +90,9 @@ export function scoreBearCall(input: {
   momentum: ScannerMomentum;
   avgPrice: number | null;
   avgPricePrev: number | null;
+  primaryResistance: number | null;
+  atr14: number | null;
+  sellCallRange: { low: number; high: number } | null;
 }): ScannerStrategyResult {
   const avgPriceFalling = isAvgPriceFalling(input.avgPrice, input.avgPricePrev);
 
@@ -108,6 +117,12 @@ export function scoreBearCall(input: {
       passed: input.soStatus === "Rolling Down",
       detail: input.soStatus,
     },
+    buildSellCallZoneCheck({
+      avgPrice: input.avgPrice,
+      primaryResistance: input.primaryResistance,
+      atr14: input.atr14,
+      sellCallRange: input.sellCallRange,
+    }),
   ];
 
   return buildResult(checklist);
@@ -126,7 +141,12 @@ export function scoreIronCondor(input: {
   rangeWidth: number | null;
 }): ScannerStrategyResult {
   const soInRange = input.so != null && input.so >= 40 && input.so <= 60;
-  const insideMid = isInMidZone(input.avgPrice, input.midPrice, input.atr14);
+  const midZoneCheck = buildMidZoneCheck({
+    avgPrice: input.avgPrice,
+    midPrice: input.midPrice,
+    atr14: input.atr14,
+    icMidZone: input.icMidZone,
+  });
   const sellPutValid = isValidSellPutSetup({
     marketStructure: input.marketStructure,
     momentum: input.momentum,
@@ -148,11 +168,7 @@ export function scoreIronCondor(input: {
       passed: soInRange,
       detail: input.so != null ? `SO = ${input.so.toFixed(1)}` : "SO unavailable",
     },
-    {
-      label: "Average Price inside Adjusted Mid Zone",
-      passed: insideMid,
-      detail: fmtRange(input.icMidZone),
-    },
+    midZoneCheck,
     {
       label: "Sell Put conditions not fully satisfied",
       passed: !sellPutValid,
