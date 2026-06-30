@@ -64,8 +64,8 @@ export function DailySnapshotTrigger() {
           date, createdAt timestamp, snapshot type (manual / automatic), My
           Portfolio, totals, contribution, and US / SG / Crypto / Personal Cash
           (SGD). Snapshots power the Daily Portfolio Worth chart. Auto capture
-          runs at 11:59pm Singapore time while the app is open (server cron in a
-          future release).
+          runs at 11:59pm Singapore time while the app is open or via server
+          cron (15:59 UTC). Snapshots are never auto-created at midnight.
         </p>
         <p className="text-xs text-slate-600">
           <strong className="text-slate-500">v1 limitations:</strong> Historical

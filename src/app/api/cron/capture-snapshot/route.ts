@@ -11,18 +11,20 @@ export async function GET(request: Request) {
 
   try {
     const { manager, services } = await createCronRuntime();
-    const snapshot = services.snapshots.captureEndOfDayForDate();
+    const result = services.snapshots.attemptAutomaticSnapshotCapture();
 
     await manager.drainSyncQueue();
 
-    if (!snapshot) {
+    if (!result.snapshot) {
       return NextResponse.json({
         ok: true,
         captured: false,
-        reason: "already_captured_or_invalid_state",
+        reason: result.skipReason ?? "unknown",
+        snapshotDate: result.snapshotDate,
       });
     }
 
+    const snapshot = result.snapshot;
     return NextResponse.json({
       ok: true,
       captured: true,

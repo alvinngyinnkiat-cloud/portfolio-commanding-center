@@ -3,11 +3,18 @@ import type { SnapshotRepository } from "@/core/database/repositories/snapshot-r
 import { createDailySnapshot } from "@/core/calculations/snapshots";
 import {
   getSingaporeDateString,
-  isSingaporeEndOfDayCaptureWindow,
   hasSnapshotForDate,
+  isSingaporeAutomaticSnapshotDue,
+  type AutomaticSnapshotSkipReason,
 } from "@/core/calculations/snapshot-schedule";
 import type { PortfolioAggregator } from "./portfolio-aggregator";
 import { sortByDateDesc } from "@/shared/lib/sort";
+
+export interface AutomaticSnapshotCaptureResult {
+  snapshot: DailySnapshot | null;
+  skipReason: AutomaticSnapshotSkipReason | null;
+  snapshotDate: string;
+}
 
 export class SnapshotService {
   constructor(
@@ -23,7 +30,7 @@ export class SnapshotService {
     this.repo.delete(date);
   }
 
-  /** Manual capture from Settings → Snapshots (v1.1 localStorage). */
+  /** Manual capture from Settings → Snapshots. */
   captureNow(): DailySnapshot | null {
     const state = this.aggregator.getPortfolioState();
     if (!state.fxRateValid || !state.inputs || !state.metrics) {
@@ -31,6 +38,7 @@ export class SnapshotService {
     }
 
     const snapshot = createDailySnapshot(state.inputs, state.metrics, {
+      date: getSingaporeDateString(),
       snapshotType: "manual",
       createdAt: new Date().toISOString(),
     });
@@ -39,39 +47,59 @@ export class SnapshotService {
   }
 
   /**
-   * End-of-day auto capture at 11:59pm Singapore time.
-   *
-   * v1.1 (localStorage): polled client-side while the dashboard is open.
-   * Vercel Cron calls captureEndOfDayForDate at the scheduled time.
-   *
-   * Returns the new snapshot when captured; null when not due or already captured today.
+   * End-of-day auto capture at 11:59 PM Singapore time.
+   * Polled client-side while the dashboard is open; also invoked by Vercel Cron.
    */
   captureEndOfDayIfDue(): DailySnapshot | null {
-    if (!isSingaporeEndOfDayCaptureWindow()) {
-      return null;
-    }
-    return this.captureEndOfDayForDate();
+    return this.attemptAutomaticSnapshotCapture().snapshot;
   }
 
-  /** Server cron capture — skips client-side time-window check. */
+  /** Server cron capture — uses the same SGT time guard as the client. */
   captureEndOfDayForDate(date: Date = new Date()): DailySnapshot | null {
+    return this.attemptAutomaticSnapshotCapture(date).snapshot;
+  }
+
+  attemptAutomaticSnapshotCapture(
+    date: Date = new Date()
+  ): AutomaticSnapshotCaptureResult {
     const snapshotDate = getSingaporeDateString(date);
+
+    if (!isSingaporeAutomaticSnapshotDue(date)) {
+      return {
+        snapshot: null,
+        skipReason: "before_capture_time",
+        snapshotDate,
+      };
+    }
+
     const existing = this.repo.list();
     if (hasSnapshotForDate(existing, snapshotDate)) {
-      return null;
+      return {
+        snapshot: null,
+        skipReason: "already_captured",
+        snapshotDate,
+      };
     }
 
     const state = this.aggregator.getPortfolioState();
     if (!state.fxRateValid || !state.inputs || !state.metrics) {
-      return null;
+      return {
+        snapshot: null,
+        skipReason: "invalid_state",
+        snapshotDate,
+      };
     }
 
     const snapshot = createDailySnapshot(state.inputs, state.metrics, {
       date: snapshotDate,
       snapshotType: "automatic",
-      createdAt: new Date().toISOString(),
+      createdAt: date.toISOString(),
     });
     this.repo.upsert(snapshot);
-    return snapshot;
+    return {
+      snapshot,
+      skipReason: null,
+      snapshotDate,
+    };
   }
 }
