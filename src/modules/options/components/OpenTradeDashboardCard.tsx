@@ -2,7 +2,7 @@
 
 import { useMemo, useRef, useState } from "react";
 import type { OptionsOpenTradeRow } from "@/core/domain/types/options";
-import type { DeltaSideHealth } from "@/core/domain/types/options";
+import type { DashboardDeltaHealth, DeltaSideHealth } from "@/core/domain/types/options";
 import {
   calculateOptionDollarValue,
   calculatePerShareOptionPrice,
@@ -123,21 +123,24 @@ function InlineNumberInput({
   );
 }
 
+function deltaHealthColorClass(color: DeltaSideHealth["color"]): string {
+  if (color === "green") return "text-accent-green";
+  if (color === "yellow") return "text-amber-300";
+  if (color === "red") return "text-accent-red";
+  return "text-slate-400";
+}
+
+function deltaOverallColorClass(
+  status: NonNullable<DashboardDeltaHealth["overallStatus"]>
+): string {
+  if (status === "healthy") return "text-accent-green";
+  if (status === "monitor") return "text-amber-300";
+  if (status === "review") return "text-orange-400";
+  return "text-accent-red";
+}
+
 function DeltaSideBlock({ side }: { side: DeltaSideHealth }) {
-  const riskLabel =
-    side.riskDirection === "increasing"
-      ? "Risk Increasing"
-      : side.riskDirection === "decreasing"
-        ? "Risk Decreasing"
-        : side.riskDirection === "unchanged"
-          ? "Unchanged"
-          : "—";
-  const riskClass =
-    side.riskDirection === "increasing"
-      ? "text-accent-red"
-      : side.riskDirection === "decreasing"
-        ? "text-accent-green"
-        : "text-slate-400";
+  const colorClass = deltaHealthColorClass(side.color);
 
   return (
     <div className="space-y-1 border-t border-surface-border/50 pt-2 first:border-0 first:pt-0">
@@ -155,7 +158,12 @@ function DeltaSideBlock({ side }: { side: DeltaSideHealth }) {
       <p className="text-xs text-slate-400">
         Delta Change {formatDelta(side.deltaChange)}
       </p>
-      <p className={`text-xs font-medium ${riskClass}`}>{riskLabel}</p>
+      <p className={`text-xs font-medium ${colorClass}`}>
+        {side.statusLabel ?? "—"}
+      </p>
+      <p className={`text-xs font-medium ${colorClass}`}>
+        {side.message ?? "—"}
+      </p>
     </div>
   );
 }
@@ -495,6 +503,15 @@ export function OpenTradeDashboardCard({
           </MetricCard>
 
           <MetricCard title="Delta Health">
+            {dashboard.deltaHealth?.overallLabel && (
+              <p
+                className={`mb-2 text-sm font-semibold ${deltaOverallColorClass(
+                  dashboard.deltaHealth.overallStatus ?? "healthy"
+                )}`}
+              >
+                Overall: {dashboard.deltaHealth.overallLabel}
+              </p>
+            )}
             {dashboard.deltaHealth?.putSide && (
               <DeltaSideBlock side={dashboard.deltaHealth.putSide} />
             )}

@@ -36,17 +36,26 @@ export type DashboardBreakevenStatus = "green" | "yellow" | "orange" | "red";
 export type DashboardTradeHealth = "HEALTHY" | "REVIEW" | "THREATENED";
 export type DashboardTrendDirection = "positive" | "negative" | "neutral";
 
+export type DeltaHealthTrend = "improving" | "stable" | "worsening";
+export type DeltaHealthColor = "green" | "yellow" | "red";
+export type DeltaHealthOverallStatus = "healthy" | "monitor" | "review" | "threatened";
+
 export interface DeltaSideHealth {
   label: string;
   openingDelta: number | null;
   currentDelta: number | null;
   deltaChange: number | null;
-  riskDirection: "increasing" | "decreasing" | "unchanged" | null;
+  trend: DeltaHealthTrend | null;
+  statusLabel: string | null;
+  message: string | null;
+  color: DeltaHealthColor | null;
 }
 
 export interface DashboardDeltaHealth {
   putSide: DeltaSideHealth | null;
   callSide: DeltaSideHealth | null;
+  overallStatus: DeltaHealthOverallStatus | null;
+  overallLabel: string | null;
 }
 
 export interface DashboardTrendHealth {

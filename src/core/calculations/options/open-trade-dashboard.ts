@@ -14,10 +14,12 @@ import type {
   OptionsTrade,
 } from "@/core/domain/types/options";
 import type { ScannerIndicators } from "@/core/domain/types/scanner";
+import { buildDeltaHealth } from "./delta-health";
 import { scaleMaxRiskForRemaining, tradeForRemainingContracts } from "./contract-tracking";
 import { calculateBuyPutMaxProfitUsd } from "./debit-option";
 import { isDebitStrategy } from "./strategy-kind";
 
+export { buildDeltaHealth } from "./delta-health";
 export type {
   DashboardBreakevenStatus,
   DashboardDteStatus,
@@ -317,108 +319,6 @@ function resolveBreakevenDashboard(
     breakevenDistancePct: null,
     ironCondorBreakeven: null,
   };
-}
-
-function derivePutSideRiskDirection(
-  deltaChange: number | null
-): DeltaSideHealth["riskDirection"] {
-  if (deltaChange == null) return null;
-  if (deltaChange === 0) return "unchanged";
-  return deltaChange < 0 ? "increasing" : "decreasing";
-}
-
-function deriveCallSideRiskDirection(
-  deltaChange: number | null
-): DeltaSideHealth["riskDirection"] {
-  if (deltaChange == null) return null;
-  if (deltaChange === 0) return "unchanged";
-  return deltaChange > 0 ? "increasing" : "decreasing";
-}
-
-function buildDeltaSide(
-  label: string,
-  opening: number | null | undefined,
-  current: number | null | undefined,
-  side: "put" | "call"
-): DeltaSideHealth | null {
-  if (opening == null && current == null) return null;
-  const openingDelta = opening ?? null;
-  const currentDelta = current ?? null;
-  const deltaChange =
-    openingDelta != null && currentDelta != null
-      ? currentDelta - openingDelta
-      : null;
-  return {
-    label,
-    openingDelta,
-    currentDelta,
-    deltaChange,
-    riskDirection:
-      side === "put"
-        ? derivePutSideRiskDirection(deltaChange)
-        : deriveCallSideRiskDirection(deltaChange),
-  };
-}
-
-export function buildDeltaHealth(trade: OptionsTrade): DashboardDeltaHealth | null {
-  if (trade.strategy === "bullPut") {
-    const putSide = buildDeltaSide(
-      "",
-      trade.openingShortPutDelta,
-      trade.currentShortPutDelta,
-      "put"
-    );
-    return putSide ? { putSide, callSide: null } : null;
-  }
-
-  if (trade.strategy === "bearCall") {
-    const callSide = buildDeltaSide(
-      "",
-      trade.openingShortCallDelta,
-      trade.currentShortCallDelta,
-      "call"
-    );
-    return callSide ? { putSide: null, callSide } : null;
-  }
-
-  if (trade.strategy === "ironCondor") {
-    const putSide = buildDeltaSide(
-      "PUT SIDE",
-      trade.openingPutSideDelta,
-      trade.currentPutSideDelta,
-      "put"
-    );
-    const callSide = buildDeltaSide(
-      "CALL SIDE",
-      trade.openingCallSideDelta,
-      trade.currentCallSideDelta,
-      "call"
-    );
-    if (!putSide && !callSide) return null;
-    return { putSide, callSide };
-  }
-
-  if (trade.strategy === "buyCall") {
-    const callSide = buildDeltaSide(
-      "",
-      trade.openingShortCallDelta,
-      trade.currentShortCallDelta,
-      "call"
-    );
-    return callSide ? { putSide: null, callSide } : null;
-  }
-
-  if (trade.strategy === "buyPut") {
-    const putSide = buildDeltaSide(
-      "",
-      trade.openingShortPutDelta,
-      trade.currentShortPutDelta,
-      "put"
-    );
-    return putSide ? { putSide, callSide: null } : null;
-  }
-
-  return null;
 }
 
 export function buildTrendHealth(

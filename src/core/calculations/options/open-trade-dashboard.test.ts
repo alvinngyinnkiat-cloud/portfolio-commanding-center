@@ -128,20 +128,21 @@ describe("open-trade-dashboard", () => {
   });
 
   describe("buildDeltaHealth", () => {
-    it("derives put side risk direction for bull put", () => {
+    it("derives put side trend for bull put when delta decreases", () => {
       const health = buildDeltaHealth({
         strategy: "bullPut",
-        openingShortPutDelta: -0.2,
-        currentShortPutDelta: -0.35,
+        openingShortPutDelta: 0.26,
+        currentShortPutDelta: 0.35,
       } as Pick<
         OptionsTrade,
         "strategy" | "openingShortPutDelta" | "currentShortPutDelta"
       >);
-      expect(health?.putSide?.deltaChange).toBeCloseTo(-0.15);
-      expect(health?.putSide?.riskDirection).toBe("increasing");
+      expect(health?.putSide?.deltaChange).toBeCloseTo(0.09);
+      expect(health?.putSide?.trend).toBe("worsening");
+      expect(health?.putSide?.message).toBe("Risk Increasing");
     });
 
-    it("derives call side risk direction for bear call", () => {
+    it("derives call side trend for bear call when delta increases", () => {
       const health = buildDeltaHealth({
         strategy: "bearCall",
         openingShortCallDelta: 0.2,
@@ -150,14 +151,15 @@ describe("open-trade-dashboard", () => {
         OptionsTrade,
         "strategy" | "openingShortCallDelta" | "currentShortCallDelta"
       >);
-      expect(health?.callSide?.riskDirection).toBe("increasing");
+      expect(health?.callSide?.trend).toBe("worsening");
+      expect(health?.callSide?.message).toBe("Risk Increasing");
     });
 
-    it("shows both sides for iron condor", () => {
+    it("shows both sides and overall status for iron condor", () => {
       const health = buildDeltaHealth({
         strategy: "ironCondor",
-        openingPutSideDelta: -0.15,
-        currentPutSideDelta: -0.1,
+        openingPutSideDelta: 0.15,
+        currentPutSideDelta: 0.1,
         openingCallSideDelta: 0.15,
         currentCallSideDelta: 0.2,
       } as Pick<
@@ -168,8 +170,9 @@ describe("open-trade-dashboard", () => {
         | "openingCallSideDelta"
         | "currentCallSideDelta"
       >);
-      expect(health?.putSide?.riskDirection).toBe("decreasing");
-      expect(health?.callSide?.riskDirection).toBe("increasing");
+      expect(health?.putSide?.trend).toBe("improving");
+      expect(health?.callSide?.trend).toBe("worsening");
+      expect(health?.overallStatus).toBe("monitor");
     });
   });
 
@@ -235,7 +238,8 @@ describe("open-trade-dashboard", () => {
         currentShortCallDelta: 0.62,
       } as OptionsTrade;
       const health = buildDeltaHealth(trade);
-      expect(health?.callSide?.riskDirection).toBe("increasing");
+      expect(health?.callSide?.trend).toBe("improving");
+      expect(health?.callSide?.message).toBe("Trade Strengthening");
     });
 
     it("tracks long put delta on buy put", () => {
@@ -245,7 +249,8 @@ describe("open-trade-dashboard", () => {
         currentShortPutDelta: -0.52,
       } as OptionsTrade;
       const health = buildDeltaHealth(trade);
-      expect(health?.putSide?.riskDirection).toBe("increasing");
+      expect(health?.putSide?.trend).toBe("improving");
+      expect(health?.putSide?.message).toBe("Trade Strengthening");
     });
   });
 
