@@ -4,15 +4,11 @@ import { runDailySnapshotCron } from "@/lib/daily-snapshot-cron";
 
 export const maxDuration = 60;
 
-/** @deprecated Use GET /api/cron/daily-snapshot */
 export async function GET(request: Request) {
   if (!isCronAuthorized(request)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
   const result = await runDailySnapshotCron();
-  return NextResponse.json(
-    { ...result, deprecated: "Use /api/cron/daily-snapshot" },
-    { status: result.ok ? 200 : 500 }
-  );
+  return NextResponse.json(result, { status: result.ok ? 200 : 500 });
 }

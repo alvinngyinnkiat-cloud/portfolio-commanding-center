@@ -55,7 +55,7 @@ export function SettingsView() {
         content: (
           <Card
             title="Daily Snapshots"
-            subtitle="Manual capture now · Auto 11:59pm SGT prepared (client poll; server cron later)"
+            subtitle="Manual capture now · Auto snapshot requires server storage such as Supabase. Local browser snapshots are manual only."
           >
             <DailySnapshotTrigger />
           </Card>
