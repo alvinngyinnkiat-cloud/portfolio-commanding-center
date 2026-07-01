@@ -148,6 +148,7 @@ export function ScannerView() {
       ) : (
         <>
           <ScannerRankingDashboard
+            results={displayRun.results}
             bullPut={displayRun.rankings.bullPut}
             bearCall={displayRun.rankings.bearCall}
             ironCondor={displayRun.rankings.ironCondor}
