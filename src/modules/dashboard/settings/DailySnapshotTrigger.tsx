@@ -8,9 +8,11 @@ import { FxRateErrorBanner } from "@/shared/components/ui/FxRateErrorBanner";
 import { Camera } from "lucide-react";
 
 export function DailySnapshotTrigger() {
-  const { data, services, refresh } = usePortfolio();
+  const { data, services, refresh, persistenceStatus } = usePortfolio();
 
   const fxRateValid = data?.fxRateValid ?? false;
+  const usesSupabase =
+    persistenceStatus === "supabase" || persistenceStatus === "supabase_migrated";
 
   const snapshots = useMemo(
     () =>
@@ -60,13 +62,14 @@ export function DailySnapshotTrigger() {
 
       <div className="space-y-2 text-sm text-slate-500">
         <p>
-          {snapshots.length} snapshot(s) stored locally. Each capture records
-          date, createdAt timestamp, snapshot type (manual / automatic), My
-          Portfolio, totals, contribution, and US / SG / Crypto / Personal Cash
-          (SGD). Snapshots power the Daily Portfolio Worth chart. Use{" "}
-          <strong className="text-slate-400">Capture Snapshot Now</strong> for
-          manual saves in this browser. Auto snapshot requires server storage
-          such as Supabase — Vercel Cron cannot update localStorage.
+          {snapshots.length} snapshot(s) stored
+          {usesSupabase ? " in Supabase (daily_snapshots)" : " locally in this browser"}.
+          Each capture records date, createdAt timestamp, snapshot type (manual /
+          automatic), My Portfolio, totals, contribution, and US / SG / Crypto /
+          Personal Cash (SGD). Snapshots power the Daily Portfolio Worth chart.
+          Automatic capture runs at 11:59pm Singapore time via Vercel Cron when
+          Supabase is configured. Re-capturing the same Singapore calendar date
+          overwrites that date only.
         </p>
         <p className="text-xs text-slate-600">
           <strong className="text-slate-500">v1 limitations:</strong> Historical

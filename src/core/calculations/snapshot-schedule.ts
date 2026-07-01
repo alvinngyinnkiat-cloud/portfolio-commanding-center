@@ -7,7 +7,6 @@ export const SNAPSHOT_AUTO_CAPTURE_MINUTE = 59;
 
 export type AutomaticSnapshotSkipReason =
   | "before_capture_time"
-  | "already_captured"
   | "invalid_state";
 
 interface SingaporeCalendarParts {

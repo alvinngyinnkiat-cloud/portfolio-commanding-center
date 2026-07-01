@@ -3,7 +3,6 @@ import type { SnapshotRepository } from "@/core/database/repositories/snapshot-r
 import { createDailySnapshot } from "@/core/calculations/snapshots";
 import {
   getSingaporeDateString,
-  hasSnapshotForDate,
   isSingaporeAutomaticSnapshotDue,
   type AutomaticSnapshotSkipReason,
 } from "@/core/calculations/snapshot-schedule";
@@ -14,6 +13,11 @@ export interface AutomaticSnapshotCaptureResult {
   snapshot: DailySnapshot | null;
   skipReason: AutomaticSnapshotSkipReason | null;
   snapshotDate: string;
+}
+
+export interface AutomaticSnapshotCaptureOptions {
+  /** Vercel Cron — skip client time-window guard; upsert by Singapore date. */
+  fromCron?: boolean;
 }
 
 export class SnapshotService {
@@ -54,29 +58,21 @@ export class SnapshotService {
     return this.attemptAutomaticSnapshotCapture().snapshot;
   }
 
-  /** Server cron capture — uses the same SGT time guard as the client. */
+  /** Server cron capture — trusts Vercel schedule (15:59 UTC = 23:59 SGT). */
   captureEndOfDayForDate(date: Date = new Date()): DailySnapshot | null {
-    return this.attemptAutomaticSnapshotCapture(date).snapshot;
+    return this.attemptAutomaticSnapshotCapture(date, { fromCron: true }).snapshot;
   }
 
   attemptAutomaticSnapshotCapture(
-    date: Date = new Date()
+    date: Date = new Date(),
+    options?: AutomaticSnapshotCaptureOptions
   ): AutomaticSnapshotCaptureResult {
     const snapshotDate = getSingaporeDateString(date);
 
-    if (!isSingaporeAutomaticSnapshotDue(date)) {
+    if (!options?.fromCron && !isSingaporeAutomaticSnapshotDue(date)) {
       return {
         snapshot: null,
         skipReason: "before_capture_time",
-        snapshotDate,
-      };
-    }
-
-    const existing = this.repo.list();
-    if (hasSnapshotForDate(existing, snapshotDate)) {
-      return {
-        snapshot: null,
-        skipReason: "already_captured",
         snapshotDate,
       };
     }

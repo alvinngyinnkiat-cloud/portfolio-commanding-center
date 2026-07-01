@@ -9,6 +9,7 @@ import { normalizeCryptoTrades } from "@/core/calculations/crypto/trade-normaliz
 import { DEFAULT_SCANNER_WATCHLIST } from "@/core/calculations/scanner/watchlist";
 import { normalizeDashboardSettings } from "@/core/database/local/normalize-settings";
 import { normalizeDailySnapshot } from "@/core/calculations/snapshots";
+import { loadDailySnapshots, syncSnapshots } from "./sync";
 import { normalizeStockPrice } from "@/core/calculations/stocks/price-normalize";
 import { normalizeStockTransactions } from "@/core/calculations/stocks/transaction-normalize";
 import { normalizeOptionsSettings } from "@/core/domain/defaults-options";
@@ -57,7 +58,7 @@ export async function isSupabaseDatastoreEmpty(
     client.from("settings").select("migrated_from_local").eq("id", "default").maybeSingle(),
     client.from("contributions").select("id", { count: "exact", head: true }),
     client.from("goals").select("id", { count: "exact", head: true }),
-    client.from("portfolio_snapshots").select("date", { count: "exact", head: true }),
+    client.from("daily_snapshots").select("snapshot_date", { count: "exact", head: true }),
     client.from("stock_transactions").select("id", { count: "exact", head: true }),
     client.from("crypto_transactions").select("id", { count: "exact", head: true }),
     client.from("options_trades").select("id", { count: "exact", head: true }),
@@ -67,7 +68,20 @@ export async function isSupabaseDatastoreEmpty(
   if (settingsRes.error) throw settingsRes.error;
   if (contributionsRes.error) throw contributionsRes.error;
   if (goalsRes.error) throw goalsRes.error;
-  if (snapshotsRes.error) throw snapshotsRes.error;
+
+  let snapshotCount = snapshotsRes.count ?? 0;
+  if (snapshotsRes.error) {
+    if (isOptionalTableQueryError(snapshotsRes.error, "daily_snapshots")) {
+      const legacySnapshotsRes = await client
+        .from("portfolio_snapshots")
+        .select("date", { count: "exact", head: true });
+      if (legacySnapshotsRes.error) throw legacySnapshotsRes.error;
+      snapshotCount = legacySnapshotsRes.count ?? 0;
+    } else {
+      throw snapshotsRes.error;
+    }
+  }
+
   if (stockRes.error) throw stockRes.error;
   if (cryptoRes.error) throw cryptoRes.error;
   if (optionsRes.error) throw optionsRes.error;
@@ -77,7 +91,7 @@ export async function isSupabaseDatastoreEmpty(
   const hasRows =
     (contributionsRes.count ?? 0) > 0 ||
     (goalsRes.count ?? 0) > 0 ||
-    (snapshotsRes.count ?? 0) > 0 ||
+    snapshotCount > 0 ||
     (stockRes.count ?? 0) > 0 ||
     (cryptoRes.count ?? 0) > 0 ||
     (optionsRes.count ?? 0) > 0 ||
@@ -121,11 +135,10 @@ export async function hydrateCacheFromSupabase(
     cache.migratedFromLocal = row.migrated_from_local === true;
   }
 
-  const [contributionsRes, goalsRes, snapshotsRes, stockRes, cryptoRes, cryptoTradesRes, optionsRes, fxRes, watchlistRes] =
+  const [contributionsRes, goalsRes, stockRes, cryptoRes, cryptoTradesRes, optionsRes, fxRes, watchlistRes] =
     await Promise.all([
       client.from("contributions").select("data"),
       client.from("goals").select("data"),
-      client.from("portfolio_snapshots").select("data"),
       client.from("stock_transactions").select("data"),
       client.from("crypto_transactions").select("data"),
       client.from("crypto_trades").select("data"),
@@ -137,7 +150,6 @@ export async function hydrateCacheFromSupabase(
   for (const res of [
     contributionsRes,
     goalsRes,
-    snapshotsRes,
     stockRes,
     cryptoRes,
     optionsRes,
@@ -159,8 +171,7 @@ export async function hydrateCacheFromSupabase(
 
   cache.contributions = contributionsRes.data?.map((row) => row.data) ?? [];
   cache.goals = goalsRes.data?.map((row) => row.data) ?? [];
-  cache.snapshots =
-    snapshotsRes.data?.map((row) => normalizeDailySnapshot(row.data)) ?? [];
+  cache.snapshots = await loadDailySnapshots(client);
   cache.stockTransactions = normalizeStockTransactions(
     stockRes.data?.map((row) => row.data) ?? []
   );
@@ -214,12 +225,7 @@ export async function importCacheToSupabase(
 
   await replaceJsonRows(client, "contributions", cache.contributions, (row) => row.id);
   await replaceJsonRows(client, "goals", cache.goals, (row) => row.id);
-  await replaceJsonRows(
-    client,
-    "portfolio_snapshots",
-    cache.snapshots,
-    (row) => row.date
-  );
+  await syncSnapshots(client, cache.snapshots);
   await replaceJsonRows(
     client,
     "stock_transactions",

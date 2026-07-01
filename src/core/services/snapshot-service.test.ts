@@ -90,15 +90,28 @@ describe("SnapshotService.attemptAutomaticSnapshotCapture", () => {
     expect(repo.upsert).toHaveBeenCalledOnce();
   });
 
-  it("skips duplicate automatic capture for the same date", () => {
+  it("overwrites automatic capture for the same Singapore date", () => {
     const { service, repo } = createService([makeSnapshot()]);
     const result = service.attemptAutomaticSnapshotCapture(
       sgtWallTimeToDate(2026, 6, 30, 23, 59)
     );
 
-    expect(result.snapshot).toBeNull();
-    expect(result.skipReason).toBe("already_captured");
-    expect(repo.upsert).not.toHaveBeenCalled();
+    expect(result.snapshot).not.toBeNull();
+    expect(result.skipReason).toBeNull();
+    expect(result.snapshot?.snapshotType).toBe("automatic");
+    expect(repo.upsert).toHaveBeenCalledOnce();
+  });
+
+  it("captures from cron without client time-window guard", () => {
+    const { service, repo } = createService();
+    const result = service.attemptAutomaticSnapshotCapture(
+      sgtWallTimeToDate(2026, 6, 30, 12, 0),
+      { fromCron: true }
+    );
+
+    expect(result.snapshot).not.toBeNull();
+    expect(result.skipReason).toBeNull();
+    expect(repo.upsert).toHaveBeenCalledOnce();
   });
 
   it("marks manual captures separately from automatic", () => {

@@ -1,6 +1,13 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { PersistenceCache } from "./cache";
 import { watchlistStorageKey } from "./local-export";
+import {
+  dailySnapshotToRow,
+  rowToDailySnapshot,
+} from "./daily-snapshot-db";
+import { normalizeDailySnapshot } from "@/core/calculations/snapshots";
+import { isMissingSupabaseTableError } from "./supabase-errors";
+import type { DailySnapshot } from "@/core/domain/types";
 
 export async function syncSettingsRow(
   client: SupabaseClient,
@@ -42,7 +49,54 @@ export async function syncSnapshots(
   client: SupabaseClient,
   rows: PersistenceCache["snapshots"]
 ): Promise<void> {
+  const dailyRes = await client.from("daily_snapshots").delete().neq("snapshot_date", "");
+  if (!dailyRes.error) {
+    if (rows.length === 0) return;
+    const payload = rows.map((row) => dailySnapshotToRow(normalizeDailySnapshot(row)));
+    const insertRes = await client.from("daily_snapshots").insert(payload);
+    if (insertRes.error) throw insertRes.error;
+    return;
+  }
+
+  if (!isMissingSupabaseTableError(dailyRes.error, "daily_snapshots")) {
+    throw dailyRes.error;
+  }
+
   await replaceTable(client, "portfolio_snapshots", "date", rows);
+}
+
+/** Upsert a single snapshot row — used by cron after capture. */
+export async function upsertDailySnapshotRow(
+  client: SupabaseClient,
+  snapshot: DailySnapshot
+): Promise<void> {
+  const normalized = normalizeDailySnapshot(snapshot);
+  const payload = dailySnapshotToRow(normalized);
+  const res = await client
+    .from("daily_snapshots")
+    .upsert(payload, { onConflict: "snapshot_date" });
+  if (res.error) throw res.error;
+}
+
+export async function loadDailySnapshots(
+  client: SupabaseClient
+): Promise<DailySnapshot[]> {
+  const dailyRes = await client
+    .from("daily_snapshots")
+    .select("*")
+    .order("snapshot_date", { ascending: true });
+
+  if (!dailyRes.error) {
+    return (dailyRes.data ?? []).map((row) => rowToDailySnapshot(row));
+  }
+
+  if (!isMissingSupabaseTableError(dailyRes.error, "daily_snapshots")) {
+    throw dailyRes.error;
+  }
+
+  const legacyRes = await client.from("portfolio_snapshots").select("data");
+  if (legacyRes.error) throw legacyRes.error;
+  return (legacyRes.data ?? []).map((row) => normalizeDailySnapshot(row.data));
 }
 
 export async function syncStockTransactions(

@@ -1,77 +1,67 @@
 # Module 1 — Vercel Cron & Daily Snapshots
 
-## Why browser localStorage cannot be updated by Vercel Cron
+## Storage model
 
-Daily snapshots in v1 are stored in **browser localStorage** when you use **Capture Snapshot Now** in Settings. That storage exists only in the user's browser tab.
+| Mode | Manual capture | Auto capture (11:59 PM SGT) |
+|------|----------------|----------------------------|
+| **Supabase configured** | `daily_snapshots` table | Vercel Cron → `/api/cron/daily-snapshot` → `daily_snapshots` |
+| **Local only (no Supabase)** | Browser localStorage | Not available — cron returns error |
 
-**Vercel Cron** runs on the server at a scheduled time (15:59 UTC = 11:59 PM Singapore Time). Server code has **no access** to any user's localStorage. A cron job cannot write snapshots into a browser.
+Vercel Cron runs on the **server** and cannot write browser localStorage. Automatic snapshots require **Supabase** with the `daily_snapshots` table.
 
-## What the cron route does today
+## Supabase table: `daily_snapshots`
 
-| Route | Schedule (Vercel) | SGT equivalent |
-|-------|-------------------|----------------|
-| `GET /api/cron/daily-snapshot` | `59 15 * * *` | 11:59 PM SGT |
+One row per **Singapore calendar date** (`snapshot_date` UNIQUE). Re-capturing the same date overwrites that row.
 
-The route is protected with:
+Run the `daily_snapshots` block in `supabase/schema.sql` in your Supabase SQL editor.
 
-```
-Authorization: Bearer ${CRON_SECRET}
-```
+Legacy `portfolio_snapshots` (JSON blob) is still read for migration; new writes go to `daily_snapshots`.
 
-### Option B (current default)
+## Cron schedule
 
-If **Supabase is not configured** (`NEXT_PUBLIC_SUPABASE_URL` / `NEXT_PUBLIC_SUPABASE_ANON_KEY` missing):
+| Route | Vercel cron | Singapore time |
+|-------|-------------|----------------|
+| `GET` or `POST `/api/cron/daily-snapshot` | `59 15 * * *` | 11:59 PM SGT |
 
-- Cron returns **200** with `enabled: false` and a clear message.
-- **No snapshot is written** — the route is prepared but disabled.
-- Manual **Capture Snapshot Now** still works in the browser via localStorage.
-
-### When Supabase is configured (future auto snapshot)
-
-If Supabase **is** configured and the `portfolio_snapshots` table exists:
-
-- Cron loads portfolio data from Supabase on the server.
-- It runs the same automatic snapshot logic as the in-app scheduler.
-- The snapshot is persisted to **`portfolio_snapshots`** in Supabase.
-- Browsers that sync with Supabase will see the new snapshot after hydration.
-
-## Manual snapshots (unchanged)
-
-**Capture Snapshot Now** in Settings → Snapshots:
-
-- Works without Supabase.
-- Writes to localStorage in the current browser.
-- Powers the Daily Portfolio Worth chart for that browser/session.
+Security: `Authorization: Bearer ${CRON_SECRET}`
 
 ## Environment variables
 
-| Variable | Purpose |
-|----------|---------|
-| `CRON_SECRET` | Bearer token for all `/api/cron/*` routes |
-| `NEXT_PUBLIC_SUPABASE_URL` | Enables server-side snapshot persistence |
-| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Supabase client for cron hydration/sync |
+| Variable | Required for auto snapshot |
+|----------|---------------------------|
+| `CRON_SECRET` | Yes (Vercel Cron auth) |
+| `NEXT_PUBLIC_SUPABASE_URL` | Yes |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Yes |
 
-Set `CRON_SECRET` in Vercel project settings. Vercel Cron sends it automatically when configured; for manual testing:
+## Manual capture
+
+**Capture Snapshot Now** (Settings → Snapshots) still works:
+
+- With Supabase: saves to `daily_snapshots` and syncs across devices after refresh.
+- Without Supabase: saves to localStorage in the current browser only.
+
+## Deploy checklist
+
+1. Run `daily_snapshots` DDL from `supabase/schema.sql`.
+2. Set Supabase env vars on Vercel.
+3. Set `CRON_SECRET` on Vercel.
+4. Deploy — cron is configured in `vercel.json`.
+
+## Test cron locally
 
 ```bash
 curl -H "Authorization: Bearer YOUR_CRON_SECRET" \
   http://localhost:3000/api/cron/daily-snapshot
 ```
 
-## Migration path
+Expected without Supabase: HTTP 500, `reason: "supabase_required"`.
 
-1. **Now:** Manual snapshots in localStorage; cron route returns disabled message without Supabase.
-2. **Next:** Configure Supabase + run `supabase/schema.sql` (includes `portfolio_snapshots`).
-3. **Then:** Cron at 11:59 PM SGT writes automatic snapshots to Supabase; clients sync on load.
+Expected with Supabase + valid portfolio data: HTTP 200, `captured: true`.
 
 ## Related files
 
-- `src/app/api/cron/daily-snapshot/route.ts` — cron entry point
-- `src/lib/daily-snapshot-cron.ts` — server handler (disabled vs Supabase capture)
-- `src/lib/cron-auth.ts` — `CRON_SECRET` validation
-- `src/core/services/snapshot-service.ts` — snapshot creation logic
-- `vercel.json` — cron schedule
-
-## Deprecated route
-
-`GET /api/cron/capture-snapshot` delegates to the same handler but is **not** scheduled. Use `/api/cron/daily-snapshot` instead.
+- `src/app/api/cron/daily-snapshot/route.ts`
+- `src/lib/daily-snapshot-cron.ts`
+- `src/core/database/supabase/daily-snapshot-db.ts`
+- `src/core/services/snapshot-service.ts`
+- `src/core/calculations/snapshot-schedule.ts`

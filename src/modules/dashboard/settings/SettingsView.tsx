@@ -55,7 +55,7 @@ export function SettingsView() {
         content: (
           <Card
             title="Daily Snapshots"
-            subtitle="Manual capture now · Auto snapshot requires server storage such as Supabase. Local browser snapshots are manual only."
+            subtitle="Manual capture now · Auto snapshot daily at 11:59pm SGT via Vercel Cron (Supabase daily_snapshots)"
           >
             <DailySnapshotTrigger />
           </Card>

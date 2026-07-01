@@ -15,12 +15,10 @@
 --   goals.data             → Goal
 --     { id, name, targetAmountSgd, targetDate?, active }
 --
---   portfolio_snapshots.data → DailySnapshot
---     { date, createdAt, snapshotType, ownPortfolio, totalPortfolio,
---       clientPortfolio, totalContribution, usStocksEtfSgd, sgStocksSgd,
---       cryptoSgd, personalCashSgd, cashSgd, breakdown?, fxRateUsed? }
---     breakdown (optional) → PortfolioBreakdown with per-account trading cash at capture.
+--   daily_snapshots        → DailySnapshot (typed columns; preferred)
+--     snapshot_date (SGT calendar date), type manual|automatic, portfolio fields
 --
+--   portfolio_snapshots.data → DailySnapshot (legacy JSON — migrated to daily_snapshots)
 --   stock_transactions.data → StockTransaction (buy|sell|dividend|fee only)
 --     { id, date, market, ticker, assetName, instrumentType?, transactionType,
 --       quantity, price, grossAmount, fees, netAmount, currency, notes?, createdAt }
@@ -92,7 +90,31 @@ CREATE TABLE IF NOT EXISTS goals (
 );
 
 -- ---------------------------------------------------------------------------
--- portfolio_snapshots (Settings → Snapshots + auto 11:59 PM SGT capture)
+-- daily_snapshots (Settings → Snapshots + Vercel Cron 11:59 PM SGT capture)
+-- One row per Singapore calendar date (snapshot_date UNIQUE).
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS daily_snapshots (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  snapshot_date text NOT NULL UNIQUE,
+  created_at timestamptz NOT NULL,
+  type text NOT NULL CHECK (type IN ('manual', 'automatic')),
+  my_portfolio_sgd numeric NOT NULL,
+  total_portfolio_sgd numeric NOT NULL,
+  client_equity_sgd numeric NOT NULL DEFAULT 0,
+  us_stocks_sgd numeric NOT NULL DEFAULT 0,
+  sg_stocks_sgd numeric NOT NULL DEFAULT 0,
+  crypto_sgd numeric NOT NULL DEFAULT 0,
+  personal_cash_sgd numeric NOT NULL DEFAULT 0,
+  total_contribution_sgd numeric NOT NULL DEFAULT 0,
+  fx_rate_used numeric,
+  extended_data jsonb,
+  updated_at timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS daily_snapshots_date_idx ON daily_snapshots (snapshot_date DESC);
+
+-- ---------------------------------------------------------------------------
+-- portfolio_snapshots (legacy JSON — migrated to daily_snapshots)
 -- ---------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS portfolio_snapshots (
   date text PRIMARY KEY,
@@ -164,6 +186,7 @@ CREATE INDEX IF NOT EXISTS watchlist_items_sort_idx ON watchlist_items (sort_ord
 ALTER TABLE settings ENABLE ROW LEVEL SECURITY;
 ALTER TABLE contributions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE goals ENABLE ROW LEVEL SECURITY;
+ALTER TABLE daily_snapshots ENABLE ROW LEVEL SECURITY;
 ALTER TABLE portfolio_snapshots ENABLE ROW LEVEL SECURITY;
 ALTER TABLE stock_transactions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE stock_fx_conversions ENABLE ROW LEVEL SECURITY;
@@ -175,6 +198,7 @@ ALTER TABLE watchlist_items ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "pcc_settings_all" ON settings FOR ALL USING (true) WITH CHECK (true);
 CREATE POLICY "pcc_contributions_all" ON contributions FOR ALL USING (true) WITH CHECK (true);
 CREATE POLICY "pcc_goals_all" ON goals FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "pcc_daily_snapshots_all" ON daily_snapshots FOR ALL USING (true) WITH CHECK (true);
 CREATE POLICY "pcc_snapshots_all" ON portfolio_snapshots FOR ALL USING (true) WITH CHECK (true);
 CREATE POLICY "pcc_stock_tx_all" ON stock_transactions FOR ALL USING (true) WITH CHECK (true);
 CREATE POLICY "pcc_stock_fx_all" ON stock_fx_conversions FOR ALL USING (true) WITH CHECK (true);

@@ -1,5 +1,6 @@
-import { isSupabaseConfigured } from "@/lib/supabase";
+import { getServerSupabaseClient, isSupabaseConfigured } from "@/lib/supabase";
 import { createCronRuntime } from "@/core/database/supabase/cron-runtime";
+import { upsertDailySnapshotRow } from "@/core/database/supabase/sync";
 import { getSingaporeDateString } from "@/core/calculations/snapshot-schedule";
 
 export interface DailySnapshotCronResult {
@@ -16,33 +17,36 @@ export interface DailySnapshotCronResult {
   error?: string;
 }
 
-const DISABLED_MESSAGE =
-  "Automatic daily snapshots are disabled. Vercel Cron runs on the server and cannot write browser localStorage. Configure Supabase (portfolio_snapshots table) to enable auto capture at 11:59 PM SGT (15:59 UTC). Manual Capture Snapshot in Settings still saves to localStorage in the browser.";
+const SUPABASE_REQUIRED_MESSAGE =
+  "Automatic daily snapshots require Supabase. Set NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY, then create the daily_snapshots table from supabase/schema.sql. Vercel Cron cannot write browser localStorage.";
 
 /**
- * Server-side daily snapshot handler for Vercel Cron.
- * Uses Supabase when configured; otherwise returns a clear disabled response (Option B).
+ * Server-side daily snapshot handler for Vercel Cron (15:59 UTC = 11:59 PM SGT).
+ * Persists to Supabase daily_snapshots — one row per Singapore calendar date.
  */
 export async function runDailySnapshotCron(): Promise<DailySnapshotCronResult> {
   const snapshotDate = getSingaporeDateString();
 
   if (!isSupabaseConfigured()) {
     return {
-      ok: true,
+      ok: false,
       enabled: false,
       captured: false,
-      reason: "server_storage_required",
+      reason: "supabase_required",
       snapshotDate,
-      message: DISABLED_MESSAGE,
+      message: SUPABASE_REQUIRED_MESSAGE,
     };
   }
 
   try {
     const { manager, services } = await createCronRuntime();
-    const result = services.snapshots.attemptAutomaticSnapshotCapture();
-    await manager.drainSyncQueue();
+    const result = services.snapshots.attemptAutomaticSnapshotCapture(
+      new Date(),
+      { fromCron: true }
+    );
 
     if (!result.snapshot) {
+      await manager.drainSyncQueue();
       return {
         ok: true,
         enabled: true,
@@ -54,6 +58,12 @@ export async function runDailySnapshotCron(): Promise<DailySnapshotCronResult> {
     }
 
     const snapshot = result.snapshot;
+    const client = getServerSupabaseClient();
+    if (client) {
+      await upsertDailySnapshotRow(client, snapshot);
+    }
+    await manager.drainSyncQueue();
+
     return {
       ok: true,
       enabled: true,
@@ -63,7 +73,7 @@ export async function runDailySnapshotCron(): Promise<DailySnapshotCronResult> {
       snapshotType: snapshot.snapshotType,
       ownPortfolio: snapshot.ownPortfolio,
       totalPortfolio: snapshot.totalPortfolio,
-      message: `Automatic snapshot captured for ${snapshot.date}.`,
+      message: `Automatic snapshot saved for ${snapshot.date} (Singapore date).`,
     };
   } catch (error) {
     const message =
