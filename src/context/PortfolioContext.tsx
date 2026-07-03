@@ -43,7 +43,6 @@ interface PortfolioContextValue {
 
 const PortfolioContext = createContext<PortfolioContextValue | null>(null);
 
-const AUTO_SNAPSHOT_POLL_MS = 60_000;
 const AUTO_PRICE_UPDATE_POLL_MS = 60_000;
 
 export function PortfolioProvider({ children }: { children: ReactNode }) {
@@ -145,19 +144,6 @@ export function PortfolioProvider({ children }: { children: ReactNode }) {
     if (!services || !isLoaded) return;
     refresh();
   }, [services, isLoaded, refresh]);
-
-  useEffect(() => {
-    if (!services) return;
-
-    const tryAutoCapture = () => {
-      const snapshot = services.snapshots.captureEndOfDayIfDue();
-      if (snapshot) refresh();
-    };
-
-    tryAutoCapture();
-    const intervalId = window.setInterval(tryAutoCapture, AUTO_SNAPSHOT_POLL_MS);
-    return () => window.clearInterval(intervalId);
-  }, [services, refresh]);
 
   useEffect(() => {
     if (!services) return;

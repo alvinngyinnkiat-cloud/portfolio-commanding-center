@@ -1,23 +1,23 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { usePortfolio } from "@/context/PortfolioContext";
 import { formatSgd, formatDate, formatDateTime } from "@/shared/lib/format";
 import { Button } from "@/shared/components/ui/Button";
 import { FxRateErrorBanner } from "@/shared/components/ui/FxRateErrorBanner";
-import { Camera } from "lucide-react";
-import { SnapshotStorageDiagnostics } from "./SnapshotStorageDiagnostics";
+import { Camera, Download, Upload } from "lucide-react";
 import { getPersistenceManager } from "@/core/database/supabase";
+import {
+  appendSnapshotBackup,
+  downloadSnapshotsJson,
+  parseSnapshotsImportFile,
+  readSnapshotBackup,
+  writeSnapshotBackup,
+} from "@/core/database/snapshots/snapshot-backup";
 
 export function DailySnapshotTrigger() {
-  const {
-    data,
-    services,
-    refresh,
-    persistenceStatus,
-    persistenceError,
-    persistenceWarning,
-  } = usePortfolio();
+  const { data, services, refresh, persistenceStatus } = usePortfolio();
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const fxRateValid = data?.fxRateValid ?? false;
   const usesSupabase =
@@ -28,6 +28,8 @@ export function DailySnapshotTrigger() {
     message: string;
   } | null>(null);
 
+  const [importFeedback, setImportFeedback] = useState<string | null>(null);
+
   const snapshots = useMemo(
     () =>
       [...(data?.snapshots ?? [])].sort((a, b) => b.date.localeCompare(a.date)),
@@ -35,19 +37,6 @@ export function DailySnapshotTrigger() {
   );
 
   const latest = snapshots[0];
-
-  const snapshotLoadError =
-    persistenceError?.startsWith("Failed to load Supabase snapshots:")
-      ? persistenceError
-      : null;
-
-  const emptyMessage = useMemo(() => {
-    if (snapshotLoadError) return snapshotLoadError;
-    if (snapshots.length === 0) {
-      return "No snapshots yet. Capture one to start tracking daily worth.";
-    }
-    return null;
-  }, [snapshotLoadError, snapshots.length]);
 
   const handleCapture = async () => {
     setCaptureFeedback(null);
@@ -70,35 +59,78 @@ export function DailySnapshotTrigger() {
         return;
       }
 
-      refresh();
+      appendSnapshotBackup(snapshot);
 
-      const manager = getPersistenceManager();
-      if (manager && usesSupabase) {
+      if (usesSupabase) {
+        const manager = getPersistenceManager();
         try {
-          await manager.drainSyncQueue(15_000);
+          if (manager) {
+            await manager.drainSyncQueue(15_000);
+          }
+          refresh();
+          setCaptureFeedback({
+            type: "success",
+            message: "Saved to Supabase ✓",
+          });
         } catch (error) {
           const message =
-            error instanceof Error ? error.message : "Supabase sync failed";
+            error instanceof Error ? error.message : "Unknown Supabase error";
+          refresh();
           setCaptureFeedback({
             type: "error",
-            message: `Snapshot saved locally but Supabase sync failed: ${message}`,
+            message: `Saved locally only — Supabase failed: ${message}`,
           });
-          refresh();
-          return;
         }
+      } else {
+        refresh();
+        setCaptureFeedback({
+          type: "success",
+          message: "Saved locally ✓",
+        });
       }
-
-      refresh();
-      setCaptureFeedback({
-        type: "success",
-        message: `Snapshot saved for ${formatDate(snapshot.date)} (${snapshot.snapshotType}).`,
-      });
     } catch (error) {
       const message = error instanceof Error ? error.message : "Unknown error";
       setCaptureFeedback({
         type: "error",
         message: `Capture failed: ${message}`,
       });
+    }
+  };
+
+  const handleExport = () => {
+    if (!services) return;
+    const exportRows = services.snapshots.exportSnapshots(readSnapshotBackup());
+    downloadSnapshotsJson(exportRows);
+  };
+
+  const handleImportClick = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleImportFile = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    setImportFeedback(null);
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file || !services) return;
+
+    try {
+      const text = await file.text();
+      const imported = parseSnapshotsImportFile(text);
+      const merged = services.snapshots.importSnapshots(imported);
+      writeSnapshotBackup(merged);
+
+      if (usesSupabase) {
+        const manager = getPersistenceManager();
+        if (manager) {
+          await manager.drainSyncQueue(15_000);
+        }
+      }
+
+      refresh();
+      setImportFeedback(`Imported ${imported.length} snapshot(s). ${merged.length} total after dedupe.`);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Import failed";
+      setImportFeedback(message);
     }
   };
 
@@ -110,12 +142,6 @@ export function DailySnapshotTrigger() {
   return (
     <div className="space-y-6">
       {!fxRateValid && <FxRateErrorBanner />}
-
-      {persistenceWarning && (
-        <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-200">
-          {persistenceWarning}
-        </div>
-      )}
 
       {captureFeedback && (
         <div
@@ -129,7 +155,13 @@ export function DailySnapshotTrigger() {
         </div>
       )}
 
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+      {importFeedback && (
+        <div className="rounded-xl border border-surface-border/60 bg-surface/40 px-4 py-3 text-sm text-slate-300">
+          {importFeedback}
+        </div>
+      )}
+
+      <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
         <Button
           onClick={() => void handleCapture()}
           disabled={!fxRateValid}
@@ -138,33 +170,48 @@ export function DailySnapshotTrigger() {
           <Camera size={16} />
           Capture Snapshot Now
         </Button>
-        {latest && (
-          <div className="rounded-xl border border-surface-border/60 bg-surface/50 px-4 py-3 text-sm">
-            <span className="text-slate-500">Latest snapshot · </span>
-            <span className="text-slate-300">{formatDate(latest.date)}</span>
-            <span className="text-slate-500"> · My Portfolio </span>
-            <span className="font-semibold text-white">
-              {formatSgd(latest.ownPortfolio)}
-            </span>
-            <span className="text-slate-500"> · {latest.snapshotType}</span>
-          </div>
-        )}
+        <Button
+          variant="secondary"
+          onClick={handleExport}
+          className="inline-flex items-center gap-2"
+        >
+          <Download size={16} />
+          Export Snapshots Backup
+        </Button>
+        <Button
+          variant="secondary"
+          onClick={handleImportClick}
+          className="inline-flex items-center gap-2"
+        >
+          <Upload size={16} />
+          Import Snapshots Backup
+        </Button>
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="application/json,.json"
+          className="hidden"
+          onChange={(event) => void handleImportFile(event)}
+        />
       </div>
 
-      <div className="space-y-2 text-sm text-slate-500">
-        <p>
-          {snapshots.length} snapshot(s) loaded
-          {usesSupabase ? " from Supabase (daily_snapshots)" : " from this browser"}.
-          Manual capture saves to Supabase when connected. Automatic capture runs
-          at 11:59pm Singapore time via Vercel Cron. Re-capturing the same
-          Singapore calendar date overwrites that date only.
-        </p>
-      </div>
+      {latest && (
+        <div className="rounded-xl border border-surface-border/60 bg-surface/50 px-4 py-3 text-sm">
+          <span className="text-slate-500">Latest snapshot · </span>
+          <span className="text-slate-300">{formatDate(latest.date)}</span>
+          <span className="text-slate-500"> · My Portfolio </span>
+          <span className="font-semibold text-white">
+            {formatSgd(latest.ownPortfolio)}
+          </span>
+        </div>
+      )}
 
-      <SnapshotStorageDiagnostics
-        persistenceStatus={persistenceStatus}
-        loadedCount={snapshots.length}
-      />
+      <p className="text-sm text-slate-500">
+        {snapshots.length} snapshot(s) loaded
+        {usesSupabase ? " from Supabase (portfolio_snapshots)" : " locally"}.
+        Manual capture saves to Supabase when connected and always writes a local
+        backup to portfolio:snapshots_backup.
+      </p>
 
       <div className="overflow-x-auto rounded-xl border border-surface-border/60">
         <table className="w-full text-sm">
@@ -184,13 +231,8 @@ export function DailySnapshotTrigger() {
           <tbody>
             {snapshots.length === 0 ? (
               <tr>
-                <td
-                  colSpan={9}
-                  className={`px-4 py-8 text-center ${
-                    snapshotLoadError ? "text-accent-red" : "text-slate-500"
-                  }`}
-                >
-                  {emptyMessage}
+                <td colSpan={9} className="px-4 py-8 text-center text-slate-500">
+                  No snapshots yet. Capture one to start tracking daily worth.
                 </td>
               </tr>
             ) : (

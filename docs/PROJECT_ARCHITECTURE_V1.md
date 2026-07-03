@@ -389,7 +389,7 @@ interface PortfolioContextValue {
 
 | Job | Interval | Service |
 |-----|----------|---------|
-| End-of-day snapshot | 60s poll | `SnapshotService.captureEndOfDayIfDue()` |
+| Manual snapshot | Settings button | `SnapshotService.captureNow()` |
 | Stock price updates | 60s poll | `StockPriceUpdateService.updateAllDuePrices()` |
 
 ### Adapter pattern (module → Dashboard)

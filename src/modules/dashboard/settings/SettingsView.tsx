@@ -55,7 +55,7 @@ export function SettingsView() {
         content: (
           <Card
             title="Daily Snapshots"
-            subtitle="Manual capture now · Auto snapshot daily at 11:59pm SGT via Vercel Cron (Supabase daily_snapshots)"
+            subtitle="Manual capture · Saved to Supabase portfolio_snapshots with local backup"
           >
             <DailySnapshotTrigger />
           </Card>

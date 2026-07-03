@@ -4,6 +4,7 @@ export const STORAGE_KEYS = {
   contributions: "portfolio:contributions",
   goals: "portfolio:goals",
   snapshots: "portfolio:snapshots",
+  snapshotsBackup: "portfolio:snapshots_backup",
   stockTransactions: "portfolio:stock_transactions",
   stockInstruments: "portfolio:stock_instruments",
   stockPrices: "portfolio:stock_prices",
