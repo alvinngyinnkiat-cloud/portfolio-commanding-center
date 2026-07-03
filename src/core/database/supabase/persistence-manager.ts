@@ -45,10 +45,17 @@ import {
 import { STORAGE_KEYS } from "../local/storage-keys";
 import { readJson, writeJson } from "../local/local-storage";
 import {
+  mergeSnapshotsByDate,
+  snapshotsChanged,
+} from "./snapshot-merge";
+import type { SnapshotLoadDiagnostics } from "./snapshot-storage";
+import {
   formatPersistenceError,
   isMissingSupabaseTableError,
   logPersistenceError,
 } from "./supabase-errors";
+import { DEFAULT_SNAPSHOTS } from "@/core/domain/defaults";
+import { normalizeDailySnapshot } from "@/core/calculations/snapshots";
 
 export type PersistenceStatus = "local" | "supabase" | "supabase_migrated";
 
@@ -62,6 +69,7 @@ export class PersistenceManager {
   private syncQueue: Array<() => Promise<void>> = [];
   private cryptoTradesSyncAvailable = true;
   private allowEmptyStockTransactionsSync = false;
+  private snapshotDiagnostics: SnapshotLoadDiagnostics | null = null;
 
   static async initialize(): Promise<PersistenceManager> {
     const manager = new PersistenceManager();
@@ -90,6 +98,14 @@ export class PersistenceManager {
 
   getLastWarning(): string | null {
     return this.lastWarning;
+  }
+
+  getSnapshotDiagnostics(): SnapshotLoadDiagnostics | null {
+    return this.snapshotDiagnostics;
+  }
+
+  setSnapshotDiagnostics(diagnostics: SnapshotLoadDiagnostics): void {
+    this.snapshotDiagnostics = diagnostics;
   }
 
   isCryptoTradesSyncAvailable(): boolean {
@@ -134,7 +150,16 @@ export class PersistenceManager {
         this.status = "supabase";
       }
 
-      this.cache = await hydrateCacheFromSupabase(this.client);
+      const hydrated = await hydrateCacheFromSupabase(this.client);
+      this.cache = hydrated.cache;
+      this.snapshotDiagnostics = hydrated.snapshotDiagnostics;
+      if (
+        hydrated.snapshotDiagnostics.lastFetchError &&
+        this.cache.snapshots.length === 0
+      ) {
+        this.lastError = `Failed to load Supabase snapshots: ${hydrated.snapshotDiagnostics.lastFetchError}`;
+      }
+
       this.persistStockTransactionsLocalBackup();
       if (this.status === "supabase_migrated") {
         this.cache.migratedFromLocal = true;
@@ -143,6 +168,7 @@ export class PersistenceManager {
       await this.refreshOptionalTableAvailability();
       this.mergeLocalStockTransactionsIfSupabaseEmpty();
       this.mergeLocalCryptoTradesIfSupabaseEmpty();
+      this.mergeLocalSnapshotsIfNeeded();
       this.markCryptoLegacyMigratedIfTradesPresent();
       await this.applyStockCashFlowMigrationIfNeeded();
       await this.applyCryptoTradesMigrationIfNeeded();
@@ -281,7 +307,10 @@ export class PersistenceManager {
     this.client = client;
     this.status = "supabase";
     try {
-      this.cache = await hydrateCacheFromSupabase(this.client);
+      this.cache = await hydrateCacheFromSupabase(this.client).then((r) => {
+        this.snapshotDiagnostics = r.snapshotDiagnostics;
+        return r.cache;
+      });
       await this.refreshOptionalTableAvailability();
       this.mergeLocalStockTransactionsIfSupabaseEmpty();
       this.mergeLocalCryptoTradesIfSupabaseEmpty();
@@ -500,6 +529,34 @@ export class PersistenceManager {
       this.enqueueSync(() =>
         syncCryptoTrades(this.client!, this.cache.cryptoTrades)
       );
+    }
+  }
+
+  /** One-time merge: localStorage snapshots → Supabase cache (preserves local backup). */
+  private mergeLocalSnapshotsIfNeeded(): void {
+    if (typeof window === "undefined") return;
+
+    const local = readJson<unknown[]>(STORAGE_KEYS.snapshots, DEFAULT_SNAPSHOTS).map(
+      (row) => normalizeDailySnapshot(row as Parameters<typeof normalizeDailySnapshot>[0])
+    );
+    if (local.length === 0) return;
+
+    const before = this.cache.snapshots;
+    const merged = mergeSnapshotsByDate([...before, ...local]);
+    if (!snapshotsChanged(before, merged)) {
+      return;
+    }
+
+    this.cache.snapshots = merged;
+    const added = merged.length - before.length;
+    this.setOptionalTableWarning(
+      added > 0
+        ? `Merged ${added} snapshot(s) from localStorage into Supabase. Local backup preserved.`
+        : "Updated snapshot cache from newer localStorage entries. Local backup preserved."
+    );
+
+    if (this.client) {
+      this.queueSnapshotsSync();
     }
   }
 

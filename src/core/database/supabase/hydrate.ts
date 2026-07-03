@@ -9,7 +9,8 @@ import { normalizeCryptoTrades } from "@/core/calculations/crypto/trade-normaliz
 import { DEFAULT_SCANNER_WATCHLIST } from "@/core/calculations/scanner/watchlist";
 import { normalizeDashboardSettings } from "@/core/database/local/normalize-settings";
 import { normalizeDailySnapshot } from "@/core/calculations/snapshots";
-import { loadDailySnapshots, syncSnapshots } from "./sync";
+import { loadDailySnapshots } from "./snapshot-storage";
+import { syncSnapshots } from "./sync";
 import { normalizeStockPrice } from "@/core/calculations/stocks/price-normalize";
 import { normalizeStockTransactions } from "@/core/calculations/stocks/transaction-normalize";
 import { normalizeOptionsSettings } from "@/core/domain/defaults-options";
@@ -102,7 +103,10 @@ export async function isSupabaseDatastoreEmpty(
 
 export async function hydrateCacheFromSupabase(
   client: SupabaseClient
-): Promise<PersistenceCache> {
+): Promise<{
+  cache: PersistenceCache;
+  snapshotDiagnostics: import("./snapshot-storage").SnapshotLoadDiagnostics;
+}> {
   const cache = createEmptyCache();
 
   const settingsRes = await client
@@ -171,7 +175,8 @@ export async function hydrateCacheFromSupabase(
 
   cache.contributions = contributionsRes.data?.map((row) => row.data) ?? [];
   cache.goals = goalsRes.data?.map((row) => row.data) ?? [];
-  cache.snapshots = await loadDailySnapshots(client);
+  const snapshotLoad = await loadDailySnapshots(client);
+  cache.snapshots = snapshotLoad.snapshots;
   cache.stockTransactions = normalizeStockTransactions(
     stockRes.data?.map((row) => row.data) ?? []
   );
@@ -197,7 +202,10 @@ export async function hydrateCacheFromSupabase(
     cache.scannerWatchlist = DEFAULT_SCANNER_WATCHLIST.map((row) => ({ ...row }));
   }
 
-  return normalizeCache(cache);
+  return {
+    cache: normalizeCache(cache),
+    snapshotDiagnostics: snapshotLoad.diagnostics,
+  };
 }
 
 export async function importCacheToSupabase(

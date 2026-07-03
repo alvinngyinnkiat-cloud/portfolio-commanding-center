@@ -47,19 +47,29 @@ export function dailySnapshotToRow(
 
 export function rowToDailySnapshot(row: DailySnapshotRow): DailySnapshot {
   const extended = row.extended_data ?? {};
+  const num = (value: unknown, fallback = 0) => {
+    if (typeof value === "number" && Number.isFinite(value)) return value;
+    if (typeof value === "string" && value.trim() !== "") {
+      const parsed = Number(value);
+      if (Number.isFinite(parsed)) return parsed;
+    }
+    return fallback;
+  };
+
   return normalizeDailySnapshot({
     date: row.snapshot_date,
     createdAt: row.created_at,
-    snapshotType: row.type,
-    ownPortfolio: row.my_portfolio_sgd,
-    totalPortfolio: row.total_portfolio_sgd,
-    clientPortfolio: row.client_equity_sgd,
-    usStocksEtfSgd: row.us_stocks_sgd,
-    sgStocksSgd: row.sg_stocks_sgd,
-    cryptoSgd: row.crypto_sgd,
-    personalCashSgd: row.personal_cash_sgd,
-    totalContribution: row.total_contribution_sgd,
-    fxRateUsed: row.fx_rate_used ?? undefined,
+    snapshotType: row.type === "automatic" ? "automatic" : "manual",
+    ownPortfolio: num(row.my_portfolio_sgd),
+    totalPortfolio: num(row.total_portfolio_sgd),
+    clientPortfolio: num(row.client_equity_sgd),
+    usStocksEtfSgd: num(row.us_stocks_sgd),
+    sgStocksSgd: num(row.sg_stocks_sgd),
+    cryptoSgd: num(row.crypto_sgd),
+    personalCashSgd: num(row.personal_cash_sgd),
+    totalContribution: num(row.total_contribution_sgd),
+    fxRateUsed:
+      row.fx_rate_used != null ? num(row.fx_rate_used, NaN) || undefined : undefined,
     netOptionsMarketValueSgd:
       extended.netOptionsMarketValueSgd as number | null | undefined,
     cryptoHoldingsValueSgd: extended.cryptoHoldingsValueSgd as number | undefined,

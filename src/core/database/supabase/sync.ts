@@ -3,11 +3,13 @@ import type { PersistenceCache } from "./cache";
 import { watchlistStorageKey } from "./local-export";
 import {
   dailySnapshotToRow,
-  rowToDailySnapshot,
 } from "./daily-snapshot-db";
 import { normalizeDailySnapshot } from "@/core/calculations/snapshots";
 import { isMissingSupabaseTableError } from "./supabase-errors";
 import type { DailySnapshot } from "@/core/domain/types";
+
+export { loadDailySnapshots, probeSnapshotStorage } from "./snapshot-storage";
+export type { SnapshotLoadDiagnostics, SnapshotLoadResult } from "./snapshot-storage";
 
 export async function syncSettingsRow(
   client: SupabaseClient,
@@ -49,20 +51,39 @@ export async function syncSnapshots(
   client: SupabaseClient,
   rows: PersistenceCache["snapshots"]
 ): Promise<void> {
-  const dailyRes = await client.from("daily_snapshots").delete().neq("snapshot_date", "");
-  if (!dailyRes.error) {
-    if (rows.length === 0) return;
-    const payload = rows.map((row) => dailySnapshotToRow(normalizeDailySnapshot(row)));
-    const insertRes = await client.from("daily_snapshots").insert(payload);
-    if (insertRes.error) throw insertRes.error;
+  if (rows.length === 0) {
     return;
   }
 
-  if (!isMissingSupabaseTableError(dailyRes.error, "daily_snapshots")) {
-    throw dailyRes.error;
+  const normalized = rows.map((row) => normalizeDailySnapshot(row));
+  const payload = normalized.map((row) => dailySnapshotToRow(row));
+
+  const upsertRes = await client
+    .from("daily_snapshots")
+    .upsert(payload, { onConflict: "snapshot_date" });
+
+  if (!upsertRes.error) {
+    const keepDates = new Set(normalized.map((row) => row.date));
+    const existingRes = await client.from("daily_snapshots").select("snapshot_date");
+    if (!existingRes.error && existingRes.data) {
+      for (const row of existingRes.data) {
+        if (!keepDates.has(row.snapshot_date)) {
+          const del = await client
+            .from("daily_snapshots")
+            .delete()
+            .eq("snapshot_date", row.snapshot_date);
+          if (del.error) throw del.error;
+        }
+      }
+    }
+    return;
   }
 
-  await replaceTable(client, "portfolio_snapshots", "date", rows);
+  if (!isMissingSupabaseTableError(upsertRes.error, "daily_snapshots")) {
+    throw upsertRes.error;
+  }
+
+  await replaceTable(client, "portfolio_snapshots", "date", normalized);
 }
 
 /** Upsert a single snapshot row — used by cron after capture. */
@@ -76,27 +97,6 @@ export async function upsertDailySnapshotRow(
     .from("daily_snapshots")
     .upsert(payload, { onConflict: "snapshot_date" });
   if (res.error) throw res.error;
-}
-
-export async function loadDailySnapshots(
-  client: SupabaseClient
-): Promise<DailySnapshot[]> {
-  const dailyRes = await client
-    .from("daily_snapshots")
-    .select("*")
-    .order("snapshot_date", { ascending: true });
-
-  if (!dailyRes.error) {
-    return (dailyRes.data ?? []).map((row) => rowToDailySnapshot(row));
-  }
-
-  if (!isMissingSupabaseTableError(dailyRes.error, "daily_snapshots")) {
-    throw dailyRes.error;
-  }
-
-  const legacyRes = await client.from("portfolio_snapshots").select("data");
-  if (legacyRes.error) throw legacyRes.error;
-  return (legacyRes.data ?? []).map((row) => normalizeDailySnapshot(row.data));
 }
 
 export async function syncStockTransactions(
