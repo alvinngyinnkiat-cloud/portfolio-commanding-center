@@ -10,6 +10,7 @@ import {
   Radar,
   ClipboardList,
   TrendingUp,
+  CircleDollarSign,
 } from "lucide-react";
 
 export function Header() {
@@ -21,6 +22,7 @@ export function Header() {
     { href: "/stocks", label: "Stocks", icon: LineChart, exact: false },
     { href: "/options", label: "Options", icon: ClipboardList, exact: false },
     { href: "/scanner", label: "Scanner", icon: Radar, exact: false },
+    { href: "/income", label: "Income", icon: CircleDollarSign, exact: false },
     { href: "/growth", label: "Growth", icon: TrendingUp, exact: false },
     { href: "/settings", label: "Settings", icon: Settings, exact: true },
   ];
