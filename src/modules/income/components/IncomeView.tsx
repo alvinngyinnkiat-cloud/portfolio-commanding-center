@@ -71,8 +71,8 @@ export function IncomeView() {
         <div className="rounded-2xl border border-dashed border-surface-border bg-surface/40 px-6 py-10 text-center">
           <p className="text-sm text-slate-300">No qualifying foundation positions.</p>
           <p className="mt-2 text-xs text-slate-500">
-            Open bull put vertical spreads with DTE ≥ {settings.minFoundationDte} in
-            Options to appear here.
+            Open bull put spreads, buy calls, or naked sell puts with opening DTE ≥
+            {settings.minFoundationDte} in Options to appear here.
           </p>
         </div>
       ) : (

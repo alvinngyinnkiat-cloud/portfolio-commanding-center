@@ -56,6 +56,8 @@ function decisionStatusClass(status: FoundationPositionView["decisionStatus"]): 
       return "border-orange-500/40 bg-orange-500/10 text-orange-200";
     case "waiting_for_trigger":
       return "border-yellow-500/40 bg-yellow-500/10 text-yellow-200";
+    case "covered":
+      return "border-sky-500/40 bg-sky-500/10 text-sky-200";
     default:
       return "border-surface-border/60 bg-surface/40 text-slate-300";
   }
@@ -64,6 +66,7 @@ function decisionStatusClass(status: FoundationPositionView["decisionStatus"]): 
 export function FoundationCard({ foundation, atrMultiplier }: FoundationCardProps) {
   const {
     ticker,
+    foundationType,
     foundationRow,
     activeSellCallRow,
     scannerCandles,
@@ -80,8 +83,9 @@ export function FoundationCard({ foundation, atrMultiplier }: FoundationCardProp
     decisionLabel,
     recoveryPct,
     recoveryPhase,
-    lifetimePremiumUsd,
-    incomeCycles,
+    lifetimeIncomeUsd,
+    monthlyIncomeUsd,
+    completedIncomeCycles,
     activeRecommendation,
     atr14,
   } = foundation;
@@ -89,7 +93,7 @@ export function FoundationCard({ foundation, atrMultiplier }: FoundationCardProp
   return (
     <Card
       title={ticker}
-      subtitle={`Foundation · ${foundationRow.strategyDisplay} · DTE ${foundationRow.daysToExpiration}`}
+      subtitle={`${foundationType} · DTE ${foundationRow.daysToExpiration} · Opening DTE ${foundation.foundationOpeningDte}`}
     >
       <div className="grid gap-6 lg:grid-cols-2">
         <div className="space-y-3">
@@ -101,22 +105,22 @@ export function FoundationCard({ foundation, atrMultiplier }: FoundationCardProp
             avgPrice={avgPriceUsd}
             currentPriceUsd={currentPriceUsd}
             foundationBreakevenUsd={foundationBreakevenUsd}
+            triggerPriceUsd={foundationTriggerPriceUsd}
             callBreakevenUsd={callBreakevenUsd}
           />
           <div className="grid grid-cols-2 gap-2 text-xs text-slate-400">
             <Metric label="Current Price" value={formatUsd(currentPriceUsd)} />
             <Metric label="Foundation BE" value={formatUsd(foundationBreakevenUsd)} />
-            <Metric label="Call BE" value={formatUsd(callBreakevenUsd)} />
-            <Metric
-              label="Lifetime Premium"
-              value={formatUsd(lifetimePremiumUsd)}
-            />
+            <Metric label="Trigger Price" value={formatUsd(foundationTriggerPriceUsd)} />
+            <Metric label="Lifetime Income" value={formatUsd(lifetimeIncomeUsd)} />
           </div>
         </div>
 
         <div className="space-y-5">
           <ChecklistSection title="Foundation Checklist" items={foundationChecklist} />
-          <ChecklistSection title="SELL CALL Timing Checklist" items={timingRules} />
+          {!foundation.isCovered && (
+            <ChecklistSection title="SELL CALL Timing Checklist" items={timingRules} />
+          )}
 
           <div className="rounded-xl border border-surface-border/60 bg-surface/40 p-4">
             <h4 className="text-xs font-semibold uppercase tracking-wide text-slate-500">
@@ -124,16 +128,10 @@ export function FoundationCard({ foundation, atrMultiplier }: FoundationCardProp
             </h4>
             <dl className="mt-3 space-y-2 text-sm">
               <Row label="Current Price" value={formatUsd(currentPriceUsd)} />
-              <Row label="Foundation Breakeven" value={formatUsd(foundationBreakevenUsd)} />
+              <Row label="Foundation BE" value={formatUsd(foundationBreakevenUsd)} />
               <Row label="ATR14" value={formatUsd(atr14)} />
-              <Row
-                label="Foundation Trigger ATR Multiplier"
-                value={String(atrMultiplier)}
-              />
-              <Row
-                label="Foundation Trigger Price"
-                value={formatUsd(foundationTriggerPriceUsd)}
-              />
+              <Row label="ATR Multiplier" value={String(atrMultiplier)} />
+              <Row label="Trigger Price" value={formatUsd(foundationTriggerPriceUsd)} />
               <Row
                 label="Distance to Trigger"
                 value={
@@ -158,6 +156,9 @@ export function FoundationCard({ foundation, atrMultiplier }: FoundationCardProp
                 Recovery {formatPercent(recoveryPct)} · {recoveryPhaseLabel(recoveryPhase)}
               </p>
             )}
+            <p className="mt-2 text-xs font-normal opacity-90">
+              Monthly Income {formatUsd(monthlyIncomeUsd)}
+            </p>
           </div>
         </div>
       </div>
@@ -193,6 +194,9 @@ export function FoundationCard({ foundation, atrMultiplier }: FoundationCardProp
         <h4 className="text-xs font-semibold uppercase tracking-wide text-slate-500">
           Income History
         </h4>
+        <p className="mt-1 text-xs text-slate-500">
+          Completed SELL CALL vertical spread cycles · Realized P&L from Module 5
+        </p>
         <div className="mt-3 overflow-x-auto rounded-xl border border-surface-border/60">
           <table className="w-full text-sm">
             <thead className="bg-surface/60">
@@ -200,20 +204,19 @@ export function FoundationCard({ foundation, atrMultiplier }: FoundationCardProp
                 <th className="px-4 py-3">Cycle</th>
                 <th className="px-4 py-3">Open Date</th>
                 <th className="px-4 py-3">Close Date</th>
-                <th className="px-4 py-3">Premium Received</th>
-                <th className="px-4 py-3">Realized P&L</th>
+                <th className="px-4 py-3">Final Realized P&L</th>
                 <th className="px-4 py-3">Status</th>
               </tr>
             </thead>
             <tbody>
-              {incomeCycles.length === 0 ? (
+              {completedIncomeCycles.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="px-4 py-6 text-center text-slate-500">
-                    No sell call income cycles yet.
+                  <td colSpan={5} className="px-4 py-6 text-center text-slate-500">
+                    No completed sell call income cycles yet.
                   </td>
                 </tr>
               ) : (
-                incomeCycles.map((cycle) => (
+                completedIncomeCycles.map((cycle) => (
                   <tr
                     key={cycle.tradeId}
                     className="border-b border-surface-border/40 last:border-0"
@@ -223,17 +226,12 @@ export function FoundationCard({ foundation, atrMultiplier }: FoundationCardProp
                       {formatDate(cycle.openDate)}
                     </td>
                     <td className="px-4 py-3 text-slate-300">
-                      {cycle.closeDate ? formatDate(cycle.closeDate) : "—"}
-                    </td>
-                    <td className="px-4 py-3 text-slate-200">
-                      {formatUsd(cycle.premiumReceivedUsd)}
+                      {formatDate(cycle.closeDate)}
                     </td>
                     <td
-                      className={`px-4 py-3 ${plColorClass(cycle.realizedPlUsd)}`}
+                      className={`px-4 py-3 font-medium ${plColorClass(cycle.finalRealizedPlUsd)}`}
                     >
-                      {cycle.realizedPlUsd != null
-                        ? formatUsd(cycle.realizedPlUsd)
-                        : "—"}
+                      {formatUsd(cycle.finalRealizedPlUsd)}
                     </td>
                     <td className="px-4 py-3 capitalize text-slate-400">
                       {cycle.status}

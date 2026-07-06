@@ -29,13 +29,13 @@ export function IncomeSummaryCards({ summary }: IncomeSummaryCardsProps) {
       <SummaryCard
         label="Foundation Positions"
         value={String(summary.foundationCount)}
-        subValue="Open bull put spreads · DTE threshold met"
+        subValue="Open foundations · opening DTE threshold met"
         icon={<Layers size={18} />}
       />
       <SummaryCard
         label="SELL CALL WINDOWS OPEN"
         value={String(summary.sellCallWindowsOpenCount)}
-        subValue="Foundation checklist + timing rules satisfied"
+        subValue="Timing rules satisfied · not covered"
         icon={<DoorOpen size={18} />}
         trend={summary.sellCallWindowsOpenCount > 0 ? "positive" : "neutral"}
       />
@@ -46,15 +46,21 @@ export function IncomeSummaryCards({ summary }: IncomeSummaryCardsProps) {
         icon={<ShieldCheck size={18} />}
       />
       <SummaryCard
-        label="Monthly Premium"
-        value={formatUsd(summary.monthlyPremiumUsd)}
-        subValue="Sell call credits opened this month"
+        label="Active Income Cycles"
+        value={String(summary.activeIncomeCycleCount)}
+        subValue="Open SELL CALL vertical spreads"
+        icon={<Repeat size={18} />}
+      />
+      <SummaryCard
+        label="Monthly Income"
+        value={formatUsd(summary.monthlyIncomeUsd)}
+        subValue="Realized P&L from cycles closed this month"
         icon={<Calendar size={18} />}
       />
       <SummaryCard
-        label="Lifetime Premium"
-        value={formatUsd(summary.lifetimePremiumUsd)}
-        subValue="All sell call income cycles"
+        label="Lifetime Income"
+        value={formatUsd(summary.lifetimeIncomeUsd)}
+        subValue="Sum of completed cycle realized P&L"
         icon={<PiggyBank size={18} />}
       />
       <SummaryCard
@@ -71,12 +77,6 @@ export function IncomeSummaryCards({ summary }: IncomeSummaryCardsProps) {
             ? "positive"
             : "neutral"
         }
-      />
-      <SummaryCard
-        label="Active Income Cycles"
-        value={String(summary.activeIncomeCycleCount)}
-        subValue="Open sell call overlays"
-        icon={<Repeat size={18} />}
       />
     </div>
   );

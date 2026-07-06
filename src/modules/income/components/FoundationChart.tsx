@@ -6,6 +6,7 @@ interface FoundationChartProps {
   avgPrice: number | null;
   currentPriceUsd: number | null;
   foundationBreakevenUsd: number | null;
+  triggerPriceUsd: number | null;
   callBreakevenUsd: number | null;
 }
 
@@ -13,6 +14,7 @@ interface HorizontalGuide {
   price: number;
   color: string;
   label: string;
+  solid?: boolean;
 }
 
 export function FoundationChart({
@@ -20,6 +22,7 @@ export function FoundationChart({
   avgPrice,
   currentPriceUsd,
   foundationBreakevenUsd,
+  triggerPriceUsd,
   callBreakevenUsd,
 }: FoundationChartProps) {
   if (candles.length === 0) {
@@ -37,7 +40,6 @@ export function FoundationChart({
   const width = 320;
   const height = 180;
   const padding = { top: 14, right: 72, bottom: 8, left: 8 };
-  const chartWidth = width - padding.left - padding.right;
   const chartHeight = height - padding.top - padding.bottom;
 
   const avgSeries = candles.map(
@@ -46,13 +48,25 @@ export function FoundationChart({
 
   const guides: HorizontalGuide[] = [];
   if (currentPriceUsd != null) {
-    guides.push({ price: currentPriceUsd, color: "#0f172a", label: "Current Price" });
+    guides.push({
+      price: currentPriceUsd,
+      color: "#f8fafc",
+      label: "Current Price",
+      solid: true,
+    });
   }
   if (foundationBreakevenUsd != null) {
     guides.push({
       price: foundationBreakevenUsd,
       color: "#22c55e",
       label: "Foundation BE",
+    });
+  }
+  if (triggerPriceUsd != null) {
+    guides.push({
+      price: triggerPriceUsd,
+      color: "#f97316",
+      label: "Trigger Price",
     });
   }
   if (callBreakevenUsd != null) {
@@ -97,13 +111,13 @@ export function FoundationChart({
                 y1={y}
                 y2={y}
                 stroke={guide.color}
-                strokeWidth={guide.label === "Current Price" ? 2 : 1.5}
-                strokeDasharray={guide.label === "Current Price" ? undefined : "5 4"}
+                strokeWidth={guide.solid ? 2 : 1.5}
+                strokeDasharray={guide.solid ? undefined : "5 4"}
               />
               <text
                 x={width - padding.right + 60}
                 y={y + 3}
-                fill={guide.color === "#0f172a" ? "#e2e8f0" : guide.color}
+                fill={guide.color}
                 fontSize={9}
                 fontWeight={600}
               >
@@ -113,6 +127,23 @@ export function FoundationChart({
           );
         })}
       </svg>
+      <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-[10px] text-slate-500">
+        <span>
+          <span className="text-sky-400">---</span> Avg Price
+        </span>
+        <span>
+          <span className="text-white">—</span> Current Price
+        </span>
+        <span>
+          <span className="text-emerald-400">---</span> Foundation BE
+        </span>
+        <span>
+          <span className="text-orange-400">---</span> Trigger Price
+        </span>
+        <span>
+          <span className="text-red-400">---</span> Call BE
+        </span>
+      </div>
     </div>
   );
 }

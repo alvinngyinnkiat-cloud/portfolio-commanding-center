@@ -39,68 +39,69 @@ function isCurrentMonth(dateIso: string, asOf: Date): boolean {
   );
 }
 
-export function buildIncomeCyclesForTicker(
+/** Completed SELL CALL vertical spread cycles for trade history. */
+export function buildCompletedIncomeCyclesForTicker(
   ticker: string,
   openRows: OptionsOpenTradeRow[],
   closedRows: OptionsClosedTradeRow[]
 ): IncomeCycleRow[] {
   const normalized = normalizeTicker(ticker);
 
-  const sellCallTrades = [
+  const allCycles = [
     ...openRows
       .filter(
         (row) =>
           normalizeTicker(row.trade.underlying) === normalized &&
           isSellCallIncomeStrategy(row.trade.strategy)
       )
-      .map((row) => ({
-        trade: row.trade,
-        status: "open" as const,
-        realizedPlUsd: row.unrealizedPlUsd,
-      })),
+      .map((row) => row.trade),
     ...closedRows
       .filter(
         (row) =>
           normalizeTicker(row.trade.underlying) === normalized &&
           isSellCallIncomeStrategy(row.trade.strategy)
       )
-      .map((row) => ({
-        trade: row.trade,
-        status: "closed" as const,
-        realizedPlUsd: row.trade.realizedPlUsd ?? null,
-      })),
-  ].sort((a, b) => a.trade.openDate.localeCompare(b.trade.openDate));
+      .map((row) => row.trade),
+  ].sort((a, b) => a.openDate.localeCompare(b.openDate));
 
-  const cycles = sellCallTrades.map((entry, index) => ({
-    cycleNumber: index + 1,
-    tradeId: entry.trade.id,
-    openDate: entry.trade.openDate,
-    closeDate: entry.status === "closed" ? entry.trade.closeDate ?? null : null,
-    premiumReceivedUsd: entry.trade.openPremiumUsd,
-    realizedPlUsd: entry.status === "closed" ? entry.realizedPlUsd : null,
-    status: entry.status,
-  }));
+  const cycleNumberByTradeId = new Map(
+    allCycles.map((trade, index) => [trade.id, index + 1])
+  );
 
-  return cycles.sort((a, b) => b.openDate.localeCompare(a.openDate));
+  return closedRows
+    .filter(
+      (row) =>
+        normalizeTicker(row.trade.underlying) === normalized &&
+        isSellCallIncomeStrategy(row.trade.strategy)
+    )
+    .map((row) => ({
+      cycleNumber: cycleNumberByTradeId.get(row.trade.id) ?? 0,
+      tradeId: row.trade.id,
+      openDate: row.trade.openDate,
+      closeDate: row.trade.closeDate ?? row.trade.openDate,
+      finalRealizedPlUsd: row.trade.realizedPlUsd ?? 0,
+      status: "completed" as const,
+    }))
+    .sort((a, b) => b.closeDate.localeCompare(a.closeDate));
 }
 
-export function sumLifetimePremiumUsd(cycles: IncomeCycleRow[]): number {
-  return cycles.reduce((sum, cycle) => sum + cycle.premiumReceivedUsd, 0);
+export function sumLifetimeIncomeUsd(cycles: IncomeCycleRow[]): number {
+  return cycles.reduce((sum, cycle) => sum + cycle.finalRealizedPlUsd, 0);
 }
 
-export function sumMonthlyPremiumUsd(
+export function sumMonthlyIncomeUsd(
   cycles: IncomeCycleRow[],
   asOf: Date = new Date()
 ): number {
   return cycles
-    .filter((cycle) => isCurrentMonth(cycle.openDate, asOf))
-    .reduce((sum, cycle) => sum + cycle.premiumReceivedUsd, 0);
+    .filter((cycle) => isCurrentMonth(cycle.closeDate, asOf))
+    .reduce((sum, cycle) => sum + cycle.finalRealizedPlUsd, 0);
 }
 
 export function calculateRecoveryPct(
-  lifetimePremiumUsd: number,
+  lifetimeIncomeUsd: number,
   foundationMaxRiskUsd: number
 ): number | null {
   if (foundationMaxRiskUsd <= 0) return null;
-  return (lifetimePremiumUsd / foundationMaxRiskUsd) * 100;
+  return (lifetimeIncomeUsd / foundationMaxRiskUsd) * 100;
 }

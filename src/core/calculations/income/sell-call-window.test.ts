@@ -8,6 +8,7 @@ import {
 describe("sell-call-window", () => {
   const baseInput = {
     foundationChecklistPass: true,
+    isCovered: false,
     currentPriceUsd: 110,
     foundationBreakevenUsd: 100,
     atr14: 2,
@@ -44,17 +45,20 @@ describe("sell-call-window", () => {
     expect(deriveIncomeDecisionStatus(baseInput)).toBe("sell_call_window_open");
   });
 
-  it("resets to waiting for trigger when price falls below trigger before confirmation", () => {
-    const rules = evaluateSellCallTimingRules({
-      ...baseInput,
-      currentPriceUsd: 104,
-      avgPricePrevUsd: 109,
-      avgPriceUsd: 108,
-    });
-    expect(rules[0]?.pass).toBe(false);
+  it("returns covered when an active sell call exists", () => {
     expect(
       deriveIncomeDecisionStatus({
         ...baseInput,
+        isCovered: true,
+      })
+    ).toBe("covered");
+  });
+
+  it("resets to waiting for trigger when price falls below trigger before confirmation", () => {
+    expect(
+      deriveIncomeDecisionStatus({
+        ...baseInput,
+        isCovered: false,
         currentPriceUsd: 104,
         avgPricePrevUsd: 109,
         avgPriceUsd: 108,

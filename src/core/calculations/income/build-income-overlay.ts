@@ -9,14 +9,20 @@ import type {
 } from "@/core/domain/types/income";
 import { normalizeTicker } from "@/core/calculations/stocks/normalize";
 import { scaleMaxRiskForRemaining } from "@/core/calculations/options/contract-tracking";
-import { isFoundationStrategy, isSellCallIncomeStrategy } from "./strategies";
 import {
-  buildIncomeCyclesForTicker,
+  getFoundationOpeningDte,
+  getFoundationTypeLabel,
+  isFoundationStrategy,
+  isSellCallIncomeStrategy,
+  qualifiesAsFoundation,
+} from "./strategies";
+import {
+  buildCompletedIncomeCyclesForTicker,
   calculateRecoveryPct,
   deriveRecoveryPhase,
   deriveSellCallRecommendation,
-  sumLifetimePremiumUsd,
-  sumMonthlyPremiumUsd,
+  sumLifetimeIncomeUsd,
+  sumMonthlyIncomeUsd,
 } from "./income-cycles";
 import {
   calculateFoundationTriggerPrice,
@@ -48,15 +54,13 @@ function indexScannerResults(
 function selectFoundationRow(
   openRows: OptionsOpenTradeRow[],
   ticker: string,
-  minFoundationDte: number
+  minOpeningDte: number
 ): OptionsOpenTradeRow | null {
   const normalized = normalizeTicker(ticker);
   const candidates = openRows.filter(
     (row) =>
       normalizeTicker(row.trade.underlying) === normalized &&
-      isFoundationStrategy(row.trade.strategy) &&
-      row.trade.status === "open" &&
-      row.daysToExpiration >= minFoundationDte
+      qualifiesAsFoundation(row.trade, minOpeningDte)
   );
 
   if (candidates.length === 0) return null;
@@ -83,10 +87,20 @@ function buildFoundationChecklist(
   activeSellCallRow: OptionsOpenTradeRow | null,
   minFoundationDte: number
 ): FoundationChecklistItem[] {
+  const foundationType =
+    foundationRow != null
+      ? getFoundationTypeLabel(foundationRow.trade.strategy)
+      : "—";
+
   return [
     {
       id: "exists",
       label: "Foundation Position Exists",
+      pass: foundationRow != null,
+    },
+    {
+      id: "type",
+      label: `Foundation Type: ${foundationType}`,
       pass: foundationRow != null,
     },
     {
@@ -117,6 +131,8 @@ function buildFoundationView(
   asOf: Date
 ): FoundationPositionView {
   const activeSellCallRow = findActiveSellCallRow(openRows, ticker);
+  const isCovered = activeSellCallRow != null;
+  const foundationType = getFoundationTypeLabel(foundationRow.trade.strategy);
   const foundationChecklist = buildFoundationChecklist(
     foundationRow,
     activeSellCallRow,
@@ -143,6 +159,7 @@ function buildFoundationView(
 
   const windowInput = {
     foundationChecklistPass,
+    isCovered,
     currentPriceUsd,
     foundationBreakevenUsd,
     atr14,
@@ -159,17 +176,23 @@ function buildFoundationView(
     settings.foundationTriggerAtrMultiplier
   );
 
-  const incomeCycles = buildIncomeCyclesForTicker(ticker, openRows, closedRows);
-  const lifetimePremiumUsd = sumLifetimePremiumUsd(incomeCycles);
-  const monthlyPremiumUsd = sumMonthlyPremiumUsd(incomeCycles, asOf);
+  const completedIncomeCycles = buildCompletedIncomeCyclesForTicker(
+    ticker,
+    openRows,
+    closedRows
+  );
+  const lifetimeIncomeUsd = sumLifetimeIncomeUsd(completedIncomeCycles);
+  const monthlyIncomeUsd = sumMonthlyIncomeUsd(completedIncomeCycles, asOf);
   const foundationMaxRiskUsd = scaleMaxRiskForRemaining(foundationRow.trade);
-  const recoveryPct = calculateRecoveryPct(lifetimePremiumUsd, foundationMaxRiskUsd);
+  const recoveryPct = calculateRecoveryPct(lifetimeIncomeUsd, foundationMaxRiskUsd);
   const recoveryPhase = deriveRecoveryPhase(recoveryPct);
 
   return {
     ticker,
+    foundationType,
     foundationRow,
     activeSellCallRow,
+    isCovered,
     scannerCandles: scannerResult?.recentCandles ?? [],
     currentPriceUsd,
     avgPriceUsd,
@@ -179,6 +202,7 @@ function buildFoundationView(
     callBreakevenUsd,
     foundationMaxRiskUsd,
     foundationDte: foundationRow.daysToExpiration,
+    foundationOpeningDte: getFoundationOpeningDte(foundationRow.trade),
     foundationChecklist,
     foundationChecklistPass,
     timingRules,
@@ -195,9 +219,9 @@ function buildFoundationView(
     decisionLabel: incomeDecisionLabel(decisionStatus),
     recoveryPct,
     recoveryPhase,
-    lifetimePremiumUsd,
-    monthlyPremiumUsd,
-    incomeCycles,
+    lifetimeIncomeUsd,
+    monthlyIncomeUsd,
+    completedIncomeCycles,
     activeRecommendation: activeSellCallRow
       ? deriveSellCallRecommendation(activeSellCallRow.dashboard.tradeHealth)
       : null,
@@ -212,11 +236,7 @@ export function buildIncomeOverlayData(
 
   const foundationTickers = new Set<string>();
   for (const row of input.openRows) {
-    if (
-      isFoundationStrategy(row.trade.strategy) &&
-      row.trade.status === "open" &&
-      row.daysToExpiration >= input.settings.minFoundationDte
-    ) {
+    if (qualifiesAsFoundation(row.trade, input.settings.minFoundationDte)) {
       foundationTickers.add(normalizeTicker(row.trade.underlying));
     }
   }
@@ -242,7 +262,7 @@ export function buildIncomeOverlayData(
     })
     .filter((view): view is FoundationPositionView => view != null);
 
-  const summary = buildIncomeOverlaySummary(foundations, asOf);
+  const summary = buildIncomeOverlaySummary(foundations);
 
   return {
     settings: input.settings,
@@ -252,15 +272,14 @@ export function buildIncomeOverlayData(
 }
 
 function buildIncomeOverlaySummary(
-  foundations: FoundationPositionView[],
-  asOf: Date
+  foundations: FoundationPositionView[]
 ): IncomeOverlaySummary {
-  const lifetimePremiumUsd = foundations.reduce(
-    (sum, foundation) => sum + foundation.lifetimePremiumUsd,
+  const lifetimeIncomeUsd = foundations.reduce(
+    (sum, foundation) => sum + foundation.lifetimeIncomeUsd,
     0
   );
-  const monthlyPremiumUsd = foundations.reduce(
-    (sum, foundation) => sum + foundation.monthlyPremiumUsd,
+  const monthlyIncomeUsd = foundations.reduce(
+    (sum, foundation) => sum + foundation.monthlyIncomeUsd,
     0
   );
   const totalFoundationRiskUsd = foundations.reduce(
@@ -268,7 +287,7 @@ function buildIncomeOverlaySummary(
     0
   );
   const aggregateRecoveryPct = calculateRecoveryPct(
-    lifetimePremiumUsd,
+    lifetimeIncomeUsd,
     totalFoundationRiskUsd
   );
 
@@ -277,14 +296,12 @@ function buildIncomeOverlaySummary(
     sellCallWindowsOpenCount: foundations.filter(
       (foundation) => foundation.decisionStatus === "sell_call_window_open"
     ).length,
-    coveredPositionCount: foundations.filter(
-      (foundation) => foundation.activeSellCallRow != null
-    ).length,
+    coveredPositionCount: foundations.filter((foundation) => foundation.isCovered).length,
     activeIncomeCycleCount: foundations.filter(
       (foundation) => foundation.activeSellCallRow != null
     ).length,
-    monthlyPremiumUsd,
-    lifetimePremiumUsd,
+    monthlyIncomeUsd,
+    lifetimeIncomeUsd,
     aggregateRecoveryPct,
     aggregateRecoveryPhase: deriveRecoveryPhase(aggregateRecoveryPct),
   };

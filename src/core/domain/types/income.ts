@@ -5,6 +5,7 @@ export type IncomeDecisionStatus =
   | "waiting_for_trigger"
   | "waiting_for_confirmation"
   | "sell_call_window_open"
+  | "covered"
   | "checklist_incomplete";
 
 export type IncomeRecoveryPhase = "building" | "recovering" | "house_money";
@@ -34,16 +35,17 @@ export interface IncomeCycleRow {
   cycleNumber: number;
   tradeId: string;
   openDate: string;
-  closeDate: string | null;
-  premiumReceivedUsd: number;
-  realizedPlUsd: number | null;
-  status: "open" | "closed";
+  closeDate: string;
+  finalRealizedPlUsd: number;
+  status: "completed";
 }
 
 export interface FoundationPositionView {
   ticker: string;
+  foundationType: string;
   foundationRow: OptionsOpenTradeRow;
   activeSellCallRow: OptionsOpenTradeRow | null;
+  isCovered: boolean;
   scannerCandles: ScannerCandleBar[];
   currentPriceUsd: number | null;
   avgPriceUsd: number | null;
@@ -53,6 +55,7 @@ export interface FoundationPositionView {
   callBreakevenUsd: number | null;
   foundationMaxRiskUsd: number;
   foundationDte: number;
+  foundationOpeningDte: number;
   foundationChecklist: FoundationChecklistItem[];
   foundationChecklistPass: boolean;
   timingRules: SellCallTimingRule[];
@@ -63,9 +66,9 @@ export interface FoundationPositionView {
   decisionLabel: string;
   recoveryPct: number | null;
   recoveryPhase: IncomeRecoveryPhase | null;
-  lifetimePremiumUsd: number;
-  monthlyPremiumUsd: number;
-  incomeCycles: IncomeCycleRow[];
+  lifetimeIncomeUsd: number;
+  monthlyIncomeUsd: number;
+  completedIncomeCycles: IncomeCycleRow[];
   activeRecommendation: SellCallRecommendation | null;
 }
 
@@ -74,8 +77,8 @@ export interface IncomeOverlaySummary {
   sellCallWindowsOpenCount: number;
   coveredPositionCount: number;
   activeIncomeCycleCount: number;
-  monthlyPremiumUsd: number;
-  lifetimePremiumUsd: number;
+  monthlyIncomeUsd: number;
+  lifetimeIncomeUsd: number;
   aggregateRecoveryPct: number | null;
   aggregateRecoveryPhase: IncomeRecoveryPhase | null;
 }

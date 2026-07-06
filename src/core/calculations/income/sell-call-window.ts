@@ -5,6 +5,7 @@ import type {
 
 export interface SellCallWindowInput {
   foundationChecklistPass: boolean;
+  isCovered: boolean;
   currentPriceUsd: number | null;
   foundationBreakevenUsd: number | null;
   atr14: number | null;
@@ -73,6 +74,10 @@ export function evaluateSellCallTimingRules(
 export function deriveIncomeDecisionStatus(
   input: SellCallWindowInput
 ): IncomeDecisionStatus {
+  if (input.isCovered) {
+    return "covered";
+  }
+
   if (!input.foundationChecklistPass) {
     return "checklist_incomplete";
   }
@@ -100,6 +105,8 @@ export function incomeDecisionLabel(status: IncomeDecisionStatus): string {
       return "🟠 WAITING FOR CONFIRMATION";
     case "sell_call_window_open":
       return "🟢 SELL CALL WINDOW OPEN";
+    case "covered":
+      return "🔵 Covered";
     default:
       return "Foundation checklist incomplete";
   }

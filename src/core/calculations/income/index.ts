@@ -16,12 +16,18 @@ export {
   incomeDecisionLabel,
 } from "./sell-call-window";
 export {
-  buildIncomeCyclesForTicker,
+  buildCompletedIncomeCyclesForTicker,
   calculateRecoveryPct,
   deriveRecoveryPhase,
   deriveSellCallRecommendation,
   recoveryPhaseLabel,
-  sumLifetimePremiumUsd,
-  sumMonthlyPremiumUsd,
+  sumLifetimeIncomeUsd,
+  sumMonthlyIncomeUsd,
 } from "./income-cycles";
-export { isFoundationStrategy, isSellCallIncomeStrategy } from "./strategies";
+export {
+  getFoundationOpeningDte,
+  getFoundationTypeLabel,
+  isFoundationStrategy,
+  isSellCallIncomeStrategy,
+  qualifiesAsFoundation,
+} from "./strategies";
