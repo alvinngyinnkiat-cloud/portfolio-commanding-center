@@ -69,6 +69,30 @@ function buildUnifiedScale(
   return { priceMin, priceMax, toY, toX, xStep };
 }
 
+/** Display-only: widen last candle so Module 5 current price sits on the wick/body. */
+function patchLastCandleForDisplay(
+  candles: ScannerCandleBar[],
+  currentPriceUsd: number | null
+): ScannerCandleBar[] {
+  if (candles.length === 0) return candles;
+
+  const cloned = candles.map((bar) => ({ ...bar }));
+  if (currentPriceUsd == null || !Number.isFinite(currentPriceUsd)) {
+    return cloned;
+  }
+
+  const lastIndex = cloned.length - 1;
+  const last = cloned[lastIndex];
+  cloned[lastIndex] = {
+    ...last,
+    high: Math.max(last.high, currentPriceUsd),
+    low: Math.min(last.low, currentPriceUsd),
+    close: currentPriceUsd,
+  };
+
+  return cloned;
+}
+
 function buildGuides(
   currentPriceUsd: number | null,
   foundationBreakevenUsd: number | null,
@@ -152,7 +176,10 @@ export function FoundationChart({
     );
   }
 
-  const displayCandles = candles.slice(-5);
+  const displayCandles = patchLastCandleForDisplay(
+    candles.slice(-5).map((bar) => ({ ...bar })),
+    currentPriceUsd
+  );
   const guides = buildGuides(
     currentPriceUsd,
     foundationBreakevenUsd,
