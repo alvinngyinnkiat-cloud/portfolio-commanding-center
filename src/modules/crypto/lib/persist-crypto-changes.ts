@@ -6,7 +6,7 @@ export type CryptoPersistResult =
   | { ok: false; error: string };
 
 export interface PersistCryptoChangesOptions {
-  /** Reload crypto holdings + trades from Supabase after drain (ledger writes). */
+  /** Require crypto_trades table (buy/sell ledger writes). */
   rehydrate?: boolean;
 }
 
@@ -21,14 +21,17 @@ function enqueuePersist<T>(task: () => Promise<T>): Promise<T> {
   return run;
 }
 
+function usesSupabasePersistence(manager: PersistenceManager | null): boolean {
+  return (
+    manager?.getStatus() === "supabase" ||
+    manager?.getStatus() === "supabase_migrated"
+  );
+}
+
 export function assertCryptoTradesSyncAvailable(
   manager: PersistenceManager | null
 ): void {
-  const requiresSupabase =
-    manager?.getStatus() === "supabase" ||
-    manager?.getStatus() === "supabase_migrated";
-
-  if (requiresSupabase && manager && !manager.isCryptoTradesSyncAvailable()) {
+  if (usesSupabasePersistence(manager) && manager && !manager.isCryptoTradesSyncAvailable()) {
     throw new Error(
       "crypto_trades table is unavailable in Supabase. Run the crypto_trades block in supabase/schema.sql before changing buy/sell transactions."
     );
@@ -36,8 +39,9 @@ export function assertCryptoTradesSyncAvailable(
 }
 
 /**
- * Wait for queued writes to finish. Optionally rehydrate crypto ledger from cloud.
- * Serialized — concurrent calls run in order to avoid partial overwrites.
+ * 1. Drain queued Supabase writes.
+ * 2. When Supabase is configured, always refetch crypto from cloud (source of truth).
+ * 3. Overwrite local draft cache from the refetched cloud data.
  */
 export async function persistCryptoChanges(
   options: PersistCryptoChangesOptions = {}
@@ -45,13 +49,15 @@ export async function persistCryptoChanges(
   return enqueuePersist(async () => {
     try {
       const manager = getPersistenceManager();
+      const cloudMode = usesSupabasePersistence(manager);
+
       if (options.rehydrate) {
         assertCryptoTradesSyncAvailable(manager);
       }
 
       await manager?.drainSyncQueue();
 
-      if (options.rehydrate) {
+      if (cloudMode || options.rehydrate) {
         await manager?.rehydrateCryptoFromSupabase();
       }
 

@@ -237,7 +237,7 @@ export function CryptoHoldingsSection() {
         notes: row.notes ?? "",
       });
       return updated != null;
-    }, { rehydrate: false });
+    }, { rehydrate: true });
 
     return success;
   };

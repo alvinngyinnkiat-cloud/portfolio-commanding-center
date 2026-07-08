@@ -149,6 +149,7 @@ export class PersistenceManager {
       await this.refreshOptionalTableAvailability();
       this.mergeLocalStockTransactionsIfSupabaseEmpty();
       this.mergeLocalCryptoTradesIfSupabaseEmpty();
+      this.mergeLocalCryptoHoldingsIfSupabaseEmpty();
       this.mergeLocalSnapshotsIfNeeded();
       this.markCryptoLegacyMigratedIfTradesPresent();
       await this.applyStockCashFlowMigrationIfNeeded();
@@ -346,27 +347,37 @@ export class PersistenceManager {
     writeJson(STORAGE_KEYS.cryptoTrades, this.cache.cryptoTrades);
   }
 
-  /** Mirror crypto holdings so manual valuations survive when cloud rows are stale or missing. */
+  /** Mirror crypto holdings to localStorage — draft cache only; Supabase wins on load. */
   persistCryptoHoldingsLocalBackup(): void {
     if (typeof window === "undefined") return;
     writeJson(STORAGE_KEYS.cryptoHoldings, this.cache.cryptoHoldings);
   }
 
+  /** Mirror crypto holdings/trades to localStorage from cloud cache (draft mirror only). */
+  syncCryptoLocalCacheFromCloud(): void {
+    this.persistCryptoHoldingsLocalBackup();
+    this.persistCryptoTradesLocalBackup();
+  }
+
   /** Merge local holdings backup, then rebuild cost basis from the trade ledger. */
   private reconcileCryptoHoldingsWithTrades(): void {
     const before = JSON.stringify(this.cache.cryptoHoldings);
-    this.mergeLocalCryptoHoldingsFromBackup();
+    // Supabase is source of truth — only merge local backup in offline/local mode.
+    if (!this.client) {
+      this.mergeLocalCryptoHoldingsFromBackup();
+    }
     this.cache.cryptoHoldings = rebuildHoldingsFromTrades(
       this.cache.cryptoTrades,
       this.cache.cryptoHoldings
     );
-    this.persistCryptoHoldingsLocalBackup();
+    this.syncCryptoLocalCacheFromCloud();
 
     if (before !== JSON.stringify(this.cache.cryptoHoldings) && this.client) {
       this.queueCryptoHoldingsSync();
     }
   }
 
+  /** Local-only fallback: read draft cache when offline. Never used after Supabase hydrate. */
   private mergeLocalCryptoHoldingsFromBackup(): void {
     if (typeof window === "undefined") return;
 
@@ -396,10 +407,13 @@ export class PersistenceManager {
       );
       if (index < 0) continue;
 
-      // Local backup is written synchronously on every holdings save — prefer manual fields.
+      const localValue = coerceNumber(localHolding.currentValueSgd);
+      const existingValue = coerceNumber(existing.currentValueSgd);
+      if (localValue <= existingValue) continue;
+
       this.cache.cryptoHoldings[index] = {
         ...existing,
-        currentValueSgd: coerceNumber(localHolding.currentValueSgd),
+        currentValueSgd: localValue,
         notes: localHolding.notes ?? existing.notes,
       };
       byAsset.set(key, this.cache.cryptoHoldings[index]!);
@@ -427,7 +441,6 @@ export class PersistenceManager {
       this.cache.cryptoHoldings = normalizeCryptoHoldings(
         holdingsRes.data?.map((row) => row.data) ?? []
       );
-      this.mergeLocalCryptoHoldingsFromBackup();
       result.holdings = true;
     } else {
       logPersistenceError("rehydrate crypto holdings failed", holdingsRes.error);
@@ -454,7 +467,6 @@ export class PersistenceManager {
       );
     } else {
       this.cache.cryptoTrades = remoteTrades;
-      this.persistCryptoTradesLocalBackup();
       result.trades = true;
     }
 
@@ -505,6 +517,23 @@ export class PersistenceManager {
       this.enqueueSync(() =>
         syncCryptoTrades(this.client!, this.cache.cryptoTrades)
       );
+    }
+  }
+
+  /** One-time migration: push local draft holdings to Supabase only when cloud is empty. */
+  private mergeLocalCryptoHoldingsIfSupabaseEmpty(): void {
+    if (typeof window === "undefined") return;
+    if (this.cache.cryptoHoldings.length > 0) return;
+
+    const local = normalizeCryptoHoldings(
+      readJson<unknown[]>(STORAGE_KEYS.cryptoHoldings, [])
+    );
+    if (local.length === 0) return;
+
+    this.cache.cryptoHoldings = local;
+
+    if (this.client) {
+      this.queueCryptoHoldingsSync();
     }
   }
 
