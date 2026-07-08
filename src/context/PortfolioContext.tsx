@@ -32,6 +32,8 @@ interface PortfolioContextValue {
   optionsData: OptionsTrackerData | null;
   services: PortfolioServices | null;
   refresh: () => void;
+  /** Refresh crypto tracker + dashboard totals only — does not touch snapshots or other modules. */
+  refreshCryptoOnly: () => void;
   isLoaded: boolean;
   isLoading: boolean;
   initError: string | null;
@@ -98,6 +100,28 @@ export function PortfolioProvider({ children }: { children: ReactNode }) {
     const manager = getPersistenceManager();
     if (manager) {
       setPersistenceStatus(manager.getStatus());
+      setPersistenceError(manager.getLastError());
+      setPersistenceWarning(manager.getLastWarning());
+    }
+  }, [services]);
+
+  const refreshCryptoOnly = useCallback(() => {
+    if (!services) return;
+
+    try {
+      setCryptoData(services.cryptoTracker.getData());
+    } catch (error) {
+      console.error("[PortfolioProvider] crypto refresh failed", error);
+    }
+
+    try {
+      setData(services.aggregator.getDashboardData());
+    } catch (error) {
+      console.error("[PortfolioProvider] dashboard refresh after crypto failed", error);
+    }
+
+    const manager = getPersistenceManager();
+    if (manager) {
       setPersistenceError(manager.getLastError());
       setPersistenceWarning(manager.getLastWarning());
     }
@@ -180,6 +204,7 @@ export function PortfolioProvider({ children }: { children: ReactNode }) {
         optionsData,
         services,
         refresh,
+        refreshCryptoOnly,
         isLoaded,
         isLoading,
         initError,

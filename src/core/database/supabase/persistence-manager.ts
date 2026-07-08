@@ -391,18 +391,15 @@ export class PersistenceManager {
         continue;
       }
 
-      const localValue = coerceNumber(localHolding.currentValueSgd);
-      const existingValue = coerceNumber(existing.currentValueSgd);
-      if (localValue <= existingValue) continue;
-
       const index = this.cache.cryptoHoldings.findIndex(
         (holding) => normalizeCryptoAssetName(holding.assetName) === key
       );
       if (index < 0) continue;
 
+      // Local backup is written synchronously on every holdings save — prefer manual fields.
       this.cache.cryptoHoldings[index] = {
         ...existing,
-        currentValueSgd: localValue,
+        currentValueSgd: coerceNumber(localHolding.currentValueSgd),
         notes: localHolding.notes ?? existing.notes,
       };
       byAsset.set(key, this.cache.cryptoHoldings[index]!);
@@ -430,6 +427,7 @@ export class PersistenceManager {
       this.cache.cryptoHoldings = normalizeCryptoHoldings(
         holdingsRes.data?.map((row) => row.data) ?? []
       );
+      this.mergeLocalCryptoHoldingsFromBackup();
       result.holdings = true;
     } else {
       logPersistenceError("rehydrate crypto holdings failed", holdingsRes.error);

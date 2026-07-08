@@ -5,6 +5,7 @@ import {
   useCallback,
   useContext,
   useMemo,
+  useRef,
   useState,
   type ReactNode,
 } from "react";
@@ -15,6 +16,7 @@ import {
   type PersistCryptoChangesOptions,
 } from "@/modules/crypto/lib/persist-crypto-changes";
 import { formatDateTime } from "@/shared/lib/format";
+import { Button } from "@/shared/components/ui/Button";
 
 export type CryptoSaveStatus = "idle" | "saving" | "saved" | "failed";
 
@@ -26,6 +28,7 @@ interface CryptoSaveContextValue {
     mutate: () => boolean,
     options?: PersistCryptoChangesOptions
   ) => Promise<{ success: boolean; error: string | null }>;
+  retryLastSave: () => Promise<{ success: boolean; error: string | null }>;
 }
 
 const CryptoSaveContext = createContext<CryptoSaveContextValue | null>(null);
@@ -33,21 +36,48 @@ const CryptoSaveContext = createContext<CryptoSaveContextValue | null>(null);
 const CRYPTO_LAST_SAVED_KEY = "portfolio:crypto_last_saved_at";
 
 export function CryptoSaveProvider({ children }: { children: ReactNode }) {
-  const { refresh } = usePortfolio();
+  const { refreshCryptoOnly } = usePortfolio();
   const [status, setStatus] = useState<CryptoSaveStatus>("idle");
   const [lastSavedAt, setLastSavedAt] = useState<string | null>(() => {
     if (typeof window === "undefined") return null;
     return sessionStorage.getItem(CRYPTO_LAST_SAVED_KEY);
   });
   const [error, setError] = useState<string | null>(null);
+  const savingRef = useRef(false);
+  const lastPersistOptionsRef = useRef<PersistCryptoChangesOptions>({});
+
+  const applyPersistResult = useCallback(
+    (result: CryptoPersistResult): { success: boolean; error: string | null } => {
+      refreshCryptoOnly();
+
+      if (!result.ok) {
+        setStatus("failed");
+        setError(result.error);
+        return { success: false, error: result.error };
+      }
+
+      setLastSavedAt(result.savedAt);
+      sessionStorage.setItem(CRYPTO_LAST_SAVED_KEY, result.savedAt);
+      setStatus("saved");
+      setError(null);
+      return { success: true, error: null };
+    },
+    [refreshCryptoOnly]
+  );
 
   const commitCryptoChange = useCallback(
     async (
       mutate: () => boolean,
       options?: PersistCryptoChangesOptions
     ): Promise<{ success: boolean; error: string | null }> => {
+      if (savingRef.current) {
+        return { success: false, error: "Save already in progress." };
+      }
+
+      savingRef.current = true;
       setStatus("saving");
       setError(null);
+      lastPersistOptionsRef.current = options ?? {};
 
       try {
         const mutated = mutate();
@@ -56,30 +86,45 @@ export function CryptoSaveProvider({ children }: { children: ReactNode }) {
           return { success: false, error: null };
         }
 
-        const result: CryptoPersistResult = await persistCryptoChanges(options);
-        refresh();
-
-        if (!result.ok) {
-          setStatus("failed");
-          setError(result.error);
-          return { success: false, error: result.error };
-        }
-
-        setLastSavedAt(result.savedAt);
-        sessionStorage.setItem(CRYPTO_LAST_SAVED_KEY, result.savedAt);
-        setStatus("saved");
-        return { success: true, error: null };
+        const result = await persistCryptoChanges(options);
+        return applyPersistResult(result);
       } catch (cause) {
-        refresh();
+        refreshCryptoOnly();
         const message =
           cause instanceof Error ? cause.message : "Failed to save crypto data.";
         setStatus("failed");
         setError(message);
         return { success: false, error: message };
+      } finally {
+        savingRef.current = false;
       }
     },
-    [refresh]
+    [applyPersistResult, refreshCryptoOnly]
   );
+
+  const retryLastSave = useCallback(async () => {
+    if (savingRef.current) {
+      return { success: false, error: "Save already in progress." };
+    }
+
+    savingRef.current = true;
+    setStatus("saving");
+    setError(null);
+
+    try {
+      const result = await persistCryptoChanges(lastPersistOptionsRef.current);
+      return applyPersistResult(result);
+    } catch (cause) {
+      refreshCryptoOnly();
+      const message =
+        cause instanceof Error ? cause.message : "Failed to save crypto data.";
+      setStatus("failed");
+      setError(message);
+      return { success: false, error: message };
+    } finally {
+      savingRef.current = false;
+    }
+  }, [applyPersistResult, refreshCryptoOnly]);
 
   const value = useMemo(
     () => ({
@@ -87,8 +132,9 @@ export function CryptoSaveProvider({ children }: { children: ReactNode }) {
       lastSavedAt,
       error,
       commitCryptoChange,
+      retryLastSave,
     }),
-    [status, lastSavedAt, error, commitCryptoChange]
+    [status, lastSavedAt, error, commitCryptoChange, retryLastSave]
   );
 
   return (
@@ -107,7 +153,7 @@ export function useCryptoSave(): CryptoSaveContextValue {
 }
 
 export function CryptoSaveStatusBar() {
-  const { status, lastSavedAt, error } = useCryptoSave();
+  const { status, lastSavedAt, error, retryLastSave } = useCryptoSave();
 
   if (status === "idle" && !lastSavedAt) {
     return null;
@@ -119,14 +165,19 @@ export function CryptoSaveStatusBar() {
       role="status"
       aria-live="polite"
     >
-      {status === "saving" && (
-        <span className="text-slate-400">Saving…</span>
-      )}
-      {status === "saved" && (
-        <span className="text-accent-green">Saved</span>
-      )}
+      {status === "saving" && <span className="text-slate-400">Saving…</span>}
+      {status === "saved" && <span className="text-accent-green">Saved</span>}
       {status === "failed" && (
-        <span className="text-accent-red">Save failed</span>
+        <>
+          <span className="text-accent-red">Failed</span>
+          <Button
+            size="sm"
+            variant="secondary"
+            onClick={() => void retryLastSave()}
+          >
+            Retry
+          </Button>
+        </>
       )}
       {lastSavedAt && (
         <span className="text-slate-500">

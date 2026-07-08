@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { usePortfolio } from "@/context/PortfolioContext";
 import { useCryptoSave } from "@/modules/crypto/lib/crypto-save-context";
 import type { CryptoHoldingRow, CryptoTradeType } from "@/core/domain/types";
@@ -14,7 +14,6 @@ import { parseIsoDateString, toLocalDateString } from "@/shared/lib/date";
 import { Input } from "@/shared/components/ui/Input";
 import { Select } from "@/shared/components/ui/Select";
 import { Button } from "@/shared/components/ui/Button";
-import { Modal } from "@/shared/components/ui/Modal";
 import { StackedValue } from "@/shared/components/ui/StackedValue";
 import {
   dataTableClass,
@@ -50,30 +49,49 @@ function plColorClass(value: number | null | undefined): string {
   return "text-slate-300";
 }
 
-function CryptoHoldingEditModal({
+function InlineCurrentValueCell({
   row,
-  onClose,
+  disabled,
   onSave,
 }: {
   row: CryptoHoldingRow;
-  onClose: () => void;
-  onSave: (currentValueSgd: string, notes: string) => Promise<boolean>;
+  disabled: boolean;
+  onSave: (currentValueSgd: string) => Promise<boolean>;
 }) {
-  const [currentValue, setCurrentValue] = useState(String(row.currentValueSgd));
-  const [notes, setNotes] = useState(row.notes ?? "");
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(String(row.currentValueSgd));
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const cancelRef = useRef(false);
 
   useEffect(() => {
-    setCurrentValue(String(row.currentValueSgd));
-    setNotes(row.notes ?? "");
-    setError(null);
-  }, [row.id, row.currentValueSgd, row.notes]);
+    if (!editing) {
+      setDraft(String(row.currentValueSgd));
+      setError(null);
+    }
+  }, [row.currentValueSgd, editing]);
 
-  const handleSave = async () => {
+  const startEdit = () => {
+    if (disabled) return;
+    cancelRef.current = false;
+    setDraft(String(row.currentValueSgd));
+    setError(null);
+    setEditing(true);
+  };
+
+  const cancel = () => {
+    cancelRef.current = true;
+    setDraft(String(row.currentValueSgd));
+    setError(null);
+    setEditing(false);
+  };
+
+  const commit = async () => {
+    if (cancelRef.current || saving) return;
+
     const validation = validateCryptoHoldingValueDraft({
-      currentValueSgd: currentValue,
-      notes,
+      currentValueSgd: draft,
+      notes: row.notes ?? "",
     });
     if (!validation.valid) {
       setError(validation.errors.currentValueSgd ?? "Invalid value");
@@ -83,48 +101,69 @@ function CryptoHoldingEditModal({
     setSaving(true);
     setError(null);
     try {
-      const saved = await onSave(currentValue, notes);
+      const saved = await onSave(draft);
       if (saved) {
-        onClose();
+        setEditing(false);
       }
     } finally {
       setSaving(false);
     }
   };
 
-  return (
-    <Modal title={`Edit Holding — ${row.assetName}`} onClose={onClose}>
-      <div className="space-y-4">
-        <Input
-          label="Current Value (SGD)"
-          type="number"
-          step="0.01"
-          min="0"
-          value={currentValue}
-          onChange={(e) => {
-            setCurrentValue(e.target.value);
-            setError(null);
-          }}
-          error={error ?? undefined}
-        />
-        <Input
-          label="Notes (optional)"
-          value={notes}
-          onChange={(e) => setNotes(e.target.value)}
-        />
-        <p className="text-xs text-slate-500">
-          Cost basis is updated via buy/sell transactions.
-        </p>
-        <div className="flex justify-end gap-2">
-          <Button variant="secondary" onClick={onClose} disabled={saving}>
-            Cancel
-          </Button>
-          <Button onClick={() => void handleSave()} disabled={saving}>
+  if (editing) {
+    return (
+      <div className="flex flex-col items-end gap-1">
+        <div className="flex items-center gap-1">
+          <input
+            autoFocus
+            type="number"
+            step="0.01"
+            min="0"
+            value={draft}
+            disabled={disabled || saving}
+            onChange={(event) => {
+              setDraft(event.target.value);
+              setError(null);
+            }}
+            onKeyDown={(event) => {
+              if (event.key === "Enter") {
+                event.preventDefault();
+                void commit();
+              }
+              if (event.key === "Escape") {
+                event.preventDefault();
+                cancel();
+              }
+            }}
+            className="w-28 rounded-lg border border-surface-border bg-surface/80 px-2 py-1 text-right text-sm text-white"
+          />
+          <Button size="sm" onClick={() => void commit()} disabled={disabled || saving}>
             {saving ? "Saving…" : "Save"}
           </Button>
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={cancel}
+            disabled={saving}
+          >
+            Cancel
+          </Button>
         </div>
+        {error && <span className="text-xs text-accent-red">{error}</span>}
       </div>
-    </Modal>
+    );
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={startEdit}
+      disabled={disabled}
+      className="rounded px-1 text-right text-slate-200 underline decoration-dotted decoration-slate-600 underline-offset-2 hover:text-white hover:decoration-slate-400 disabled:cursor-not-allowed disabled:opacity-50"
+      title="Click to edit current value"
+    >
+      {formatSgd(row.currentValueSgd)}
+    </button>
   );
 }
 
@@ -133,7 +172,6 @@ export function CryptoHoldingsSection() {
   const { commitCryptoChange, status: saveStatus, error: saveError } =
     useCryptoSave();
   const [tradeForm, setTradeForm] = useState(emptyTradeForm);
-  const [editingRow, setEditingRow] = useState<CryptoHoldingRow | null>(null);
   const [tradeErrors, setTradeErrors] = useState<Record<string, string>>({});
   const [tradeSaveError, setTradeSaveError] = useState<string | null>(null);
   const [actionInFlight, setActionInFlight] = useState(false);
@@ -187,19 +225,21 @@ export function CryptoHoldingsSection() {
     }
   };
 
-  const saveHoldingEdit = async (
-    currentValueSgd: string,
-    notes: string
+  const saveCurrentValue = async (
+    row: CryptoHoldingRow,
+    currentValueSgd: string
   ): Promise<boolean> => {
-    if (!services?.cryptoHoldings || !editingRow) return false;
+    if (!services?.cryptoHoldings || isSaving) return false;
 
-    return commitCryptoChange(() => {
-      const updated = services.cryptoHoldings!.updateValuation(editingRow.id, {
+    const { success } = await commitCryptoChange(() => {
+      const updated = services.cryptoHoldings!.updateValuation(row.id, {
         currentValueSgd,
-        notes,
+        notes: row.notes ?? "",
       });
       return updated != null;
-    }, { rehydrate: true }).then(({ success }) => success);
+    }, { rehydrate: false });
+
+    return success;
   };
 
   const handleDeleteHolding = async (row: CryptoHoldingRow) => {
@@ -217,9 +257,6 @@ export function CryptoHoldingsSection() {
       );
       services.cryptoTrades!.replaceAll(remaining);
       services.cryptoHoldings!.delete(row.id);
-      if (editingRow?.id === row.id) {
-        setEditingRow(null);
-      }
       return true;
     }, { rehydrate: true });
     setActionInFlight(false);
@@ -305,11 +342,11 @@ export function CryptoHoldingsSection() {
             <tr>
               <th className={`${dataTableThLeftClass} w-[20%]`}>Coin</th>
               <th className={`${dataTableThRightClass} w-[8%]`}>Qty</th>
-              <th className={`${dataTableThRightClass} w-[14%]`}>Current Value</th>
+              <th className={`${dataTableThRightClass} w-[18%]`}>Current Value</th>
               <th className={`${dataTableThRightClass} w-[14%]`}>Contribution</th>
               <th className={`${dataTableThRightClass} w-[14%]`}>P/L</th>
               <th className={`${dataTableThRightClass} w-[10%]`}>Alloc %</th>
-              <th className={`${dataTableThLeftClass} w-[12%]`}>Actions</th>
+              <th className={`${dataTableThLeftClass} w-[10%]`}>Actions</th>
             </tr>
           </thead>
           <tbody>
@@ -318,7 +355,7 @@ export function CryptoHoldingsSection() {
                 <td colSpan={7} className="px-2 py-6 text-center text-slate-500">
                   <p>No crypto holdings yet.</p>
                   <p className="mt-2 text-xs text-slate-600">
-                    Record a buy transaction above, then set current value via Edit.
+                    Record a buy transaction above, then click Current Value to set price.
                   </p>
                 </td>
               </tr>
@@ -330,7 +367,11 @@ export function CryptoHoldingsSection() {
                   </td>
                   <td className={dataTableTdRightClass}>—</td>
                   <td className={dataTableTdRightClass}>
-                    {formatSgd(row.currentValueSgd)}
+                    <InlineCurrentValueCell
+                      row={row}
+                      disabled={isSaving}
+                      onSave={(value) => saveCurrentValue(row, value)}
+                    />
                   </td>
                   <td className={dataTableTdRightClass}>
                     {formatSgd(row.contributionSgd)}
@@ -348,24 +389,14 @@ export function CryptoHoldingsSection() {
                     {formatPercent(row.portfolioPercent)}
                   </td>
                   <td className={dataTableTdLeftClass}>
-                    <div className="flex gap-1">
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        onClick={() => setEditingRow(row)}
-                        disabled={isSaving}
-                      >
-                        Edit
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="danger"
-                        onClick={() => void handleDeleteHolding(row)}
-                        disabled={isSaving}
-                      >
-                        Delete
-                      </Button>
-                    </div>
+                    <Button
+                      size="sm"
+                      variant="danger"
+                      onClick={() => void handleDeleteHolding(row)}
+                      disabled={isSaving}
+                    >
+                      Delete
+                    </Button>
                   </td>
                 </tr>
               ))
@@ -373,14 +404,6 @@ export function CryptoHoldingsSection() {
           </tbody>
         </table>
       </div>
-
-      {editingRow && (
-        <CryptoHoldingEditModal
-          row={editingRow}
-          onClose={() => setEditingRow(null)}
-          onSave={saveHoldingEdit}
-        />
-      )}
     </div>
   );
 }
