@@ -48,6 +48,9 @@ export interface FoundationPositionView {
   isCovered: boolean;
   scannerCandles: ScannerCandleBar[];
   currentPriceUsd: number | null;
+  currentPriceSourceLabel: string | null;
+  currentPriceAsOf: string | null;
+  priceNewerThanCandle: boolean;
   avgPriceUsd: number | null;
   avgPricePrevUsd: number | null;
   atr14: number | null;

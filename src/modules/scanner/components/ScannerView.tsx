@@ -50,7 +50,7 @@ function formatScanTime(iso: string | null | undefined): string {
 }
 
 export function ScannerView() {
-  const { scannerData, services, refresh, isLoaded } = usePortfolio();
+  const { scannerData, services, refreshScannerPricesOnly, isLoaded } = usePortfolio();
   const [strategyFilter, setStrategyFilter] = useState<StrategyFilter>("all");
   const [categoryFilter, setCategoryFilter] = useState<CategoryFilter>("all");
   const [systemFilter, setSystemFilter] = useState<SystemFilter>("all");
@@ -87,7 +87,7 @@ export function ScannerView() {
     setRefreshStatus("refreshing");
     try {
       const result = await services.refreshScannerNow();
-      refresh();
+      refreshScannerPricesOnly();
       if (result.outcome === "failed") {
         setRefreshStatus("failed");
       } else {
@@ -96,7 +96,7 @@ export function ScannerView() {
     } catch {
       setRefreshStatus("failed");
     }
-  }, [services, refresh]);
+  }, [services, refreshScannerPricesOnly]);
 
   if (!isLoaded) {
     return <ScannerSkeleton />;

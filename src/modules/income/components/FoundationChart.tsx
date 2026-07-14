@@ -5,6 +5,8 @@ interface FoundationChartProps {
   candles: ScannerCandleBar[];
   avgPrice: number | null;
   currentPriceUsd: number | null;
+  currentPriceAsOf?: string | null;
+  priceNewerThanCandle?: boolean;
   foundationBreakevenUsd: number | null;
   triggerPriceUsd: number | null;
   callBreakevenUsd: number | null;
@@ -69,20 +71,33 @@ function buildUnifiedScale(
   return { priceMin, priceMax, toY, toX, xStep };
 }
 
-/** Display-only: widen last candle so Module 5 current price sits on the wick/body. */
+/** Display-only: widen last candle when price shares the latest candle market date. */
 function patchLastCandleForDisplay(
   candles: ScannerCandleBar[],
-  currentPriceUsd: number | null
-): ScannerCandleBar[] {
-  if (candles.length === 0) return candles;
+  currentPriceUsd: number | null,
+  priceAsOf: string | null
+): { candles: ScannerCandleBar[]; priceNewerThanCandle: boolean } {
+  if (candles.length === 0) {
+    return { candles, priceNewerThanCandle: false };
+  }
 
   const cloned = candles.map((bar) => ({ ...bar }));
   if (currentPriceUsd == null || !Number.isFinite(currentPriceUsd)) {
-    return cloned;
+    return { candles: cloned, priceNewerThanCandle: false };
   }
 
   const lastIndex = cloned.length - 1;
   const last = cloned[lastIndex];
+  const sameMarketDate =
+    priceAsOf != null && last.date != null && priceAsOf === last.date;
+
+  if (!sameMarketDate) {
+    return {
+      candles: cloned,
+      priceNewerThanCandle: priceAsOf != null && last.date != null && priceAsOf > last.date,
+    };
+  }
+
   cloned[lastIndex] = {
     ...last,
     high: Math.max(last.high, currentPriceUsd),
@@ -90,7 +105,7 @@ function patchLastCandleForDisplay(
     close: currentPriceUsd,
   };
 
-  return cloned;
+  return { candles: cloned, priceNewerThanCandle: false };
 }
 
 function buildGuides(
@@ -160,6 +175,8 @@ export function FoundationChart({
   candles,
   avgPrice,
   currentPriceUsd,
+  currentPriceAsOf = null,
+  priceNewerThanCandle = false,
   foundationBreakevenUsd,
   triggerPriceUsd,
   callBreakevenUsd,
@@ -176,10 +193,13 @@ export function FoundationChart({
     );
   }
 
-  const displayCandles = patchLastCandleForDisplay(
-    candles.slice(-5).map((bar) => ({ ...bar })),
-    currentPriceUsd
-  );
+  const { candles: displayCandles, priceNewerThanCandle: chartPriceNewer } =
+    patchLastCandleForDisplay(
+      candles.slice(-5).map((bar) => ({ ...bar })),
+      currentPriceUsd,
+      currentPriceAsOf
+    );
+  const showPriceNewerNote = priceNewerThanCandle || chartPriceNewer;
   const guides = buildGuides(
     currentPriceUsd,
     foundationBreakevenUsd,
@@ -279,6 +299,12 @@ export function FoundationChart({
       </svg>
 
       <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-[10px] text-slate-500">
+        {showPriceNewerNote && (
+          <span className="text-amber-400/90">
+            Price newer than candle
+            {currentPriceAsOf ? ` · ${currentPriceAsOf}` : ""}
+          </span>
+        )}
         <span>
           <span className="text-sky-400">---</span> Avg Price
         </span>

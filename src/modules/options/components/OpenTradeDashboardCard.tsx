@@ -333,7 +333,7 @@ export function OpenTradeDashboardCard({
           <div className="grid gap-2 sm:grid-cols-2">
             <InlineNumberInput
               label="Current Price"
-              value={dashboard.currentPriceUsd}
+              value={trade.underlyingPriceUsd}
               onSave={(v) => saveMonitoring({ underlyingPriceUsd: v })}
             />
             {(trade.strategy === "bullPut" || trade.strategy === "bearCall") && (
@@ -440,6 +440,11 @@ export function OpenTradeDashboardCard({
                     ? formatUsd(dashboard.currentPriceUsd)
                     : "—"}
                 </p>
+                {dashboard.currentPriceSourceLabel && (
+                  <p className="text-[10px] text-slate-500">
+                    {dashboard.currentPriceSourceLabel}
+                  </p>
+                )}
                 <p className="text-xs text-slate-400">
                   Breakeven{" "}
                   {dashboard.breakevenPriceUsd != null

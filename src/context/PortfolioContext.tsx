@@ -34,6 +34,8 @@ interface PortfolioContextValue {
   refresh: () => void;
   /** Refresh crypto tracker + dashboard totals only — does not touch snapshots or other modules. */
   refreshCryptoOnly: () => void;
+  /** Refresh scanner + options tracker only — does not touch crypto, stocks, or snapshots. */
+  refreshScannerPricesOnly: () => void;
   isLoaded: boolean;
   isLoading: boolean;
   initError: string | null;
@@ -127,6 +129,22 @@ export function PortfolioProvider({ children }: { children: ReactNode }) {
     }
   }, [services]);
 
+  const refreshScannerPricesOnly = useCallback(() => {
+    if (!services) return;
+
+    try {
+      setScannerData(services.scanner.getData());
+    } catch (error) {
+      console.error("[PortfolioProvider] scanner refresh failed", error);
+    }
+
+    try {
+      setOptionsData(services.optionsTracker.getData());
+    } catch (error) {
+      console.error("[PortfolioProvider] options tracker refresh failed", error);
+    }
+  }, [services]);
+
   const clearPersistenceError = useCallback(() => {
     getPersistenceManager()?.clearError();
     setPersistenceError(null);
@@ -173,17 +191,22 @@ export function PortfolioProvider({ children }: { children: ReactNode }) {
     if (!services) return;
 
     const runScheduledMarketAndScan = async () => {
-      let shouldRefresh = false;
+      let shouldRefreshAll = false;
+      let shouldRefreshScannerPrices = false;
       if ((await services.stockPriceUpdates.updateAllDuePrices()).length > 0) {
-        shouldRefresh = true;
+        shouldRefreshAll = true;
       }
       if ((await services.stockCandleUpdates.updateUsCandlesIfDue()).updated) {
-        shouldRefresh = true;
+        shouldRefreshAll = true;
       }
       if (services.scanner.runScanIfDue()) {
-        shouldRefresh = true;
+        shouldRefreshScannerPrices = true;
       }
-      if (shouldRefresh) refresh();
+      if (shouldRefreshAll) {
+        refresh();
+      } else if (shouldRefreshScannerPrices) {
+        refreshScannerPricesOnly();
+      }
     };
 
     runScheduledMarketAndScan();
@@ -192,7 +215,7 @@ export function PortfolioProvider({ children }: { children: ReactNode }) {
       AUTO_PRICE_UPDATE_POLL_MS
     );
     return () => window.clearInterval(intervalId);
-  }, [services, refresh]);
+  }, [services, refresh, refreshScannerPricesOnly]);
 
   return (
     <PortfolioContext.Provider
@@ -205,6 +228,7 @@ export function PortfolioProvider({ children }: { children: ReactNode }) {
         services,
         refresh,
         refreshCryptoOnly,
+        refreshScannerPricesOnly,
         isLoaded,
         isLoading,
         initError,

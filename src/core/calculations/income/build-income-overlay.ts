@@ -140,9 +140,16 @@ function buildFoundationView(
   );
   const foundationChecklistPass = foundationChecklist.every((item) => item.pass);
 
-  const currentPriceUsd =
-    foundationRow.dashboard.currentPriceUsd ??
-    foundationRow.underlyingPrice.priceUsd;
+  const currentPriceUsd = foundationRow.dashboard.currentPriceUsd;
+  const currentPriceSourceLabel = foundationRow.dashboard.currentPriceSourceLabel;
+  const currentPriceAsOf = foundationRow.dashboard.currentPriceAsOf;
+  const latestCandleDate =
+    scannerResult?.recentCandles[scannerResult.recentCandles.length - 1]?.date ??
+    null;
+  const priceNewerThanCandle =
+    currentPriceAsOf != null &&
+    latestCandleDate != null &&
+    currentPriceAsOf > latestCandleDate;
   const foundationBreakevenUsd = foundationRow.dashboard.breakevenPriceUsd;
   const callBreakevenUsd = activeSellCallRow?.dashboard.breakevenPriceUsd ?? null;
 
@@ -195,6 +202,9 @@ function buildFoundationView(
     isCovered,
     scannerCandles: scannerResult?.recentCandles ?? [],
     currentPriceUsd,
+    currentPriceSourceLabel,
+    currentPriceAsOf,
+    priceNewerThanCandle,
     avgPriceUsd,
     avgPricePrevUsd,
     atr14,

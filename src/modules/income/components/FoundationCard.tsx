@@ -71,6 +71,9 @@ export function FoundationCard({ foundation, atrMultiplier }: FoundationCardProp
     activeSellCallRow,
     scannerCandles,
     currentPriceUsd,
+    currentPriceSourceLabel,
+    currentPriceAsOf,
+    priceNewerThanCandle,
     avgPriceUsd,
     foundationBreakevenUsd,
     callBreakevenUsd,
@@ -104,12 +107,19 @@ export function FoundationCard({ foundation, atrMultiplier }: FoundationCardProp
             candles={scannerCandles}
             avgPrice={avgPriceUsd}
             currentPriceUsd={currentPriceUsd}
+            currentPriceAsOf={currentPriceAsOf}
+            priceNewerThanCandle={priceNewerThanCandle}
             foundationBreakevenUsd={foundationBreakevenUsd}
             triggerPriceUsd={foundationTriggerPriceUsd}
             callBreakevenUsd={callBreakevenUsd}
           />
           <div className="grid grid-cols-2 gap-2 text-xs text-slate-400">
             <Metric label="Current Price" value={formatUsd(currentPriceUsd)} />
+            {currentPriceSourceLabel && (
+              <p className="col-span-2 text-[10px] text-slate-500">
+                {currentPriceSourceLabel}
+              </p>
+            )}
             <Metric label="Foundation BE" value={formatUsd(foundationBreakevenUsd)} />
             <Metric label="Trigger Price" value={formatUsd(foundationTriggerPriceUsd)} />
             <Metric label="Lifetime Income" value={formatUsd(lifetimeIncomeUsd)} />

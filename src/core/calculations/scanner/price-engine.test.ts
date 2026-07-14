@@ -1,12 +1,76 @@
 import { describe, expect, it } from "vitest";
 import {
   buildScannerScanPriceMap,
+  getLatestTickerPrice,
   indexUsDailyCandlesByTicker,
   resolveScannerWatchlistPrice,
 } from "./price-engine";
 import { DEFAULT_SCANNER_WATCHLIST } from "./watchlist";
 
 const watchlist = DEFAULT_SCANNER_WATCHLIST;
+
+describe("getLatestTickerPrice", () => {
+  it("prefers scanner refreshed price over manual and saved fallbacks", () => {
+    const resolved = getLatestTickerPrice({
+      ticker: "QQQ",
+      scannerScanPrice: { priceUsd: 510.25, priceAsOf: "2025-06-13" },
+      manualPriceUsd: 500,
+      watchlist,
+      prices: [
+        {
+          market: "US",
+          ticker: "QQQ",
+          latestPrice: 505,
+          lastPriceUpdate: "2025-06-12",
+          priceAsOf: "2025-06-12",
+          source: "yahoo",
+        },
+      ],
+      dailyCandles: [],
+    });
+
+    expect(resolved.source).toBe("scanner_refreshed");
+    expect(resolved.priceUsd).toBe(510.25);
+    expect(resolved.priceAsOf).toBe("2025-06-13");
+  });
+
+  it("falls back to manual Module 5 price when scanner price is invalid", () => {
+    const resolved = getLatestTickerPrice({
+      ticker: "VRT",
+      scannerScanPrice: { priceUsd: 0, priceAsOf: "2025-06-13" },
+      manualPriceUsd: 142.5,
+      watchlist,
+      prices: [],
+      dailyCandles: [],
+    });
+
+    expect(resolved.source).toBe("manual_fallback");
+    expect(resolved.priceUsd).toBe(142.5);
+  });
+
+  it("falls back to saved quote/candle when scanner and manual are missing", () => {
+    const resolved = getLatestTickerPrice({
+      ticker: "AVGO",
+      scannerScanPrice: null,
+      manualPriceUsd: undefined,
+      watchlist,
+      prices: [
+        {
+          market: "US",
+          ticker: "AVGO",
+          latestPrice: 172.25,
+          lastPriceUpdate: "2025-06-13",
+          priceAsOf: "2025-06-13",
+          source: "yahoo",
+        },
+      ],
+      dailyCandles: [],
+    });
+
+    expect(resolved.source).toBe("saved_fallback");
+    expect(resolved.priceUsd).toBe(172.25);
+  });
+});
 
 describe("resolveScannerWatchlistPrice", () => {
   it("uses scanner scan cache for watchlist tickers without stock holdings", () => {

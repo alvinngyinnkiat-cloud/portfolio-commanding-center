@@ -255,6 +255,51 @@ describe("open-trade-dashboard", () => {
   });
 
   describe("buildOpenTradeDashboardMetrics for buy call", () => {
+    it("uses scanner-resolved price ahead of manual underlying price", () => {
+      const trade = {
+        id: "t-scan",
+        strategy: "buyCall",
+        status: "open",
+        contracts: 1,
+        longStrikeUsd: 120,
+        openPremiumUsd: 300,
+        openFeesUsd: 1,
+        maxRiskUsd: 301,
+        expirationDate: "2026-07-18",
+        underlyingPriceUsd: 125,
+        entryValueUsd: 300,
+        currentValueUsd: 360,
+      } as OptionsTrade;
+
+      const row = {
+        trade,
+        daysToExpiration: 20,
+        unrealizedPlUsd: 60,
+        tradeEconomics: {
+          breakevenUsd: 123,
+          maxRiskUsd: 301,
+          maxProfitUsd: null,
+        },
+        spreadMetrics: null,
+        ironCondorMetrics: null,
+        underlyingPrice: {
+          priceUsd: 132.5,
+          source: "watchlist_scan" as const,
+          isWatchlistTicker: true,
+          priceAsOf: "2025-06-13",
+        },
+        resolvedTickerPrice: {
+          priceUsd: 132.5,
+          source: "scanner_refreshed" as const,
+          priceAsOf: "2025-06-13",
+        },
+      };
+
+      const metrics = buildOpenTradeDashboardMetrics(row);
+      expect(metrics.currentPriceUsd).toBe(132.5);
+      expect(metrics.currentPriceSourceLabel).toContain("Scanner refreshed");
+    });
+
     it("uses bull-put-style breakeven distance and debit economics", () => {
       const trade = {
         id: "t1",
@@ -282,7 +327,17 @@ describe("open-trade-dashboard", () => {
         },
         spreadMetrics: null,
         ironCondorMetrics: null,
-        underlyingPrice: { priceUsd: null },
+        underlyingPrice: {
+          priceUsd: 125,
+          source: "manual_fallback" as const,
+          isWatchlistTicker: false,
+          priceAsOf: null,
+        },
+        resolvedTickerPrice: {
+          priceUsd: 125,
+          source: "manual_fallback" as const,
+          priceAsOf: null,
+        },
       };
 
       const metrics = buildOpenTradeDashboardMetrics(row);

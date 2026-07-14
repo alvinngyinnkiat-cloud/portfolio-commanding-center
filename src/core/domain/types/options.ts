@@ -91,6 +91,9 @@ export interface OpenTradeDashboardMetrics {
   dte: number;
   dteStatus: DashboardDteStatus;
   currentPriceUsd: number | null;
+  /** Human-readable source for resolved current price. */
+  currentPriceSourceLabel: string | null;
+  currentPriceAsOf: string | null;
   /** Single breakeven for vertical spreads; null for iron condor. */
   breakevenPriceUsd: number | null;
   /** Effective distance for trade health — worst / closest side for iron condor. */
@@ -229,7 +232,7 @@ export interface OptionsSplitLegs {
   clientLegUsd: number;
 }
 
-import type { ResolvedScannerPrice } from "@/core/calculations/scanner/price-engine";
+import type { ResolvedScannerPrice, ResolvedTickerPrice } from "@/core/calculations/scanner/price-engine";
 import type { OptionsTradeEconomics } from "@/core/calculations/options/trade-economics";
 import type { ScannerIndicators } from "@/core/domain/types/scanner";
 
@@ -239,6 +242,8 @@ export interface OptionsOpenTradeRow {
   ironCondorMetrics: OptionsIronCondorMetrics | null;
   tradeEconomics: OptionsTradeEconomics | null;
   underlyingPrice: ResolvedScannerPrice;
+  /** Shared resolver output — scanner refresh → manual → saved fallback. */
+  resolvedTickerPrice: ResolvedTickerPrice;
   unrealizedPlUsd: number | null;
   userUnrealizedPlUsd: number | null;
   clientUnrealizedPlUsd: number | null;

@@ -5,7 +5,10 @@ import type { ScannerScanRun } from "@/core/domain/types/scanner";
 import type { WatchlistEntry } from "@/core/calculations/scanner/watchlist";
 import {
   buildScannerScanPriceMap,
+  findWatchlistEntry,
+  getLatestTickerPrice,
   indexUsDailyCandlesByTicker,
+  resolvedTickerPriceToScannerPrice,
   resolveScannerWatchlistPrice,
 } from "@/core/calculations/scanner/price-engine";
 import { normalizeTicker } from "@/core/calculations/stocks/normalize";
@@ -119,27 +122,61 @@ export function buildOpenTradeRows(
           : splitForTrade(trade, unrealizedPlUsd);
       const ticker = normalizeTicker(trade.underlying);
       const scannerIndicators = scanIndicatorsMap.get(ticker) ?? null;
+      const tickerCandles = candlesByTicker.get(ticker) ?? [];
 
+      const resolvedTickerPrice = scannerPriceContext
+        ? getLatestTickerPrice({
+            ticker: trade.underlying,
+            scannerScanPrice: scanPriceMap.get(ticker) ?? null,
+            manualPriceUsd: trade.underlyingPriceUsd,
+            watchlist: scannerPriceContext.watchlist,
+            prices: scannerPriceContext.prices,
+            dailyCandles: tickerCandles,
+          })
+        : {
+            priceUsd: trade.underlyingPriceUsd ?? null,
+            source: "manual_fallback" as const,
+            priceAsOf: null,
+          };
+
+      const cachedFallback = scannerPriceContext
+        ? resolveScannerWatchlistPrice({
+            underlying: trade.underlying,
+            watchlist: scannerPriceContext.watchlist,
+            prices: scannerPriceContext.prices,
+            dailyCandles: tickerCandles,
+            scannerScanPrice: null,
+            storedManualFallback: undefined,
+          })
+        : null;
+
+      const savedScannerSource =
+        cachedFallback &&
+        cachedFallback.source !== "unavailable" &&
+        cachedFallback.source !== "manual_fallback"
+          ? cachedFallback.source
+          : undefined;
+
+      const underlyingPrice = scannerPriceContext
+        ? resolvedTickerPriceToScannerPrice(resolvedTickerPrice, {
+            isWatchlistTicker:
+              findWatchlistEntry(trade.underlying, scannerPriceContext.watchlist) !=
+              null,
+            savedScannerSource,
+          })
+        : {
+            priceUsd: resolvedTickerPrice.priceUsd,
+            source: "unavailable" as const,
+            isWatchlistTicker: false,
+            priceAsOf: null,
+          };
       const rowBase = {
         trade,
         spreadMetrics: buildVerticalSpreadMetricsFromTrade(effectiveTrade),
         ironCondorMetrics: buildIronCondorMetricsFromTrade(effectiveTrade),
         tradeEconomics: buildTradeEconomicsFromTrade(effectiveTrade),
-        underlyingPrice: scannerPriceContext
-          ? resolveScannerWatchlistPrice({
-              underlying: trade.underlying,
-              watchlist: scannerPriceContext.watchlist,
-              prices: scannerPriceContext.prices,
-              dailyCandles: candlesByTicker.get(ticker) ?? [],
-              scannerScanPrice: scanPriceMap.get(ticker) ?? null,
-              storedManualFallback: trade.underlyingPriceUsd,
-            })
-          : {
-              priceUsd: null,
-              source: "unavailable" as const,
-              isWatchlistTicker: false,
-              priceAsOf: null,
-            },
+        underlyingPrice,
+        resolvedTickerPrice,
         unrealizedPlUsd,
         userUnrealizedPlUsd: split.userLegUsd,
         clientUnrealizedPlUsd: split.clientLegUsd,

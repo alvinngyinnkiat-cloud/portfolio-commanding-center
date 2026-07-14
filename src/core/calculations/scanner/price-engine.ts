@@ -11,6 +11,19 @@ export type ScannerPriceSource =
   | "manual_fallback"
   | "unavailable";
 
+/** Shared read-only resolution source for Modules 5 and 6. */
+export type TickerPriceResolutionSource =
+  | "scanner_refreshed"
+  | "manual_fallback"
+  | "saved_fallback"
+  | "unavailable";
+
+export interface ResolvedTickerPrice {
+  priceUsd: number | null;
+  source: TickerPriceResolutionSource;
+  priceAsOf: string | null;
+}
+
 export interface ScannerScanPriceCache {
   priceUsd: number;
   priceAsOf: string | null;
@@ -163,5 +176,97 @@ export function formatScannerPriceSourceLabel(source: ScannerPriceSource): strin
   if (source === "watchlist_quote") return "Scanner · Quote";
   if (source === "watchlist_candle") return "Scanner · Candle";
   if (source === "manual_fallback") return "Manual fallback";
+  return "Unavailable";
+}
+
+function isValidTickerPrice(price: number | null | undefined): price is number {
+  return price != null && Number.isFinite(price) && price > 0;
+}
+
+/**
+ * Shared current-price resolver for Modules 5 and 6.
+ * Priority: scanner refresh → manual Module 5 input → cached quote/candle.
+ */
+export function getLatestTickerPrice(input: {
+  ticker: string;
+  scannerScanPrice?: ScannerScanPriceCache | null;
+  manualPriceUsd?: number | null;
+  watchlist?: WatchlistEntry[];
+  prices?: StockPrice[];
+  dailyCandles?: StockDailyCandle[];
+}): ResolvedTickerPrice {
+  if (isValidTickerPrice(input.scannerScanPrice?.priceUsd)) {
+    return {
+      priceUsd: input.scannerScanPrice.priceUsd,
+      source: "scanner_refreshed",
+      priceAsOf: input.scannerScanPrice.priceAsOf ?? null,
+    };
+  }
+
+  if (isValidTickerPrice(input.manualPriceUsd)) {
+    return {
+      priceUsd: input.manualPriceUsd,
+      source: "manual_fallback",
+      priceAsOf: null,
+    };
+  }
+
+  if (input.watchlist && input.prices && input.dailyCandles) {
+    const cached = resolveScannerWatchlistPrice({
+      underlying: input.ticker,
+      watchlist: input.watchlist,
+      prices: input.prices,
+      dailyCandles: input.dailyCandles,
+      scannerScanPrice: null,
+      storedManualFallback: undefined,
+    });
+    if (isValidTickerPrice(cached.priceUsd)) {
+      return {
+        priceUsd: cached.priceUsd,
+        source: "saved_fallback",
+        priceAsOf: cached.priceAsOf,
+      };
+    }
+  }
+
+  return {
+    priceUsd: null,
+    source: "unavailable",
+    priceAsOf: null,
+  };
+}
+
+export function resolvedTickerPriceToScannerPrice(
+  resolved: ResolvedTickerPrice,
+  options?: { isWatchlistTicker?: boolean; savedScannerSource?: ScannerPriceSource }
+): ResolvedScannerPrice {
+  let source: ScannerPriceSource = "unavailable";
+  if (resolved.source === "scanner_refreshed") {
+    source = "watchlist_scan";
+  } else if (resolved.source === "manual_fallback") {
+    source = "manual_fallback";
+  } else if (resolved.source === "saved_fallback") {
+    source = options?.savedScannerSource ?? "watchlist_quote";
+  }
+
+  return {
+    priceUsd: resolved.priceUsd,
+    source,
+    isWatchlistTicker: options?.isWatchlistTicker ?? false,
+    priceAsOf: resolved.priceAsOf,
+  };
+}
+
+export function formatTickerPriceSourceLabel(
+  source: TickerPriceResolutionSource,
+  priceAsOf?: string | null
+): string {
+  if (source === "scanner_refreshed") {
+    return priceAsOf ? `Scanner refreshed · ${priceAsOf}` : "Scanner refreshed";
+  }
+  if (source === "manual_fallback") return "Manual fallback";
+  if (source === "saved_fallback") {
+    return priceAsOf ? `Saved fallback · ${priceAsOf}` : "Saved fallback";
+  }
   return "Unavailable";
 }

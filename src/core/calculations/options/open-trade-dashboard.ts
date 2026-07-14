@@ -14,6 +14,7 @@ import type {
   OptionsTrade,
 } from "@/core/domain/types/options";
 import type { ScannerIndicators } from "@/core/domain/types/scanner";
+import { formatTickerPriceSourceLabel } from "@/core/calculations/scanner/price-engine";
 import { buildDeltaHealth } from "./delta-health";
 import { scaleMaxRiskForRemaining, tradeForRemainingContracts } from "./contract-tracking";
 import { calculateBuyPutMaxProfitUsd } from "./debit-option";
@@ -363,8 +364,15 @@ export function buildOpenTradeDashboardMetrics(
   const supportsDashboard = supportsOpenTradeDashboard(trade.strategy);
 
   const dteStatus = deriveDashboardDteStatus(daysToExpiration);
-  const currentPriceUsd =
-    trade.underlyingPriceUsd ?? row.underlyingPrice.priceUsd ?? null;
+  const currentPriceUsd = row.underlyingPrice.priceUsd ?? null;
+  const currentPriceSourceLabel =
+    row.resolvedTickerPrice.source !== "unavailable"
+      ? formatTickerPriceSourceLabel(
+          row.resolvedTickerPrice.source,
+          row.resolvedTickerPrice.priceAsOf
+        )
+      : null;
+  const currentPriceAsOf = row.resolvedTickerPrice.priceAsOf;
 
   const breakeven = supportsDashboard
     ? resolveBreakevenDashboard(row, currentPriceUsd)
@@ -423,6 +431,8 @@ export function buildOpenTradeDashboardMetrics(
     dte: daysToExpiration,
     dteStatus,
     currentPriceUsd,
+    currentPriceSourceLabel,
+    currentPriceAsOf,
     breakevenPriceUsd: breakeven.breakevenPriceUsd,
     breakevenDistancePct: breakeven.breakevenDistancePct,
     breakevenStatus,
