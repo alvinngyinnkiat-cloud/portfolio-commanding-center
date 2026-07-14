@@ -87,12 +87,12 @@ export function ScannerView() {
     setRefreshStatus("refreshing");
     try {
       const result = await services.refreshScannerNow();
-      refreshScannerPricesOnly();
       if (result.outcome === "failed") {
         setRefreshStatus("failed");
-      } else {
-        setRefreshStatus("success");
+        return;
       }
+      await refreshScannerPricesOnly();
+      setRefreshStatus("success");
     } catch {
       setRefreshStatus("failed");
     }

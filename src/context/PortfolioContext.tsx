@@ -35,7 +35,9 @@ interface PortfolioContextValue {
   /** Refresh crypto tracker + dashboard totals only — does not touch snapshots or other modules. */
   refreshCryptoOnly: () => void;
   /** Refresh scanner + options tracker only — does not touch crypto, stocks, or snapshots. */
-  refreshScannerPricesOnly: () => void;
+  refreshScannerPricesOnly: () => Promise<void>;
+  /** Bumps when shared scanner snapshot reloads after refresh. */
+  scannerSnapshotVersion: number;
   isLoaded: boolean;
   isLoading: boolean;
   initError: string | null;
@@ -56,6 +58,7 @@ export function PortfolioProvider({ children }: { children: ReactNode }) {
   const [cryptoData, setCryptoData] = useState<CryptoTrackerData | null>(null);
   const [scannerData, setScannerData] = useState<ScannerTrackerData | null>(null);
   const [optionsData, setOptionsData] = useState<OptionsTrackerData | null>(null);
+  const [scannerSnapshotVersion, setScannerSnapshotVersion] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
   const [isLoaded, setIsLoaded] = useState(false);
   const [initError, setInitError] = useState<string | null>(null);
@@ -129,8 +132,15 @@ export function PortfolioProvider({ children }: { children: ReactNode }) {
     }
   }, [services]);
 
-  const refreshScannerPricesOnly = useCallback(() => {
+  const refreshScannerPricesOnly = useCallback(async () => {
     if (!services) return;
+
+    const manager = getPersistenceManager();
+    if (manager) {
+      await manager.drainSyncQueue();
+    }
+
+    services.scannerSnapshot.invalidate();
 
     try {
       setScannerData(services.scanner.getData());
@@ -143,6 +153,8 @@ export function PortfolioProvider({ children }: { children: ReactNode }) {
     } catch (error) {
       console.error("[PortfolioProvider] options tracker refresh failed", error);
     }
+
+    setScannerSnapshotVersion(services.scannerSnapshot.getVersion());
   }, [services]);
 
   const clearPersistenceError = useCallback(() => {
@@ -205,7 +217,7 @@ export function PortfolioProvider({ children }: { children: ReactNode }) {
       if (shouldRefreshAll) {
         refresh();
       } else if (shouldRefreshScannerPrices) {
-        refreshScannerPricesOnly();
+        await refreshScannerPricesOnly();
       }
     };
 
@@ -229,6 +241,7 @@ export function PortfolioProvider({ children }: { children: ReactNode }) {
         refresh,
         refreshCryptoOnly,
         refreshScannerPricesOnly,
+        scannerSnapshotVersion,
         isLoaded,
         isLoading,
         initError,

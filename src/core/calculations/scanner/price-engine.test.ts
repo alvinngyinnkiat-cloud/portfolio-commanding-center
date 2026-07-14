@@ -10,6 +10,33 @@ import { DEFAULT_SCANNER_WATCHLIST } from "./watchlist";
 const watchlist = DEFAULT_SCANNER_WATCHLIST;
 
 describe("getLatestTickerPrice", () => {
+  it("prefers scanner snapshot record over manual and saved fallbacks", () => {
+    const resolved = getLatestTickerPrice({
+      ticker: "QQQ",
+      scannerRecord: {
+        ticker: "QQQ",
+        currentPrice: 512,
+        marketDate: "2026-07-15",
+        refreshedAt: "2026-07-15T05:52:00.000Z",
+        scanDate: "2026-07-15",
+        indicators: {} as never,
+        recentCandles: [],
+        status: "ok",
+        sourceRunId: "run-b",
+        isTickerStale: false,
+      },
+      scannerScanPrice: { priceUsd: 510.25, priceAsOf: "2025-06-13" },
+      manualPriceUsd: 500,
+      watchlist,
+      prices: [],
+      dailyCandles: [],
+    });
+
+    expect(resolved.source).toBe("scanner_refreshed");
+    expect(resolved.priceUsd).toBe(512);
+    expect(resolved.priceAsOf).toBe("2026-07-15");
+  });
+
   it("prefers scanner refreshed price over manual and saved fallbacks", () => {
     const resolved = getLatestTickerPrice({
       ticker: "QQQ",

@@ -369,7 +369,8 @@ export function buildOpenTradeDashboardMetrics(
     row.resolvedTickerPrice.source !== "unavailable"
       ? formatTickerPriceSourceLabel(
           row.resolvedTickerPrice.source,
-          row.resolvedTickerPrice.priceAsOf
+          row.resolvedTickerPrice.priceAsOf,
+          row.scannerRecord
         )
       : null;
   const currentPriceAsOf = row.resolvedTickerPrice.priceAsOf;

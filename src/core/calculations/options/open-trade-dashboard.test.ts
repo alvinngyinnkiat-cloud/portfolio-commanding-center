@@ -293,11 +293,12 @@ describe("open-trade-dashboard", () => {
           source: "scanner_refreshed" as const,
           priceAsOf: "2025-06-13",
         },
+        scannerRecord: null,
       };
 
       const metrics = buildOpenTradeDashboardMetrics(row);
       expect(metrics.currentPriceUsd).toBe(132.5);
-      expect(metrics.currentPriceSourceLabel).toContain("Scanner refreshed");
+      expect(metrics.currentPriceSourceLabel).toContain("Scanner market date");
     });
 
     it("uses bull-put-style breakeven distance and debit economics", () => {
@@ -338,6 +339,7 @@ describe("open-trade-dashboard", () => {
           source: "manual_fallback" as const,
           priceAsOf: null,
         },
+        scannerRecord: null,
       };
 
       const metrics = buildOpenTradeDashboardMetrics(row);

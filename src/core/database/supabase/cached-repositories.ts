@@ -330,6 +330,7 @@ class CachedScannerResultRepository implements ScannerResultRepository {
     const store = this.manager.getCache().scannerResults;
     store.previous = store.latest;
     store.latest = normalized;
+    this.manager.persistScannerResultsLocalBackup();
     this.manager.queueSettingsSync();
   }
 }

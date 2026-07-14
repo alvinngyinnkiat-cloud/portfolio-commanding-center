@@ -1,6 +1,8 @@
 import type { StockDailyCandle, StockPrice } from "@/core/domain/types";
 import { normalizeTicker } from "@/core/calculations/stocks/normalize";
 import { resolveEffectivePrice } from "@/core/calculations/stocks/price-normalize";
+import type { LatestScannerRecord } from "@/core/calculations/scanner/scanner-snapshot";
+import { formatScannerRecordMarketDateLabel } from "@/core/calculations/scanner/scanner-snapshot";
 import type { WatchlistEntry } from "./watchlist";
 import { getActiveWatchlistEntries } from "./watchlist";
 
@@ -189,12 +191,21 @@ function isValidTickerPrice(price: number | null | undefined): price is number {
  */
 export function getLatestTickerPrice(input: {
   ticker: string;
+  scannerRecord?: LatestScannerRecord | null;
   scannerScanPrice?: ScannerScanPriceCache | null;
   manualPriceUsd?: number | null;
   watchlist?: WatchlistEntry[];
   prices?: StockPrice[];
   dailyCandles?: StockDailyCandle[];
 }): ResolvedTickerPrice {
+  if (input.scannerRecord && isValidTickerPrice(input.scannerRecord.currentPrice)) {
+    return {
+      priceUsd: input.scannerRecord.currentPrice,
+      source: "scanner_refreshed",
+      priceAsOf: input.scannerRecord.marketDate,
+    };
+  }
+
   if (isValidTickerPrice(input.scannerScanPrice?.priceUsd)) {
     return {
       priceUsd: input.scannerScanPrice.priceUsd,
@@ -259,10 +270,15 @@ export function resolvedTickerPriceToScannerPrice(
 
 export function formatTickerPriceSourceLabel(
   source: TickerPriceResolutionSource,
-  priceAsOf?: string | null
+  priceAsOf?: string | null,
+  scannerRecord?: LatestScannerRecord | null
 ): string {
   if (source === "scanner_refreshed") {
-    return priceAsOf ? `Scanner refreshed · ${priceAsOf}` : "Scanner refreshed";
+    const recordLabel = formatScannerRecordMarketDateLabel(scannerRecord ?? null);
+    if (recordLabel) return recordLabel;
+    return priceAsOf
+      ? `Scanner market date: ${priceAsOf}`
+      : "Scanner refreshed";
   }
   if (source === "manual_fallback") return "Manual fallback";
   if (source === "saved_fallback") {

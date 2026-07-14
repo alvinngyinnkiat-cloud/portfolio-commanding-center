@@ -7,7 +7,6 @@ import type {
   OptionsTradeRepository,
 } from "@/core/database/repositories/options-repository";
 import type { StockFxConversionRepository } from "@/core/database/repositories/stock-fx-conversion-repository";
-import type { ScannerResultRepository } from "@/core/database/repositories/scanner-repository";
 import type { ScannerWatchlistRepository } from "@/core/database/repositories/scanner-watchlist-repository";
 import type { StockDailyCandleRepository } from "@/core/database/repositories/stock-daily-candle-repository";
 import type { StockPriceRepository } from "@/core/database/repositories/stock-price-repository";
@@ -23,6 +22,7 @@ import {
   buildOptionsClientSummary,
   buildTradeTypePerformanceDetail,
 } from "@/core/calculations/options";
+import type { ScannerSnapshotService } from "./scanner-snapshot-service";
 
 export class OptionsTrackerService {
   constructor(
@@ -34,7 +34,7 @@ export class OptionsTrackerService {
     private watchlistRepo: ScannerWatchlistRepository,
     private priceRepo: StockPriceRepository,
     private dailyCandleRepo: StockDailyCandleRepository,
-    private scannerResultRepo: ScannerResultRepository,
+    private scannerSnapshot: ScannerSnapshotService,
     private fxConversionRepo: StockFxConversionRepository
   ) {}
 
@@ -62,7 +62,7 @@ export class OptionsTrackerService {
       watchlist: this.watchlistRepo.get(),
       prices: normalizeStockPrices(this.priceRepo.list()),
       dailyCandles: this.dailyCandleRepo.list(),
-      latestScannerRun: this.scannerResultRepo.getLatest(),
+      scannerSnapshot: this.scannerSnapshot.getRecordMap(),
     };
 
     return {

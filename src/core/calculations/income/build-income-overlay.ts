@@ -1,5 +1,4 @@
 import type { OptionsClosedTradeRow, OptionsOpenTradeRow } from "@/core/domain/types/options";
-import type { ScannerScanRun, ScannerTickerResult } from "@/core/domain/types/scanner";
 import type {
   FoundationChecklistItem,
   FoundationPositionView,
@@ -36,19 +35,8 @@ import {
 export interface BuildIncomeOverlayInput {
   openRows: OptionsOpenTradeRow[];
   closedRows: OptionsClosedTradeRow[];
-  scannerRun: ScannerScanRun | null;
   settings: IncomeOverlaySettings;
   asOf?: Date;
-}
-
-function indexScannerResults(
-  scannerRun: ScannerScanRun | null
-): Map<string, ScannerTickerResult> {
-  const map = new Map<string, ScannerTickerResult>();
-  for (const result of scannerRun?.results ?? []) {
-    map.set(normalizeTicker(result.ticker), result);
-  }
-  return map;
 }
 
 function selectFoundationRow(
@@ -126,10 +114,10 @@ function buildFoundationView(
   foundationRow: OptionsOpenTradeRow,
   openRows: OptionsOpenTradeRow[],
   closedRows: OptionsClosedTradeRow[],
-  scannerResult: ScannerTickerResult | null,
   settings: IncomeOverlaySettings,
   asOf: Date
 ): FoundationPositionView {
+  const scannerRecord = foundationRow.scannerRecord;
   const activeSellCallRow = findActiveSellCallRow(openRows, ticker);
   const isCovered = activeSellCallRow != null;
   const foundationType = getFoundationTypeLabel(foundationRow.trade.strategy);
@@ -144,7 +132,7 @@ function buildFoundationView(
   const currentPriceSourceLabel = foundationRow.dashboard.currentPriceSourceLabel;
   const currentPriceAsOf = foundationRow.dashboard.currentPriceAsOf;
   const latestCandleDate =
-    scannerResult?.recentCandles[scannerResult.recentCandles.length - 1]?.date ??
+    scannerRecord?.recentCandles[scannerRecord.recentCandles.length - 1]?.date ??
     null;
   const priceNewerThanCandle =
     currentPriceAsOf != null &&
@@ -153,16 +141,9 @@ function buildFoundationView(
   const foundationBreakevenUsd = foundationRow.dashboard.breakevenPriceUsd;
   const callBreakevenUsd = activeSellCallRow?.dashboard.breakevenPriceUsd ?? null;
 
-  const avgPriceUsd =
-    foundationRow.scannerIndicators?.avgPrice ??
-    scannerResult?.indicators.avgPrice ??
-    null;
-  const avgPricePrevUsd =
-    foundationRow.scannerIndicators?.avgPricePrev ??
-    scannerResult?.indicators.avgPricePrev ??
-    null;
-  const atr14 =
-    foundationRow.scannerIndicators?.atr14 ?? scannerResult?.indicators.atr14 ?? null;
+  const avgPriceUsd = scannerRecord?.indicators.avgPrice ?? null;
+  const avgPricePrevUsd = scannerRecord?.indicators.avgPricePrev ?? null;
+  const atr14 = scannerRecord?.indicators.atr14 ?? null;
 
   const windowInput = {
     foundationChecklistPass,
@@ -200,7 +181,7 @@ function buildFoundationView(
     foundationRow,
     activeSellCallRow,
     isCovered,
-    scannerCandles: scannerResult?.recentCandles ?? [],
+    scannerCandles: scannerRecord?.recentCandles ?? [],
     currentPriceUsd,
     currentPriceSourceLabel,
     currentPriceAsOf,
@@ -242,7 +223,6 @@ export function buildIncomeOverlayData(
   input: BuildIncomeOverlayInput
 ): IncomeOverlayData {
   const asOf = input.asOf ?? new Date();
-  const scannerByTicker = indexScannerResults(input.scannerRun);
 
   const foundationTickers = new Set<string>();
   for (const row of input.openRows) {
@@ -265,7 +245,6 @@ export function buildIncomeOverlayData(
         foundationRow,
         input.openRows,
         input.closedRows,
-        scannerByTicker.get(ticker) ?? null,
         input.settings,
         asOf
       );

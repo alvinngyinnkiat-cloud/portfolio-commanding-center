@@ -353,6 +353,12 @@ export class PersistenceManager {
     writeJson(STORAGE_KEYS.cryptoHoldings, this.cache.cryptoHoldings);
   }
 
+  /** Mirror scanner results to localStorage so refresh survives before cloud sync completes. */
+  persistScannerResultsLocalBackup(): void {
+    if (typeof window === "undefined") return;
+    writeJson(STORAGE_KEYS.scannerResults, this.cache.scannerResults);
+  }
+
   /** Mirror crypto holdings/trades to localStorage from cloud cache (draft mirror only). */
   syncCryptoLocalCacheFromCloud(): void {
     this.persistCryptoHoldingsLocalBackup();

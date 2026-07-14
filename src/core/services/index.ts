@@ -18,6 +18,7 @@ import { createBrowserStockHistoryFetcher } from "./stock-history-fetcher";
 import { createStockMarketDataReader } from "./stock-market-data-reader";
 import { ScannerService } from "./scanner-service";
 import { ScannerWatchlistService } from "./scanner-watchlist-service";
+import { ScannerSnapshotService } from "./scanner-snapshot-service";
 import { runScannerManualRefresh } from "./scanner-refresh-service";
 import { OptionsTradeService } from "./options-trade-service";
 import { OptionsSettingsService } from "./options-settings-service";
@@ -79,6 +80,8 @@ export function createPortfolioServices(
     repos.scannerWatchlist
   );
 
+  const scannerSnapshot = new ScannerSnapshotService(repos.scannerResults);
+
   const cryptoTracker = new CryptoTrackerService(
     repos.cryptoHoldings,
     repos.cryptoTrades,
@@ -95,7 +98,7 @@ export function createPortfolioServices(
     repos.scannerWatchlist,
     repos.stockPrices,
     repos.stockDailyCandles,
-    repos.scannerResults,
+    scannerSnapshot,
     repos.stockFxConversions
   );
 
@@ -125,6 +128,7 @@ export function createPortfolioServices(
     stockPriceUpdates,
     stockCandleUpdates,
     scannerWatchlist,
+    scannerSnapshot,
     scanner,
     cryptoHoldings: new CryptoHoldingService(repos.cryptoHoldings),
     cryptoTrades: new CryptoTradeService(repos.cryptoTrades, repos.cryptoHoldings),
