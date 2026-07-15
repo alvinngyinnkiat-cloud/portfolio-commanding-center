@@ -1,13 +1,19 @@
 "use client";
 
 import type { ScannerTickerResult } from "@/core/domain/types/scanner";
+import type { ScannerTickerDataStatus } from "@/core/calculations/scanner/scanner-ticker-records";
+import { normalizeTicker } from "@/core/calculations/stocks/normalize";
 import { ScannerOpportunityCard } from "./ScannerOpportunityCard";
 
 interface ScannerOpportunityCardsProps {
   results: ScannerTickerResult[];
+  tickerStatuses?: Record<string, ScannerTickerDataStatus>;
 }
 
-export function ScannerOpportunityCards({ results }: ScannerOpportunityCardsProps) {
+export function ScannerOpportunityCards({
+  results,
+  tickerStatuses = {},
+}: ScannerOpportunityCardsProps) {
   if (results.length === 0) {
     return (
       <div className="rounded-2xl border border-dashed border-surface-border/80 bg-surface-card/40 p-8 text-center text-slate-500">
@@ -19,7 +25,11 @@ export function ScannerOpportunityCards({ results }: ScannerOpportunityCardsProp
   return (
     <div className="space-y-4">
       {results.map((result) => (
-        <ScannerOpportunityCard key={result.ticker} result={result} />
+        <ScannerOpportunityCard
+          key={result.ticker}
+          result={result}
+          dataStatus={tickerStatuses[normalizeTicker(result.ticker)]}
+        />
       ))}
     </div>
   );

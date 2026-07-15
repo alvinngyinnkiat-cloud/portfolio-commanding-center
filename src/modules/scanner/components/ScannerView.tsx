@@ -1,11 +1,14 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import { List } from "lucide-react";
 import { usePortfolio } from "@/context/PortfolioContext";
+import type { ScannerTickerDataStatus } from "@/core/calculations/scanner/scanner-ticker-records";
+import type { ScannerRefreshProgress } from "@/core/services/scanner-refresh-orchestrator";
 import {
   ScannerHealthCard,
+  mapRefreshProgressToUiStatus,
   type ScannerRefreshUiStatus,
 } from "./ScannerHealthCard";
 import { ScannerRankingDashboard } from "./ScannerRankingDashboard";
@@ -49,6 +52,15 @@ function formatScanTime(iso: string | null | undefined): string {
     .replace(",", "");
 }
 
+function mapMetadataToUiStatus(
+  status: "running" | "partial_success" | "success" | "failed"
+): ScannerRefreshUiStatus {
+  if (status === "partial_success") return "partial_success";
+  if (status === "success") return "success";
+  if (status === "failed") return "failed";
+  return "refreshing";
+}
+
 export function ScannerView() {
   const { scannerData, services, refreshScannerPricesOnly, isLoaded } = usePortfolio();
   const [strategyFilter, setStrategyFilter] = useState<StrategyFilter>("all");
@@ -57,6 +69,12 @@ export function ScannerView() {
   const [tradableOnly, setTradableOnly] = useState(false);
   const [refreshStatus, setRefreshStatus] =
     useState<ScannerRefreshUiStatus>("idle");
+  const [progressMessage, setProgressMessage] = useState<string | null>(null);
+  const [failedTickers, setFailedTickers] = useState<string[]>([]);
+  const [tickerStatuses, setTickerStatuses] = useState<
+    Record<string, ScannerTickerDataStatus>
+  >({});
+  const refreshInFlightRef = useRef(false);
 
   const displayRun = scannerData?.latestRun ?? scannerData?.previousRun ?? null;
 
@@ -83,20 +101,56 @@ export function ScannerView() {
       });
   }, [displayRun, strategyFilter, categoryFilter, systemFilter, tradableOnly]);
 
-  const handleManualRefresh = useCallback(async () => {
-    setRefreshStatus("refreshing");
-    try {
-      const result = await services.refreshScannerNow();
-      if (result.outcome === "failed") {
-        setRefreshStatus("failed");
+  const runRefresh = useCallback(
+    async (mode: "all" | "failed") => {
+      if (refreshInFlightRef.current || services.scannerRefresh.isRefreshRunning()) {
         return;
       }
-      await refreshScannerPricesOnly();
-      setRefreshStatus("success");
-    } catch {
-      setRefreshStatus("failed");
-    }
-  }, [services, refreshScannerPricesOnly]);
+
+      refreshInFlightRef.current = true;
+      setRefreshStatus("refreshing");
+      setProgressMessage("Refreshing 0/0");
+
+      try {
+        const onProgress = (progress: ScannerRefreshProgress) => {
+          setProgressMessage(progress.message);
+          setRefreshStatus(mapRefreshProgressToUiStatus(progress));
+        };
+
+        const result =
+          mode === "failed" && failedTickers.length > 0
+            ? await services.retryFailedScannerTickers(failedTickers, new Date(), onProgress)
+            : await services.refreshScannerNow(new Date(), onProgress);
+
+        await refreshScannerPricesOnly();
+
+        setFailedTickers(result.refreshRun.failedTickers.map((row) => row.ticker));
+        setTickerStatuses(result.tickerStatuses);
+        setRefreshStatus(mapMetadataToUiStatus(result.metadataStatus));
+        setProgressMessage(
+          result.metadataStatus === "partial_success"
+            ? `Partial success — ${result.refreshRun.successfulTickers.length}/${result.refreshRun.totalTickers} tickers updated`
+            : result.metadataStatus === "success"
+              ? "Refresh complete"
+              : "Refresh failed"
+        );
+      } catch {
+        setRefreshStatus("failed");
+        setProgressMessage("Refresh failed");
+      } finally {
+        refreshInFlightRef.current = false;
+      }
+    },
+    [services, refreshScannerPricesOnly, failedTickers]
+  );
+
+  const handleManualRefresh = useCallback(async () => {
+    await runRefresh("all");
+  }, [runRefresh]);
+
+  const handleRetryFailed = useCallback(async () => {
+    await runRefresh("failed");
+  }, [runRefresh]);
 
   if (!isLoaded) {
     return <ScannerSkeleton />;
@@ -136,7 +190,10 @@ export function ScannerView() {
       <ScannerHealthCard
         health={displayRun?.health ?? null}
         refreshStatus={refreshStatus}
+        progressMessage={progressMessage}
+        failedTickers={failedTickers}
         onRefresh={handleManualRefresh}
+        onRetryFailed={handleRetryFailed}
       />
 
       {!displayRun ? (
@@ -163,7 +220,10 @@ export function ScannerView() {
             onSystemChange={setSystemFilter}
             onTradableOnlyChange={setTradableOnly}
           />
-          <ScannerOpportunityCards results={filteredResults} />
+          <ScannerOpportunityCards
+            results={filteredResults}
+            tickerStatuses={tickerStatuses}
+          />
         </>
       )}
     </div>

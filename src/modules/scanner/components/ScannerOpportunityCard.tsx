@@ -5,6 +5,7 @@ import type {
   ScannerTickerResult,
   StrategyOutput,
 } from "@/core/domain/types/scanner";
+import type { ScannerTickerDataStatus } from "@/core/calculations/scanner/scanner-ticker-records";
 import { STRATEGY_LABELS, STRATEGY_OUTPUT_LABELS } from "@/core/domain/types/scanner";
 import { buildSuggestedTradeFromResult } from "@/core/calculations/scanner/suggested-trade";
 import { buildEmaSuggestedTrade } from "@/core/calculations/scanner/ema-suggested-trade";
@@ -15,6 +16,7 @@ import { ChevronDown, ChevronUp } from "lucide-react";
 
 interface ScannerOpportunityCardProps {
   result: ScannerTickerResult;
+  dataStatus?: ScannerTickerDataStatus;
 }
 
 const OUTPUT_STYLES: Record<StrategyOutput, string> = {
@@ -24,13 +26,14 @@ const OUTPUT_STYLES: Record<StrategyOutput, string> = {
   "NO TRADE": "border-surface-border bg-surface/60 text-slate-400",
 };
 
-export function ScannerOpportunityCard({ result }: ScannerOpportunityCardProps) {
+export function ScannerOpportunityCard({ result, dataStatus }: ScannerOpportunityCardProps) {
   const [expanded, setExpanded] = useState(false);
 
   return (
     <Card noPadding className={`overflow-hidden ${result.tradable ? "" : "opacity-85"}`}>
       <div className="space-y-4 overflow-hidden p-4 sm:p-5">
         <div className="flex flex-wrap items-center justify-end gap-2">
+          {dataStatus && <TickerDataStatusBadge status={dataStatus} />}
           <TradableBadge tradable={result.tradable} />
           <button
             type="button"
@@ -606,6 +609,32 @@ function EmaSuggestedTradeDetails({ result }: { result: ScannerTickerResult }) {
         ],
       ]}
     />
+  );
+}
+
+function TickerDataStatusBadge({ status }: { status: ScannerTickerDataStatus }) {
+  const styles: Record<ScannerTickerDataStatus, string> = {
+    fresh: "bg-emerald-500/15 text-emerald-300",
+    stale: "bg-yellow-500/15 text-yellow-200",
+    failed: "bg-red-500/15 text-red-300",
+    missing: "bg-slate-500/15 text-slate-300",
+    fallback: "bg-sky-500/15 text-sky-200",
+  };
+
+  const labels: Record<ScannerTickerDataStatus, string> = {
+    fresh: "Fresh",
+    stale: "Stale",
+    failed: "Failed",
+    missing: "Missing",
+    fallback: "Fallback used",
+  };
+
+  return (
+    <span
+      className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold ${styles[status]}`}
+    >
+      {labels[status]}
+    </span>
   );
 }
 

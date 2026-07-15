@@ -32,13 +32,10 @@ import { normalizeDashboardSettings } from "@/core/database/local/normalize-sett
 import { normalizeDailySnapshot } from "@/core/calculations/snapshots";
 import { normalizeOptionsSettings } from "@/core/domain/defaults-options";
 import { normalizeScannerScanRun } from "@/core/calculations/scanner/normalize-scan-result";
+import type { ScannerResultsStore } from "@/core/calculations/scanner/scanner-ticker-records";
+import { normalizeScannerResultsStore } from "@/core/calculations/scanner/scanner-ticker-records";
 import { normalizeStockPrice } from "@/core/calculations/stocks/price-normalize";
 import { normalizeStockTransactions } from "@/core/calculations/stocks/transaction-normalize";
-
-export interface ScannerResultsStore {
-  latest: ScannerScanRun | null;
-  previous: ScannerScanRun | null;
-}
 
 export interface PersistenceCache {
   dashboardSettings: DashboardSettings;
@@ -88,7 +85,7 @@ export function createEmptyCache(): PersistenceCache {
     stockPriceSchedule: { ...EMPTY_PRICE_SCHEDULE },
     stockDailyCandles: [],
     stockWeeklyCandles: [],
-    scannerResults: { latest: null, previous: null },
+    scannerResults: normalizeScannerResultsStore({ latest: null, previous: null }),
     scannerSchedule: { ...EMPTY_SCHEDULE },
     scannerWatchlist: DEFAULT_SCANNER_WATCHLIST.map((row) => ({ ...row })),
     cryptoHoldings: [],
@@ -108,14 +105,17 @@ export function normalizeCache(cache: PersistenceCache): PersistenceCache {
     snapshots: cache.snapshots.map((row) => normalizeDailySnapshot(row)),
     stockPrices: cache.stockPrices.map((row) => normalizeStockPrice(row)),
     stockTransactions: normalizeStockTransactions(cache.stockTransactions),
-    scannerResults: {
+    scannerResults: normalizeScannerResultsStore({
       latest: cache.scannerResults.latest
         ? normalizeScannerScanRun(cache.scannerResults.latest)
         : null,
       previous: cache.scannerResults.previous
         ? normalizeScannerScanRun(cache.scannerResults.previous)
         : null,
-      },
+      tickerRecords: cache.scannerResults.tickerRecords,
+      tickerLatestKeys: cache.scannerResults.tickerLatestKeys,
+      lastRefreshRun: cache.scannerResults.lastRefreshRun,
+    }),
     optionsSettings: normalizeOptionsSettings(cache.optionsSettings),
     cryptoHoldings: normalizeCryptoHoldings(cache.cryptoHoldings),
     cryptoTrades: normalizeCryptoTrades(cache.cryptoTrades ?? []),

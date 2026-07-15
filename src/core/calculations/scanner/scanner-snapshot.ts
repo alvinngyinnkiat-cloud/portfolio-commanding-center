@@ -4,6 +4,7 @@ import type {
   ScannerScanRun,
   ScannerTickerResult,
 } from "@/core/domain/types/scanner";
+import type { PersistedScannerTickerRecord } from "./scanner-ticker-records";
 import { normalizeTicker } from "@/core/calculations/stocks/normalize";
 
 export interface LatestScannerRecord {
@@ -101,6 +102,52 @@ export function buildLatestScannerRecordMap(
       ...candidate,
       isTickerStale: latestRun != null && candidate.sourceRunId !== latestRun.id,
     });
+  }
+
+  return map;
+}
+
+function persistedToLatest(
+  record: PersistedScannerTickerRecord,
+  latestRunId: string | null
+): LatestScannerRecord {
+  return {
+    ticker: normalizeTicker(record.ticker),
+    currentPrice: record.result.currentPrice ?? 0,
+    marketDate: record.marketDate,
+    refreshedAt: record.refreshedAt,
+    scanDate: record.marketDate,
+    indicators: record.result.indicators,
+    recentCandles: record.result.recentCandles,
+    status: record.result.status,
+    sourceRunId: record.refreshRunId,
+    isTickerStale: latestRunId != null && record.refreshRunId !== latestRunId,
+  };
+}
+
+/** Prefer persisted per-ticker records; fill gaps from scan runs. */
+export function buildLatestScannerRecordMapFromSources(input: {
+  persisted: Map<string, PersistedScannerTickerRecord>;
+  runs: Array<ScannerScanRun | null | undefined>;
+  latestRunId?: string | null;
+}): Map<string, LatestScannerRecord> {
+  const latestRunId =
+    input.latestRunId ??
+    input.runs.find((run) => run != null)?.id ??
+    null;
+  const map = new Map<string, LatestScannerRecord>();
+
+  for (const [ticker, record] of input.persisted) {
+    if (record.result.currentPrice != null && record.result.currentPrice > 0) {
+      map.set(ticker, persistedToLatest(record, latestRunId));
+    }
+  }
+
+  const fromRuns = buildLatestScannerRecordMap(input.runs);
+  for (const [ticker, record] of fromRuns) {
+    if (!map.has(ticker)) {
+      map.set(ticker, record);
+    }
   }
 
   return map;

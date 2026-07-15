@@ -14,6 +14,12 @@ import { normalizeOptionsSettings } from "@/core/domain/defaults-options";
 import { normalizeOptionsTradeForStorage, normalizeOptionsTradesForStorage } from "@/core/calculations/options/trade-dates";
 import { normalizeScannerScanRun } from "@/core/calculations/scanner/normalize-scan-result";
 import {
+  createScannerResultRepositoryExtensions,
+  getLatestScannerRun,
+  getPreviousScannerRun,
+  saveScannerRun,
+} from "../scanner-result-repository-helpers";
+import {
   normalizeCryptoAllocationSettings,
   normalizeCryptoHolding,
 } from "@/core/calculations/crypto/normalize";
@@ -317,21 +323,76 @@ class CachedStockWeeklyCandleRepository implements StockWeeklyCandleRepository {
 
 class CachedScannerResultRepository implements ScannerResultRepository {
   constructor(private readonly manager: PersistenceManager) {}
-  getLatest() {
-    const latest = this.manager.getCache().scannerResults.latest;
-    return latest ? normalizeScannerScanRun(latest) : null;
+
+  private readStoreInternal() {
+    return this.manager.getCache().scannerResults;
   }
-  getPrevious() {
-    const previous = this.manager.getCache().scannerResults.previous;
-    return previous ? normalizeScannerScanRun(previous) : null;
-  }
-  save(run: Parameters<ScannerResultRepository["save"]>[0]) {
-    const normalized = normalizeScannerScanRun(run);
-    const store = this.manager.getCache().scannerResults;
-    store.previous = store.latest;
-    store.latest = normalized;
+
+  private writeStoreInternal(store: ReturnType<CachedScannerResultRepository["readStoreInternal"]>) {
+    this.manager.getCache().scannerResults = store;
     this.manager.persistScannerResultsLocalBackup();
     this.manager.queueSettingsSync();
+  }
+
+  private get extensions() {
+    return createScannerResultRepositoryExtensions(
+      () => this.readStoreInternal(),
+      (store) => this.writeStoreInternal(store)
+    );
+  }
+
+  getLatest() {
+    return getLatestScannerRun(() => this.readStoreInternal());
+  }
+
+  getPrevious() {
+    return getPreviousScannerRun(() => this.readStoreInternal());
+  }
+
+  save(run: Parameters<ScannerResultRepository["save"]>[0]) {
+    saveScannerRun(
+      () => this.readStoreInternal(),
+      (store) => this.writeStoreInternal(store),
+      run
+    );
+  }
+
+  upsertTickerRecord(record: Parameters<ScannerResultRepository["upsertTickerRecord"]>[0]) {
+    return this.extensions.upsertTickerRecord(record);
+  }
+
+  getTickerRecord(
+    ticker: Parameters<ScannerResultRepository["getTickerRecord"]>[0],
+    marketDate: Parameters<ScannerResultRepository["getTickerRecord"]>[1]
+  ) {
+    return this.extensions.getTickerRecord(ticker, marketDate);
+  }
+
+  getLatestTickerRecord(ticker: Parameters<ScannerResultRepository["getLatestTickerRecord"]>[0]) {
+    return this.extensions.getLatestTickerRecord(ticker);
+  }
+
+  getAllLatestTickerRecords() {
+    return this.extensions.getAllLatestTickerRecords();
+  }
+
+  getLastRefreshRun() {
+    return this.extensions.getLastRefreshRun();
+  }
+
+  setLastRefreshRun(run: Parameters<ScannerResultRepository["setLastRefreshRun"]>[0]) {
+    this.extensions.setLastRefreshRun(run);
+  }
+
+  verifyTickerRecord(
+    stored: Parameters<ScannerResultRepository["verifyTickerRecord"]>[0],
+    expected: Parameters<ScannerResultRepository["verifyTickerRecord"]>[1]
+  ) {
+    return this.extensions.verifyTickerRecord(stored, expected);
+  }
+
+  readStore() {
+    return this.extensions.readStore();
   }
 }
 

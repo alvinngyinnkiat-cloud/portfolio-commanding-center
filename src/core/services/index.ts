@@ -19,7 +19,11 @@ import { createStockMarketDataReader } from "./stock-market-data-reader";
 import { ScannerService } from "./scanner-service";
 import { ScannerWatchlistService } from "./scanner-watchlist-service";
 import { ScannerSnapshotService } from "./scanner-snapshot-service";
-import { runScannerManualRefresh } from "./scanner-refresh-service";
+import { ScannerRefreshOrchestrator } from "./scanner-refresh-orchestrator";
+import {
+  retryFailedScannerTickers,
+  runScannerManualRefresh,
+} from "./scanner-refresh-service";
 import { OptionsTradeService } from "./options-trade-service";
 import { OptionsSettingsService } from "./options-settings-service";
 import { OptionsTrackerService } from "./options-tracker-service";
@@ -82,6 +86,16 @@ export function createPortfolioServices(
 
   const scannerSnapshot = new ScannerSnapshotService(repos.scannerResults);
 
+  const scannerRefresh = new ScannerRefreshOrchestrator(
+    repos.scannerWatchlist,
+    repos.stockPrices,
+    repos.stockDailyCandles,
+    repos.stockWeeklyCandles,
+    repos.scannerResults,
+    repos.scannerSchedule,
+    repos.stockPriceSchedule
+  );
+
   const cryptoTracker = new CryptoTrackerService(
     repos.cryptoHoldings,
     repos.cryptoTrades,
@@ -129,6 +143,7 @@ export function createPortfolioServices(
     stockCandleUpdates,
     scannerWatchlist,
     scannerSnapshot,
+    scannerRefresh,
     scanner,
     cryptoHoldings: new CryptoHoldingService(repos.cryptoHoldings),
     cryptoTrades: new CryptoTradeService(repos.cryptoTrades, repos.cryptoHoldings),
@@ -141,11 +156,27 @@ export function createPortfolioServices(
     optionsSettings: new OptionsSettingsService(repos.optionsSettings),
     optionsTracker,
     stockFxConversions: new StockFxConversionService(repos.stockFxConversions),
-    refreshScannerNow: async (date: Date = new Date()) =>
+    refreshScannerNow: async (
+      date: Date = new Date(),
+      onProgress?: Parameters<typeof runScannerManualRefresh>[3]
+    ) =>
       runScannerManualRefresh(
+        scannerRefresh,
         (refreshDate) => stockCandleUpdates.updateUsCandles(refreshDate),
-        (refreshDate) => scanner.runScan(refreshDate),
-        date
+        date,
+        onProgress
+      ),
+    retryFailedScannerTickers: async (
+      failedTickers: string[],
+      date: Date = new Date(),
+      onProgress?: Parameters<typeof retryFailedScannerTickers>[4]
+    ) =>
+      retryFailedScannerTickers(
+        scannerRefresh,
+        failedTickers,
+        (refreshDate) => stockCandleUpdates.updateUsCandles(refreshDate),
+        date,
+        onProgress
       ),
   };
 }

@@ -1,21 +1,20 @@
 import type { ScannerScanRun } from "@/core/domain/types/scanner";
 import type { ScannerResultRepository } from "@/core/database/repositories/scanner-repository";
 import {
-  buildLatestScannerRecordMap,
-  getLatestScannerRecordFromRuns,
+  buildLatestScannerRecordMapFromSources,
   type LatestScannerRecord,
 } from "@/core/calculations/scanner/scanner-snapshot";
+import { normalizeTicker } from "@/core/calculations/stocks/normalize";
 
 /**
  * Shared read-only scanner snapshot for Modules 5 and 6.
- * Always resolves per-ticker records from persisted scan runs (latest + previous).
+ * Reads persisted per-ticker records first, then scan-run fallbacks.
  */
 export class ScannerSnapshotService {
   private version = 0;
 
   constructor(private readonly scannerResultRepo: ScannerResultRepository) {}
 
-  /** Bump after scanner refresh persistence so subscribers refetch. */
   invalidate(): void {
     this.version += 1;
   }
@@ -31,11 +30,16 @@ export class ScannerSnapshotService {
   }
 
   getLatestScannerRecord(ticker: string): LatestScannerRecord | null {
-    return getLatestScannerRecordFromRuns(this.loadRuns(), ticker);
+    return this.getRecordMap().get(normalizeTicker(ticker)) ?? null;
   }
 
   getRecordMap(): Map<string, LatestScannerRecord> {
-    return buildLatestScannerRecordMap(this.loadRuns());
+    const store = this.scannerResultRepo.readStore();
+    return buildLatestScannerRecordMapFromSources({
+      persisted: this.scannerResultRepo.getAllLatestTickerRecords(),
+      runs: this.loadRuns(),
+      latestRunId: store.lastRefreshRun?.refreshRunId ?? store.latest?.id ?? null,
+    });
   }
 }
 
