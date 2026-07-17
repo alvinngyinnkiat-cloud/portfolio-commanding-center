@@ -526,7 +526,7 @@ export class ScannerRefreshOrchestrator {
     });
 
     const missingTickers = results
-      .filter((row) => row.status !== "ok")
+      .filter((row) => row.status !== "ok" && row.status !== "price_only")
       .map((row) => row.ticker);
     const indicatorsCalculated = results.filter((row) => row.status === "ok").length;
     const successCount = input.successfulTickers.size;

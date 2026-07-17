@@ -1,6 +1,7 @@
 import type { ScannerTickerResult } from "@/core/domain/types/scanner";
 import type { PersistedScannerTickerRecord } from "./scanner-ticker-records";
 import { normalizeTicker } from "@/core/calculations/stocks/normalize";
+import { hasValidScannerTickerPrice } from "./scan";
 
 export interface TickerValidationResult {
   ok: boolean;
@@ -11,23 +12,25 @@ function isValidPrice(value: number | null | undefined): value is number {
   return value != null && Number.isFinite(value) && value > 0;
 }
 
-export function validateTickerScanResult(
-  result: ScannerTickerResult,
-  expectedTicker: string,
-  previousRecord: PersistedScannerTickerRecord | null
-): TickerValidationResult {
-  const ticker = normalizeTicker(expectedTicker);
-  if (normalizeTicker(result.ticker) !== ticker) {
-    return { ok: false, error: "Ticker mismatch" };
-  }
+function isPriceOnlyResult(result: ScannerTickerResult): boolean {
+  return (
+    result.status === "price_only" ||
+    result.indicatorStatus === "insufficient_history"
+  );
+}
 
-  if (!result.recentCandles.length) {
-    return { ok: false, error: "Candle list is empty" };
+function validatePriceAlignment(result: ScannerTickerResult): TickerValidationResult {
+  if (result.recentCandles.length === 0) {
+    return { ok: true };
   }
 
   const latest = result.recentCandles[result.recentCandles.length - 1];
   if (!latest) {
-    return { ok: false, error: "Latest candle missing" };
+    return { ok: true };
+  }
+
+  if (result.priceSourceKey !== "daily_close" && result.priceSourceKey !== "stored_candle") {
+    return { ok: true };
   }
 
   if (!isValidPrice(latest.close)) {
@@ -38,23 +41,7 @@ export function validateTickerScanResult(
     return { ok: false, error: "Latest candle high < low" };
   }
 
-  if (latest.close < latest.low || latest.close > latest.high) {
-    return { ok: false, error: "Latest candle close outside high-low range" };
-  }
-
-  if (!isValidPrice(result.indicators.atr14)) {
-    return { ok: false, error: "ATR14 is invalid" };
-  }
-
-  if (!result.priceAsOf) {
-    return { ok: false, error: "Market date missing" };
-  }
-
-  if (!isValidPrice(result.currentPrice)) {
-    return { ok: false, error: "Current price is invalid" };
-  }
-
-  if (Math.abs(result.currentPrice - latest.close) > 1e-6) {
+  if (Math.abs(result.currentPrice! - latest.close) > 1e-6) {
     return {
       ok: false,
       error: "Current price must equal latest completed candle close",
@@ -69,13 +56,28 @@ export function validateTickerScanResult(
   }
 
   if (
-    result.currentPrice < latest.low ||
-    result.currentPrice > latest.high
+    result.currentPrice! < latest.low ||
+    result.currentPrice! > latest.high
   ) {
     return {
       ok: false,
       error: "Current price outside latest candle high-low range",
     };
+  }
+
+  return { ok: true };
+}
+
+function validatePricePersistence(
+  result: ScannerTickerResult,
+  previousRecord: PersistedScannerTickerRecord | null
+): TickerValidationResult {
+  if (!result.priceAsOf) {
+    return { ok: false, error: "Market date missing" };
+  }
+
+  if (!hasValidScannerTickerPrice(result)) {
+    return { ok: false, error: "Current price is invalid" };
   }
 
   if (previousRecord) {
@@ -86,6 +88,41 @@ export function validateTickerScanResult(
         error: "Fetched market date is older than stored valid record",
       };
     }
+  }
+
+  return validatePriceAlignment(result);
+}
+
+export function validateTickerScanResult(
+  result: ScannerTickerResult,
+  expectedTicker: string,
+  previousRecord: PersistedScannerTickerRecord | null
+): TickerValidationResult {
+  const ticker = normalizeTicker(expectedTicker);
+  if (normalizeTicker(result.ticker) !== ticker) {
+    return { ok: false, error: "Ticker mismatch" };
+  }
+
+  if (isPriceOnlyResult(result)) {
+    return validatePricePersistence(result, previousRecord);
+  }
+
+  if (!result.recentCandles.length) {
+    return { ok: false, error: "Candle list is empty" };
+  }
+
+  const latest = result.recentCandles[result.recentCandles.length - 1];
+  if (!latest) {
+    return { ok: false, error: "Latest candle missing" };
+  }
+
+  if (!isValidPrice(result.indicators.atr14)) {
+    return { ok: false, error: "ATR14 is invalid" };
+  }
+
+  const priceValidation = validatePricePersistence(result, previousRecord);
+  if (!priceValidation.ok) {
+    return priceValidation;
   }
 
   if (result.status !== "ok") {

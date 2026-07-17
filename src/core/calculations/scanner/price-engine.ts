@@ -3,6 +3,7 @@ import { normalizeTicker } from "@/core/calculations/stocks/normalize";
 import { resolveEffectivePrice } from "@/core/calculations/stocks/price-normalize";
 import type { LatestScannerRecord } from "@/core/calculations/scanner/scanner-snapshot";
 import { formatScannerRecordMarketDateLabel } from "@/core/calculations/scanner/scanner-snapshot";
+import { formatScannerPriceSourceForModules } from "@/core/calculations/scanner/resolve-scanner-ticker-price";
 import type { WatchlistEntry } from "./watchlist";
 import { getActiveWatchlistEntries } from "./watchlist";
 
@@ -266,6 +267,31 @@ export function formatTickerPriceSourceLabel(
   scannerRecord?: LatestScannerRecord | null
 ): string {
   if (source === "scanner_refreshed") {
+    if (scannerRecord?.indicatorStatus === "insufficient_history") {
+      const lines = [
+        `Market session: ${scannerRecord.marketDate ?? priceAsOf ?? "—"}`,
+        formatScannerPriceSourceForModules({
+          priceSource: scannerRecord.priceSource,
+          indicatorStatus: scannerRecord.indicatorStatus,
+        }),
+      ];
+      if (scannerRecord.refreshedAt) {
+        const refreshed = new Intl.DateTimeFormat("en-SG", {
+          timeZone: "Asia/Singapore",
+          year: "numeric",
+          month: "2-digit",
+          day: "2-digit",
+          hour: "2-digit",
+          minute: "2-digit",
+          hour12: false,
+        })
+          .format(new Date(scannerRecord.refreshedAt))
+          .replace(",", "");
+        lines.push(`Refreshed: ${refreshed} SGT`);
+      }
+      return lines.join("\n");
+    }
+
     const recordLabel = formatScannerRecordMarketDateLabel(scannerRecord ?? null);
     if (recordLabel) return recordLabel;
     const lines = ["Source: Scanner"];

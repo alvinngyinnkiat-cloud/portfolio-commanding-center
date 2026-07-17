@@ -6,7 +6,8 @@ export type IncomeDecisionStatus =
   | "waiting_for_confirmation"
   | "sell_call_window_open"
   | "covered"
-  | "checklist_incomplete";
+  | "checklist_incomplete"
+  | "scanner_indicators_unavailable";
 
 export type IncomeRecoveryPhase = "building" | "recovering" | "house_money";
 
@@ -73,6 +74,8 @@ export interface FoundationPositionView {
   monthlyIncomeUsd: number;
   completedIncomeCycles: IncomeCycleRow[];
   activeRecommendation: SellCallRecommendation | null;
+  scannerIndicatorsAvailable: boolean;
+  scannerIndicatorFailures: string[];
 }
 
 export interface IncomeOverlaySummary {

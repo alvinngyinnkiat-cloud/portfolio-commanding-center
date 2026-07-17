@@ -66,6 +66,18 @@ export type ScannerDataSourceStatus = "healthy" | "stale" | "unavailable";
 
 export type ScannerRefreshStatus = "success" | "partial" | "failed";
 
+export type ScannerPriceStatus = "fresh" | "fallback" | "stale";
+
+export type ScannerIndicatorStatus = "ready" | "insufficient_history" | "failed";
+
+export type ScannerTickerPriceSourceKey =
+  | "daily_close"
+  | "quote"
+  | "fmp_fallback"
+  | "stored_candle";
+
+export type ScannerTickerStatus = "ok" | "price_only" | "incomplete" | "error";
+
 
 
 export interface RuleCheck {
@@ -311,7 +323,22 @@ export interface ScannerTickerResult {
 
   recentCandles: ScannerCandleBar[];
 
-  status: "ok" | "incomplete" | "error";
+  status: ScannerTickerStatus;
+
+  /** Human-readable price source label for UI. */
+  priceSource?: string | null;
+
+  priceSourceKey?: ScannerTickerPriceSourceKey | null;
+
+  priceStatus?: ScannerPriceStatus | null;
+
+  indicatorStatus?: ScannerIndicatorStatus | null;
+
+  indicatorError?: string | null;
+
+  candlesAvailable?: number;
+
+  candlesRequired?: number;
 
   notes: string[];
 

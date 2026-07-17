@@ -56,6 +56,8 @@ function decisionStatusClass(status: FoundationPositionView["decisionStatus"]): 
       return "border-orange-500/40 bg-orange-500/10 text-orange-200";
     case "waiting_for_trigger":
       return "border-yellow-500/40 bg-yellow-500/10 text-yellow-200";
+    case "scanner_indicators_unavailable":
+      return "border-orange-500/40 bg-orange-500/10 text-orange-200";
     case "covered":
       return "border-sky-500/40 bg-sky-500/10 text-sky-200";
     default:
@@ -91,6 +93,8 @@ export function FoundationCard({ foundation, atrMultiplier }: FoundationCardProp
     completedIncomeCycles,
     activeRecommendation,
     atr14,
+    scannerIndicatorsAvailable,
+    scannerIndicatorFailures,
   } = foundation;
 
   return (
@@ -128,8 +132,23 @@ export function FoundationCard({ foundation, atrMultiplier }: FoundationCardProp
 
         <div className="space-y-5">
           <ChecklistSection title="Foundation Checklist" items={foundationChecklist} />
-          {!foundation.isCovered && (
+          {!foundation.isCovered && scannerIndicatorsAvailable && (
             <ChecklistSection title="SELL CALL Timing Checklist" items={timingRules} />
+          )}
+          {!foundation.isCovered && !scannerIndicatorsAvailable && (
+            <div className="rounded-xl border border-orange-500/30 bg-orange-500/5 p-4">
+              <h4 className="text-xs font-semibold uppercase tracking-wide text-orange-300">
+                SELL CALL Timing Checklist
+              </h4>
+              <p className="mt-2 text-sm text-orange-200">
+                WAIT — SCANNER INDICATORS UNAVAILABLE
+              </p>
+              <ul className="mt-3 space-y-2 text-sm text-slate-400">
+                {scannerIndicatorFailures.map((item) => (
+                  <li key={item}>Failed: {item}</li>
+                ))}
+              </ul>
+            </div>
           )}
 
           <div className="rounded-xl border border-surface-border/60 bg-surface/40 p-4">

@@ -82,6 +82,14 @@ export function deriveIncomeDecisionStatus(
     return "checklist_incomplete";
   }
 
+  if (
+    input.atr14 == null ||
+    input.avgPriceUsd == null ||
+    input.avgPricePrevUsd == null
+  ) {
+    return "scanner_indicators_unavailable";
+  }
+
   const rules = evaluateSellCallTimingRules(input);
   const rule1Pass = rules[0]?.pass ?? false;
   const rule2Pass = rules[1]?.pass ?? false;
@@ -107,6 +115,8 @@ export function incomeDecisionLabel(status: IncomeDecisionStatus): string {
       return "🟢 SELL CALL WINDOW OPEN";
     case "covered":
       return "🔵 Covered";
+    case "scanner_indicators_unavailable":
+      return "WAIT — SCANNER INDICATORS UNAVAILABLE";
     default:
       return "Foundation checklist incomplete";
   }

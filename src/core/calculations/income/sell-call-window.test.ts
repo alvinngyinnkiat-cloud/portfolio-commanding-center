@@ -54,6 +54,22 @@ describe("sell-call-window", () => {
     ).toBe("covered");
   });
 
+  it("returns scanner indicators unavailable when ATR or average price is missing", () => {
+    expect(
+      deriveIncomeDecisionStatus({
+        ...baseInput,
+        atr14: null,
+      })
+    ).toBe("scanner_indicators_unavailable");
+
+    expect(
+      deriveIncomeDecisionStatus({
+        ...baseInput,
+        avgPriceUsd: null,
+      })
+    ).toBe("scanner_indicators_unavailable");
+  });
+
   it("resets to waiting for trigger when price falls below trigger before confirmation", () => {
     expect(
       deriveIncomeDecisionStatus({

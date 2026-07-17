@@ -144,6 +144,18 @@ function buildFoundationView(
   const avgPriceUsd = scannerRecord?.indicators.avgPrice ?? null;
   const avgPricePrevUsd = scannerRecord?.indicators.avgPricePrev ?? null;
   const atr14 = scannerRecord?.indicators.atr14 ?? null;
+  const scannerIndicatorsAvailable =
+    scannerRecord != null &&
+    (scannerRecord.indicatorStatus === "ready" ||
+      (scannerRecord.indicatorStatus == null && scannerRecord.status === "ok"));
+
+  const scannerIndicatorFailures: string[] = [];
+  if (!scannerIndicatorsAvailable) {
+    if (atr14 == null) scannerIndicatorFailures.push("ATR14 unavailable");
+    if (avgPriceUsd == null || avgPricePrevUsd == null) {
+      scannerIndicatorFailures.push("Average Price confirmation unavailable");
+    }
+  }
 
   const windowInput = {
     foundationChecklistPass,
@@ -156,7 +168,14 @@ function buildFoundationView(
     avgPricePrevUsd,
   };
 
-  const timingRules = evaluateSellCallTimingRules(windowInput);
+  const timingRules = scannerIndicatorsAvailable
+    ? evaluateSellCallTimingRules(windowInput)
+    : scannerIndicatorFailures.map((label, index) => ({
+        id: `scanner-missing-${index}`,
+        label,
+        pass: false,
+        detail: "Scanner indicators unavailable for this ticker",
+      }));
   const decisionStatus = deriveIncomeDecisionStatus(windowInput);
   const foundationTriggerPriceUsd = calculateFoundationTriggerPrice(
     foundationBreakevenUsd,
@@ -216,6 +235,8 @@ function buildFoundationView(
     activeRecommendation: activeSellCallRow
       ? deriveSellCallRecommendation(activeSellCallRow.dashboard.tradeHealth)
       : null,
+    scannerIndicatorsAvailable,
+    scannerIndicatorFailures,
   };
 }
 

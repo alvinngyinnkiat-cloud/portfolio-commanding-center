@@ -29,13 +29,18 @@ const OUTPUT_STYLES: Record<StrategyOutput, string> = {
 
 export function ScannerOpportunityCard({ result, dataStatus, refreshedAt }: ScannerOpportunityCardProps) {
   const [expanded, setExpanded] = useState(false);
+  const priceOnly = isPriceOnlyScannerResult(result);
 
   return (
     <Card noPadding className={`overflow-hidden ${result.tradable ? "" : "opacity-85"}`}>
       <div className="space-y-4 overflow-hidden p-4 sm:p-5">
         <div className="flex flex-wrap items-center justify-end gap-2">
           {dataStatus && <TickerDataStatusBadge status={dataStatus} />}
-          <TradableBadge tradable={result.tradable} />
+          {priceOnly ? (
+            <IndicatorStatusBadge status="insufficient_history" />
+          ) : (
+            <TradableBadge tradable={result.tradable} />
+          )}
           <button
             type="button"
             onClick={() => setExpanded((value) => !value)}
@@ -46,15 +51,28 @@ export function ScannerOpportunityCard({ result, dataStatus, refreshedAt }: Scan
           </button>
         </div>
 
-        <div className="grid min-w-0 gap-4 lg:grid-cols-3 lg:gap-5">
+        <div className={`grid min-w-0 gap-4 ${priceOnly ? "lg:grid-cols-2" : "lg:grid-cols-3"} lg:gap-5`}>
           <ChartColumn result={result} refreshedAt={refreshedAt} dataStatus={dataStatus} />
-          <EarlyReversalPanel result={result} />
-          <MainStrategyPanel result={result} />
+          {priceOnly ? (
+            <InsufficientHistoryPanel result={result} />
+          ) : (
+            <>
+              <EarlyReversalPanel result={result} />
+              <MainStrategyPanel result={result} />
+            </>
+          )}
         </div>
 
-        {expanded && <ExpandedDetails result={result} />}
+        {expanded && !priceOnly && <ExpandedDetails result={result} />}
       </div>
     </Card>
+  );
+}
+
+function isPriceOnlyScannerResult(result: ScannerTickerResult): boolean {
+  return (
+    result.status === "price_only" ||
+    result.indicatorStatus === "insufficient_history"
   );
 }
 
@@ -86,6 +104,29 @@ function ChartColumn({
         <p className="mt-2 text-xs text-slate-400">
           Market session: {result.priceAsOf ?? "—"}
         </p>
+        {result.priceStatus && (
+          <p className="mt-1 text-xs text-slate-400">
+            Price status:{" "}
+            <span className="capitalize text-slate-200">{result.priceStatus}</span>
+          </p>
+        )}
+        {result.priceSource && (
+          <p className="mt-1 text-[10px] text-slate-500">Source: {result.priceSource}</p>
+        )}
+        {isPriceOnlyScannerResult(result) && (
+          <div className="mt-3 space-y-1 border-t border-surface-border/50 pt-3">
+            <p className="text-[11px] font-semibold uppercase tracking-wide text-orange-300">
+              Scanner status: Insufficient History
+            </p>
+            <p className="text-xs text-slate-400">
+              Available: {result.candlesAvailable ?? 0} daily candles
+            </p>
+            <p className="text-xs text-slate-400">
+              Required: enough candles for all configured indicators (
+              {result.candlesRequired ?? 200})
+            </p>
+          </div>
+        )}
         {refreshedAt && (
           <p className="mt-1 text-[10px] text-slate-500">
             Refreshed: {formatScannerRefreshTime(refreshedAt)}
@@ -160,6 +201,40 @@ function MainStrategyPanel({ result }: { result: ScannerTickerResult }) {
       </p>
       <Checklist items={checklist} compact />
     </StrategyPanel>
+  );
+}
+
+function InsufficientHistoryPanel({ result }: { result: ScannerTickerResult }) {
+  return (
+    <div className="flex min-w-0 flex-col rounded-xl border border-orange-500/30 bg-orange-500/5 p-4 lg:col-span-1">
+      <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+        Scanner Result
+      </p>
+      <div className="mt-4 rounded-xl border border-surface-border bg-surface/60 px-4 py-6 text-center">
+        <p className="text-lg font-extrabold tracking-wide text-slate-300">
+          NO SCANNER RESULT — INSUFFICIENT HISTORY
+        </p>
+        {result.indicatorError && (
+          <p className="mt-3 text-sm text-slate-400">{result.indicatorError}</p>
+        )}
+      </div>
+      <p className="mt-4 text-xs text-slate-500">
+        Current Price remains available for Options and Income modules. Strategy
+        indicators require more daily history.
+      </p>
+    </div>
+  );
+}
+
+function IndicatorStatusBadge({
+  status,
+}: {
+  status: "insufficient_history";
+}) {
+  return (
+    <span className="inline-flex items-center rounded-full bg-orange-500/15 px-3 py-1 text-xs font-semibold text-orange-200">
+      Indicators: Insufficient History
+    </span>
   );
 }
 

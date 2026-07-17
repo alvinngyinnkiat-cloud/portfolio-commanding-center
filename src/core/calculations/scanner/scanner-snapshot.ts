@@ -15,6 +15,9 @@ export interface LatestScannerRecord {
   /** ISO timestamp when the parent scan run completed. */
   refreshedAt: string;
   scanDate: string;
+  priceSource?: string | null;
+  priceStatus?: ScannerTickerResult["priceStatus"];
+  indicatorStatus?: ScannerTickerResult["indicatorStatus"];
   indicators: ScannerIndicators;
   recentCandles: ScannerCandleBar[];
   status: ScannerTickerResult["status"];
@@ -29,6 +32,9 @@ interface ScannerRecordCandidate {
   marketDate: string | null;
   refreshedAt: string;
   scanDate: string;
+  priceSource?: string | null;
+  priceStatus?: ScannerTickerResult["priceStatus"];
+  indicatorStatus?: ScannerTickerResult["indicatorStatus"];
   indicators: ScannerIndicators;
   recentCandles: ScannerCandleBar[];
   status: ScannerTickerResult["status"];
@@ -73,6 +79,9 @@ function flattenRunsToCandidates(runs: ScannerScanRun[]): ScannerRecordCandidate
         marketDate: result.priceAsOf,
         refreshedAt: run.scanTime,
         scanDate: run.scanDate,
+        priceSource: result.priceSource,
+        priceStatus: result.priceStatus,
+        indicatorStatus: result.indicatorStatus,
         indicators: result.indicators,
         recentCandles: result.recentCandles,
         status: result.status,
@@ -117,6 +126,9 @@ function persistedToLatest(
     marketDate: record.marketDate,
     refreshedAt: record.refreshedAt,
     scanDate: record.marketDate,
+    priceSource: record.result.priceSource,
+    priceStatus: record.result.priceStatus,
+    indicatorStatus: record.result.indicatorStatus,
     indicators: record.result.indicators,
     recentCandles: record.result.recentCandles,
     status: record.result.status,
