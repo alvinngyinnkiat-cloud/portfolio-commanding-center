@@ -28,6 +28,7 @@ import type { StockWeeklyCandleRepository } from "@/core/database/repositories/s
 import { generateId } from "@/core/database/local/local-storage";
 import { getLatestCandleDate } from "@/core/calculations/stocks/weekly-candles";
 import type { StockCandleUpdateResult } from "./stock-candle-update-service";
+import type { CurrentPriceService } from "./current-price-service";
 
 export type ScannerRefreshPhase =
   | "fetching"
@@ -100,7 +101,8 @@ export class ScannerRefreshOrchestrator {
     private readonly weeklyRepo: StockWeeklyCandleRepository,
     private readonly resultRepo: ScannerResultRepository,
     private readonly scheduleRepo: ScannerScheduleRepository,
-    private readonly priceScheduleRepo: StockPriceScheduleRepository
+    private readonly priceScheduleRepo: StockPriceScheduleRepository,
+    private readonly currentPriceService?: CurrentPriceService
   ) {}
 
   isRefreshRunning(): boolean {
@@ -389,6 +391,8 @@ export class ScannerRefreshOrchestrator {
           }
           break;
         }
+
+        this.currentPriceService?.persistFromScannerTickerRecord(record);
 
         return {
           ticker,

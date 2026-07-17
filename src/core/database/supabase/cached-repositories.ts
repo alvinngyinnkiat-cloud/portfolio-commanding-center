@@ -391,6 +391,29 @@ class CachedScannerResultRepository implements ScannerResultRepository {
     return this.extensions.verifyTickerRecord(stored, expected);
   }
 
+  upsertCurrentPriceRecord(
+    record: Parameters<ScannerResultRepository["upsertCurrentPriceRecord"]>[0]
+  ) {
+    return this.extensions.upsertCurrentPriceRecord(record);
+  }
+
+  getCurrentPriceRecord(
+    ticker: Parameters<ScannerResultRepository["getCurrentPriceRecord"]>[0]
+  ) {
+    return this.extensions.getCurrentPriceRecord(ticker);
+  }
+
+  getAllCurrentPriceRecords() {
+    return this.extensions.getAllCurrentPriceRecords();
+  }
+
+  verifyCurrentPriceRecord(
+    stored: Parameters<ScannerResultRepository["verifyCurrentPriceRecord"]>[0],
+    expected: Parameters<ScannerResultRepository["verifyCurrentPriceRecord"]>[1]
+  ) {
+    return this.extensions.verifyCurrentPriceRecord(stored, expected);
+  }
+
   readStore() {
     return this.extensions.readStore();
   }

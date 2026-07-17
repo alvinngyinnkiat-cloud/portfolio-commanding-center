@@ -1,5 +1,6 @@
 import type { MarketDataRecord } from "@/core/domain/types/market-data";
-import type { ScannerScanRun } from "@/core/domain/types/scanner";
+import type { ScannerScanRun, ScannerTickerPriceSourceKey } from "@/core/domain/types/scanner";
+import type { PersistedCurrentPriceRecord } from "@/core/domain/types/current-price";
 import type { ScannerResultRepository } from "@/core/database/repositories/scanner-repository";
 import type {
   PersistedScannerTickerRecord,
@@ -13,25 +14,163 @@ function isValidPrice(price: number | null | undefined): price is number {
 
 export function mapPersistedToMarketDataRecord(
   record: PersistedScannerTickerRecord,
-  latestRunId: string | null
+  latestRunId: string | null,
+  priceRecord?: PersistedCurrentPriceRecord | null
 ): MarketDataRecord {
   const result = record.result;
+  const useCentralPrice =
+    priceRecord != null && isValidPrice(priceRecord.currentPrice);
+
   return {
     ticker: normalizeTicker(record.ticker),
-    currentPrice: result.currentPrice ?? 0,
-    marketSession: record.marketDate,
-    refreshedAt: record.refreshedAt,
-    priceSource: result.priceSource ?? null,
-    priceSourceKey: result.priceSourceKey ?? null,
-    priceStatus: result.priceStatus ?? null,
+    currentPrice: useCentralPrice
+      ? priceRecord.currentPrice
+      : (result.currentPrice ?? 0),
+    marketSession: useCentralPrice
+      ? priceRecord.marketSession
+      : record.marketDate,
+    refreshedAt: useCentralPrice ? priceRecord.refreshedAt : record.refreshedAt,
+    priceSource: useCentralPrice
+      ? priceRecord.source
+      : (result.priceSource ?? null),
+    priceSourceKey: useCentralPrice
+      ? priceRecord.sourceKey
+      : (result.priceSourceKey ?? null),
+    priceStatus: useCentralPrice
+      ? priceRecord.status
+      : (result.priceStatus ?? null),
     candles: result.recentCandles,
     atr14: result.indicators.atr14,
     currentAveragePrice: result.indicators.avgPrice,
     previousAveragePrice: result.indicators.avgPricePrev,
     indicatorStatus: result.indicatorStatus ?? null,
-    refreshRunId: record.refreshRunId,
+    refreshRunId: useCentralPrice
+      ? priceRecord.refreshRunId
+      : record.refreshRunId,
     scannerResult: result,
-    isStale: latestRunId != null && record.refreshRunId !== latestRunId,
+    isStale:
+      priceRecord?.status === "stale" ||
+      (latestRunId != null && record.refreshRunId !== latestRunId),
+  };
+}
+
+function toScannerPriceSourceKey(
+  key: import("@/core/domain/types/current-price").CurrentPriceSourceKey
+): ScannerTickerPriceSourceKey {
+  if (key === "primary_quote") return "quote";
+  if (key === "manual_fallback" || key === "saved_trade") return "stored_candle";
+  return key;
+}
+
+function mapPriceOnlyMarketDataRecord(
+  priceRecord: PersistedCurrentPriceRecord
+): MarketDataRecord {
+  const reason = "Price-only — scanner indicators unavailable";
+  const scannerResult: import("@/core/domain/types/scanner").ScannerTickerResult = {
+    ticker: priceRecord.ticker,
+    category: "Custom",
+    market: "US",
+    currentPrice: priceRecord.currentPrice,
+    priceAsOf: priceRecord.marketSession,
+    priceSource: priceRecord.source,
+    priceSourceKey: toScannerPriceSourceKey(priceRecord.sourceKey),
+    priceStatus: priceRecord.status === "unavailable" ? "stale" : priceRecord.status,
+    status: "price_only",
+    indicatorStatus: "insufficient_history",
+    indicatorError: reason,
+    candlesAvailable: 0,
+    candlesRequired: 200,
+    indicators: {
+      ema20: null,
+      ema20Prev: null,
+      sma50: null,
+      sma50Prev: null,
+      sma50SlopePct: null,
+      sma200: null,
+      sma200Prev: null,
+      atr14: null,
+      so: null,
+      soPrev: null,
+      soStatus: "Rolling Down",
+      soDebug: null,
+      atrDebug: null,
+      high: null,
+      low: null,
+      avgPrice: null,
+      avgPricePrev: null,
+      emaDiff: null,
+      emaDiffPct: null,
+      marketStructure: "Neutral",
+      momentum: "At EMA",
+      trend: "Neutral",
+      trendQualityScore: 0,
+    },
+    structure: {
+      dailySupport: null,
+      weeklySupport: null,
+      primarySupport: null,
+      dailyResistance: null,
+      weeklyResistance: null,
+      primaryResistance: null,
+      midPrice: null,
+      rangeWidth: null,
+      sellPutRange: null,
+      sellCallRange: null,
+      icMidZone: null,
+    },
+    strategies: {
+      bullPut: {
+        eligible: false,
+        checklist: [],
+        passReasons: [],
+        failReasons: [reason],
+      },
+      bearCall: {
+        eligible: false,
+        checklist: [],
+        passReasons: [],
+        failReasons: [reason],
+      },
+      ironCondor: {
+        eligible: false,
+        checklist: [],
+        passReasons: [],
+        failReasons: [reason],
+      },
+    },
+    emaStrategy: {
+      output: "NO TRADE",
+      reasons: [reason],
+      checklist: [],
+    },
+    mainSystem: {
+      output: "NO TRADE",
+      strategy: null,
+      reasons: [reason],
+    },
+    bestSetup: null,
+    tradable: false,
+    tradeReasons: [reason],
+    recentCandles: [],
+    notes: [reason],
+  };
+
+  return {
+    ticker: normalizeTicker(priceRecord.ticker),
+    currentPrice: priceRecord.currentPrice,
+    marketSession: priceRecord.marketSession,
+    refreshedAt: priceRecord.refreshedAt,
+    priceSource: priceRecord.source,
+    priceSourceKey: priceRecord.sourceKey,
+    priceStatus: priceRecord.status,
+    candles: [],
+    atr14: null,
+    currentAveragePrice: null,
+    previousAveragePrice: null,
+    indicatorStatus: "insufficient_history",
+    refreshRunId: priceRecord.refreshRunId,
+    scannerResult,
+    isStale: priceRecord.status === "stale",
   };
 }
 
@@ -43,7 +182,7 @@ function compareMarketDataRecords(a: MarketDataRecord, b: MarketDataRecord): num
 
 /**
  * Single shared read surface for Modules 4, 5 and 6.
- * Reads centrally persisted per-ticker records only — no quote/candle fallbacks.
+ * Merges central current-price records with scanner indicator records.
  */
 export class MarketDataService {
   private version = 0;
@@ -70,12 +209,30 @@ export class MarketDataService {
     const store = this.scannerResultRepo.readStore();
     const latestRunId =
       store.lastRefreshRun?.refreshRunId ?? store.latest?.id ?? null;
-    const persisted = this.scannerResultRepo.getAllLatestTickerRecords();
+    const priceRecords = this.scannerResultRepo.getAllCurrentPriceRecords();
+    const scannerRecords = this.scannerResultRepo.getAllLatestTickerRecords();
     const map = new Map<string, MarketDataRecord>();
+    const seen = new Set<string>();
 
-    for (const [ticker, record] of persisted) {
-      if (!isValidPrice(record.result.currentPrice)) continue;
-      map.set(ticker, mapPersistedToMarketDataRecord(record, latestRunId));
+    for (const [ticker, scannerRecord] of scannerRecords) {
+      if (!isValidPrice(scannerRecord.result.currentPrice) && !priceRecords.has(ticker)) {
+        continue;
+      }
+      const priceRecord = priceRecords.get(ticker) ?? null;
+      if (priceRecord && isValidPrice(priceRecord.currentPrice)) {
+        map.set(
+          ticker,
+          mapPersistedToMarketDataRecord(scannerRecord, latestRunId, priceRecord)
+        );
+      } else if (isValidPrice(scannerRecord.result.currentPrice)) {
+        map.set(ticker, mapPersistedToMarketDataRecord(scannerRecord, latestRunId));
+      }
+      seen.add(ticker);
+    }
+
+    for (const [ticker, priceRecord] of priceRecords) {
+      if (seen.has(ticker)) continue;
+      map.set(ticker, mapPriceOnlyMarketDataRecord(priceRecord));
     }
 
     return map;

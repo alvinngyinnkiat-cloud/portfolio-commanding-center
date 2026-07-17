@@ -1,3 +1,4 @@
+import type { PersistedCurrentPriceRecord } from "@/core/domain/types/current-price";
 import type { ScannerTickerResult } from "@/core/domain/types/scanner";
 import { normalizeTicker } from "@/core/calculations/stocks/normalize";
 
@@ -38,6 +39,8 @@ export interface ScannerResultsStore {
   previous: import("@/core/domain/types/scanner").ScannerScanRun | null;
   tickerRecords?: Record<string, PersistedScannerTickerRecord>;
   tickerLatestKeys?: Record<string, string>;
+  /** Canonical current-price store — updated by any module refresh. */
+  currentPriceRecords?: Record<string, PersistedCurrentPriceRecord>;
   lastRefreshRun?: ScannerRefreshRunMetadata | null;
 }
 
@@ -53,6 +56,7 @@ export function normalizeScannerResultsStore(
     previous: store?.previous ?? null,
     tickerRecords: store?.tickerRecords ?? {},
     tickerLatestKeys: store?.tickerLatestKeys ?? {},
+    currentPriceRecords: store?.currentPriceRecords ?? {},
     lastRefreshRun: store?.lastRefreshRun ?? null,
   };
 }

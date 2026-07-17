@@ -20,6 +20,7 @@ import { ScannerService } from "./scanner-service";
 import { ScannerWatchlistService } from "./scanner-watchlist-service";
 import { ScannerSnapshotService } from "./scanner-snapshot-service";
 import { MarketDataService } from "./market-data-service";
+import { CurrentPriceService } from "./current-price-service";
 import { ScannerRefreshOrchestrator } from "./scanner-refresh-orchestrator";
 import {
   retryFailedScannerTickers,
@@ -87,6 +88,14 @@ export function createPortfolioServices(
 
   const marketData = new MarketDataService(repos.scannerResults);
 
+  const currentPrice = new CurrentPriceService(
+    repos.scannerResults,
+    repos.stockPrices,
+    repos.stockDailyCandles,
+    stockPriceUpdates,
+    marketData
+  );
+
   const scannerSnapshot = new ScannerSnapshotService(repos.scannerResults, marketData);
 
   const scannerRefresh = new ScannerRefreshOrchestrator(
@@ -96,7 +105,8 @@ export function createPortfolioServices(
     repos.stockWeeklyCandles,
     repos.scannerResults,
     repos.scannerSchedule,
-    repos.stockPriceSchedule
+    repos.stockPriceSchedule,
+    currentPrice
   );
 
   const cryptoTracker = new CryptoTrackerService(
@@ -144,6 +154,7 @@ export function createPortfolioServices(
     scannerWatchlist,
     scannerSnapshot,
     marketData,
+    currentPrice,
     scannerRefresh,
     scanner,
     cryptoHoldings: new CryptoHoldingService(repos.cryptoHoldings),

@@ -114,6 +114,7 @@ export function normalizeCache(cache: PersistenceCache): PersistenceCache {
         : null,
       tickerRecords: cache.scannerResults.tickerRecords,
       tickerLatestKeys: cache.scannerResults.tickerLatestKeys,
+      currentPriceRecords: cache.scannerResults.currentPriceRecords,
       lastRefreshRun: cache.scannerResults.lastRefreshRun,
     }),
     optionsSettings: normalizeOptionsSettings(cache.optionsSettings),

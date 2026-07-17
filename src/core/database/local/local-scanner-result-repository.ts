@@ -6,6 +6,8 @@ import type {
   ScannerResultsStore,
   UpsertTickerRecordOutcome,
 } from "@/core/calculations/scanner/scanner-ticker-records";
+import type { PersistedCurrentPriceRecord } from "@/core/domain/types/current-price";
+import type { UpsertCurrentPriceRecordOutcome } from "@/core/calculations/scanner/current-price-records";
 import {
   createScannerResultRepositoryExtensions,
   getLatestScannerRun,
@@ -20,6 +22,7 @@ const EMPTY: ScannerResultsStore = {
   previous: null,
   tickerRecords: {},
   tickerLatestKeys: {},
+  currentPriceRecords: {},
   lastRefreshRun: null,
 };
 
@@ -84,6 +87,27 @@ export class LocalScannerResultRepository implements ScannerResultRepository {
     expected: PersistedScannerTickerRecord
   ): boolean {
     return this.extensions.verifyTickerRecord(stored, expected);
+  }
+
+  upsertCurrentPriceRecord(
+    record: PersistedCurrentPriceRecord
+  ): UpsertCurrentPriceRecordOutcome {
+    return this.extensions.upsertCurrentPriceRecord(record);
+  }
+
+  getCurrentPriceRecord(ticker: string): PersistedCurrentPriceRecord | null {
+    return this.extensions.getCurrentPriceRecord(ticker);
+  }
+
+  getAllCurrentPriceRecords(): Map<string, PersistedCurrentPriceRecord> {
+    return this.extensions.getAllCurrentPriceRecords();
+  }
+
+  verifyCurrentPriceRecord(
+    stored: PersistedCurrentPriceRecord | null,
+    expected: PersistedCurrentPriceRecord
+  ): boolean {
+    return this.extensions.verifyCurrentPriceRecord(stored, expected);
   }
 
   readStore(): ScannerResultsStore {

@@ -17,6 +17,8 @@ import { Button } from "@/shared/components/ui/Button";
 import { SummaryCard } from "@/shared/components/ui/SummaryCard";
 import { plTrend } from "./options-utils";
 import { usePortfolio } from "@/context/PortfolioContext";
+import { collectOpenTradeCurrentPriceInputs } from "@/core/calculations/scanner/collect-current-price-tickers";
+import { RefreshCurrentPricesButton } from "@/shared/components/ui/RefreshCurrentPricesButton";
 import { OpenTradeDashboardCard } from "./OpenTradeDashboardCard";
 import { TradeHealthSummaryCards } from "./TradeHealthSummaryCards";
 
@@ -115,7 +117,7 @@ export function OpenTradesTab({
   onEdit: (row: OptionsOpenTradeRow) => void;
   onClose: (row: OptionsOpenTradeRow) => void;
 }) {
-  const { optionsData, services, refresh } = usePortfolio();
+  const { optionsData, services, refresh, refreshCurrentPrices } = usePortfolio();
   const rows = optionsData?.openRows ?? [];
   const [healthFilter, setHealthFilter] = useState<OpenTradeHealthCategory | null>(
     null
@@ -157,6 +159,11 @@ export function OpenTradesTab({
     [sharedRows]
   );
 
+  const openTradePriceInputs = useMemo(
+    () => collectOpenTradeCurrentPriceInputs(rows),
+    [rows]
+  );
+
   const handleDelete = (row: OptionsOpenTradeRow) => {
     if (!window.confirm(`Delete open trade ${row.trade.underlying}?`)) return;
     const result = services.optionsTrades.deleteOpenTrade(row.trade.id);
@@ -187,7 +194,13 @@ export function OpenTradesTab({
   return (
     <div className="min-w-0 space-y-8">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <Button onClick={onOpenNew}>+ Open Trade</Button>
+        <div className="flex flex-wrap items-center gap-3">
+          <Button onClick={onOpenNew}>+ Open Trade</Button>
+          <RefreshCurrentPricesButton
+            tickers={openTradePriceInputs}
+            onRefresh={refreshCurrentPrices}
+          />
+        </div>
         {healthFilter != null && (
           <button
             type="button"

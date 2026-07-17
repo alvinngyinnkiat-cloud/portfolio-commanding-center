@@ -255,11 +255,10 @@ export function formatTickerPriceSourceLabel(
             indicatorStatus: marketData.indicatorStatus,
           })
         );
+      } else if (marketData.priceSource) {
+        lines.push(`Source: ${marketData.priceSource}`);
       } else {
-        lines.push(`Source: Scanner`);
-        if (marketData.priceSource) {
-          lines.push(`Price source: ${marketData.priceSource}`);
-        }
+        lines.push("Source: Scanner");
       }
       if (marketData.refreshedAt) {
         const refreshed = new Intl.DateTimeFormat("en-SG", {

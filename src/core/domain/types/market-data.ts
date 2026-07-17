@@ -1,3 +1,4 @@
+import type { CurrentPriceSourceKey, CurrentPriceStatus } from "./current-price";
 import type {
   ScannerCandleBar,
   ScannerIndicatorStatus,
@@ -13,8 +14,8 @@ export interface MarketDataRecord {
   marketSession: string;
   refreshedAt: string;
   priceSource: string | null;
-  priceSourceKey: ScannerTickerPriceSourceKey | null;
-  priceStatus: ScannerPriceStatus | null;
+  priceSourceKey: ScannerTickerPriceSourceKey | CurrentPriceSourceKey | null;
+  priceStatus: ScannerPriceStatus | CurrentPriceStatus | null;
   candles: ScannerCandleBar[];
   atr14: number | null;
   currentAveragePrice: number | null;

@@ -13,6 +13,8 @@ import type { StockTrackerData } from "@/core/services/stock-tracker-service";
 import type { CryptoTrackerData } from "@/core/services/crypto-tracker-service";
 import type { ScannerTrackerData } from "@/core/domain/types/scanner";
 import type { OptionsTrackerData } from "@/core/domain/types/options";
+import type { CurrentPriceRefreshBatchResult } from "@/core/domain/types/current-price";
+import type { CurrentPriceTickerInput } from "@/core/services/current-price-service";
 import {
   createPortfolioServices,
   type PortfolioServices,
@@ -36,6 +38,10 @@ interface PortfolioContextValue {
   refreshCryptoOnly: () => void;
   /** Refresh scanner + options tracker only — does not touch crypto, stocks, or snapshots. */
   refreshScannerPricesOnly: () => Promise<void>;
+  /** Refresh central current prices for the given tickers (Modules 5 and 6). */
+  refreshCurrentPrices: (
+    tickers: CurrentPriceTickerInput[]
+  ) => Promise<CurrentPriceRefreshBatchResult>;
   /** Bumps when shared market-data store reloads after Scanner refresh. */
   marketDataVersion: number;
   /** @deprecated Use marketDataVersion */
@@ -161,6 +167,25 @@ export function PortfolioProvider({ children }: { children: ReactNode }) {
     setMarketDataVersion(version);
   }, [services]);
 
+  const refreshCurrentPrices = useCallback(
+    async (tickers: CurrentPriceTickerInput[]) => {
+      if (!services) {
+        throw new Error("Portfolio services are not ready");
+      }
+
+      const manager = getPersistenceManager();
+      const result = await services.currentPrice.refreshTickers({ tickers });
+
+      if (manager) {
+        await manager.drainSyncQueue();
+      }
+
+      await refreshScannerPricesOnly();
+      return result;
+    },
+    [services, refreshScannerPricesOnly]
+  );
+
   const clearPersistenceError = useCallback(() => {
     getPersistenceManager()?.clearError();
     setPersistenceError(null);
@@ -248,6 +273,7 @@ export function PortfolioProvider({ children }: { children: ReactNode }) {
         refresh,
         refreshCryptoOnly,
         refreshScannerPricesOnly,
+        refreshCurrentPrices,
         marketDataVersion,
         scannerSnapshotVersion: marketDataVersion,
         isLoaded,

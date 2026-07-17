@@ -98,6 +98,72 @@ export class StockPriceUpdateService {
     return Promise.all(MARKETS.map((market) => this.updateMarketPrices(market, date)));
   }
 
+  /** Force-fetch live quotes for specific US tickers (Module 5/6 current-price refresh). */
+  async refreshPricesForTickers(
+    tickers: Array<{ ticker: string; fetchSymbol?: string }>,
+    date: Date = new Date()
+  ): Promise<StockPriceUpdateResult> {
+    const fetchedAt = date.toISOString();
+    const priceAsOf = getSingaporeDateString(date);
+    const seen = new Set<string>();
+    const symbols: Array<{ market: StockMarket; ticker: string; fetchSymbol?: string }> = [];
+
+    for (const row of tickers) {
+      const normalized = normalizeTicker(row.ticker);
+      if (!normalized || seen.has(normalized)) continue;
+      seen.add(normalized);
+      symbols.push({
+        market: "US",
+        ticker: normalized,
+        fetchSymbol: row.fetchSymbol,
+      });
+    }
+
+    if (symbols.length === 0) {
+      return {
+        market: "US",
+        updated: true,
+        symbolsRequested: 0,
+        symbolsUpdated: 0,
+        symbolsFailed: 0,
+      };
+    }
+
+    const quotes = await this.fetchQuotes(
+      symbols.map((symbol) => ({
+        market: symbol.market,
+        ticker: symbol.fetchSymbol ?? symbol.ticker,
+      }))
+    );
+
+    let symbolsUpdated = 0;
+    let symbolsFailed = 0;
+
+    for (let index = 0; index < symbols.length; index += 1) {
+      const symbol = symbols[index];
+      const quote = quotes[index];
+      if (!quote) continue;
+      const outcome = this.applyQuote(
+        { ...quote, ticker: symbol.ticker },
+        fetchedAt,
+        priceAsOf
+      );
+      if (outcome === "updated") {
+        symbolsUpdated += 1;
+      } else if (outcome === "failed") {
+        symbolsFailed += 1;
+      }
+    }
+
+    return {
+      market: "US",
+      updated: true,
+      symbolsRequested: symbols.length,
+      symbolsUpdated,
+      symbolsFailed,
+    };
+  }
+
   private findExistingPrice(
     market: StockMarket,
     ticker: string

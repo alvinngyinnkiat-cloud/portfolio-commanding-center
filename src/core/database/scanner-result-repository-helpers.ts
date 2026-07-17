@@ -11,6 +11,14 @@ import {
   type ScannerResultsStore,
   type UpsertTickerRecordOutcome,
 } from "@/core/calculations/scanner/scanner-ticker-records";
+import {
+  buildAllCurrentPriceRecords,
+  getPersistedCurrentPriceRecord,
+  upsertCurrentPriceRecord,
+  verifyPersistedCurrentPriceRecord,
+  type UpsertCurrentPriceRecordOutcome,
+} from "@/core/calculations/scanner/current-price-records";
+import type { PersistedCurrentPriceRecord } from "@/core/domain/types/current-price";
 import { normalizeScannerScanRun } from "@/core/calculations/scanner/normalize-scan-result";
 import type { ScannerScanRun } from "@/core/domain/types/scanner";
 
@@ -27,6 +35,10 @@ export function createScannerResultRepositoryExtensions(
   | "setLastRefreshRun"
   | "verifyTickerRecord"
   | "readStore"
+  | "upsertCurrentPriceRecord"
+  | "getCurrentPriceRecord"
+  | "getAllCurrentPriceRecords"
+  | "verifyCurrentPriceRecord"
 > {
   return {
     readStore(): ScannerResultsStore {
@@ -70,6 +82,33 @@ export function createScannerResultRepositoryExtensions(
       expected: PersistedScannerTickerRecord
     ): boolean {
       return verifyPersistedTickerRecord(stored, expected);
+    },
+
+    upsertCurrentPriceRecord(
+      record: PersistedCurrentPriceRecord
+    ): UpsertCurrentPriceRecordOutcome {
+      const store = normalizeScannerResultsStore(readStore());
+      const outcome = upsertCurrentPriceRecord(store, record);
+      writeStore(store);
+      return outcome;
+    },
+
+    getCurrentPriceRecord(ticker: string): PersistedCurrentPriceRecord | null {
+      return getPersistedCurrentPriceRecord(
+        normalizeScannerResultsStore(readStore()),
+        ticker
+      );
+    },
+
+    getAllCurrentPriceRecords(): Map<string, PersistedCurrentPriceRecord> {
+      return buildAllCurrentPriceRecords(normalizeScannerResultsStore(readStore()));
+    },
+
+    verifyCurrentPriceRecord(
+      stored: PersistedCurrentPriceRecord | null,
+      expected: PersistedCurrentPriceRecord
+    ): boolean {
+      return verifyPersistedCurrentPriceRecord(stored, expected);
     },
   };
 }

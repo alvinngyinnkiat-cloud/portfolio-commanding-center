@@ -1,3 +1,7 @@
+import type { PersistedCurrentPriceRecord } from "@/core/domain/types/current-price";
+import type {
+  UpsertCurrentPriceRecordOutcome,
+} from "@/core/calculations/scanner/current-price-records";
 import type {
   ScannerRefreshRunMetadata,
   PersistedScannerTickerRecord,
@@ -22,6 +26,15 @@ export interface ScannerResultRepository {
   verifyTickerRecord(
     stored: PersistedScannerTickerRecord | null,
     expected: PersistedScannerTickerRecord
+  ): boolean;
+  upsertCurrentPriceRecord(
+    record: PersistedCurrentPriceRecord
+  ): UpsertCurrentPriceRecordOutcome;
+  getCurrentPriceRecord(ticker: string): PersistedCurrentPriceRecord | null;
+  getAllCurrentPriceRecords(): Map<string, PersistedCurrentPriceRecord>;
+  verifyCurrentPriceRecord(
+    stored: PersistedCurrentPriceRecord | null,
+    expected: PersistedCurrentPriceRecord
   ): boolean;
   /** Read normalized store — used to rebuild snapshot after refresh. */
   readStore(): ScannerResultsStore;

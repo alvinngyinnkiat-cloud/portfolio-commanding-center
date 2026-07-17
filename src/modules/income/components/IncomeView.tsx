@@ -6,7 +6,9 @@ import {
   buildIncomeOverlayData,
   readIncomeOverlaySettings,
 } from "@/core/calculations/income";
+import { collectFoundationCurrentPriceInputs } from "@/core/calculations/scanner/collect-current-price-tickers";
 import type { IncomeOverlaySettings } from "@/core/domain/types/income";
+import { RefreshCurrentPricesButton } from "@/shared/components/ui/RefreshCurrentPricesButton";
 import { IncomeSummaryCards } from "./IncomeSummaryCards";
 import { FoundationCard } from "./FoundationCard";
 import { IncomeSettingsPanel } from "./IncomeSettingsPanel";
@@ -28,7 +30,8 @@ function IncomeSkeleton() {
 }
 
 export function IncomeView() {
-  const { isLoaded, optionsData, marketDataVersion } = usePortfolio();
+  const { isLoaded, optionsData, marketDataVersion, refreshCurrentPrices } =
+    usePortfolio();
   const [settings, setSettings] = useState<IncomeOverlaySettings>(() =>
     readIncomeOverlaySettings()
   );
@@ -43,20 +46,34 @@ export function IncomeView() {
     });
   }, [optionsData, marketDataVersion, settings]);
 
+  const foundationPriceInputs = useMemo(() => {
+    if (!overlay) return [];
+    return collectFoundationCurrentPriceInputs(
+      overlay.foundations.map((row) => row.ticker),
+      optionsData?.openRows ?? []
+    );
+  }, [overlay, optionsData?.openRows]);
+
   if (!isLoaded || !optionsData || !overlay) {
     return <IncomeSkeleton />;
   }
 
   return (
     <div className="space-y-8 pb-8">
-      <header className="space-y-1">
-        <h1 className="text-2xl font-bold tracking-tight text-white sm:text-3xl">
-          Income Overlay Manager
-        </h1>
-        <p className="text-sm text-slate-500">
-          Read-only · Module 4 Scanner + Module 5 Options · Tracks SELL CALL windows and
-          income cycles per foundation position
-        </p>
+      <header className="space-y-3">
+        <div className="space-y-1">
+          <h1 className="text-2xl font-bold tracking-tight text-white sm:text-3xl">
+            Income Overlay Manager
+          </h1>
+          <p className="text-sm text-slate-500">
+            Read-only · Module 4 Scanner + Module 5 Options · Tracks SELL CALL windows and
+            income cycles per foundation position
+          </p>
+        </div>
+        <RefreshCurrentPricesButton
+          tickers={foundationPriceInputs}
+          onRefresh={refreshCurrentPrices}
+        />
       </header>
 
       <IncomeSettingsPanel settings={settings} onSettingsChange={setSettings} />
