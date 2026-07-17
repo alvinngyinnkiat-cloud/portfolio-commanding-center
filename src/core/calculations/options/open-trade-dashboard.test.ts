@@ -298,7 +298,8 @@ describe("open-trade-dashboard", () => {
 
       const metrics = buildOpenTradeDashboardMetrics(row);
       expect(metrics.currentPriceUsd).toBe(132.5);
-      expect(metrics.currentPriceSourceLabel).toContain("Scanner market date");
+      expect(metrics.currentPriceSourceLabel).toContain("Source: Scanner");
+      expect(metrics.currentPriceSourceLabel).toContain("Market session");
     });
 
     it("uses bull-put-style breakeven distance and debit economics", () => {

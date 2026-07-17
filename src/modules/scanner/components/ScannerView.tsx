@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useCallback, useMemo, useRef, useState } from "react";
 import { List } from "lucide-react";
 import { usePortfolio } from "@/context/PortfolioContext";
+import { normalizeTicker } from "@/core/calculations/stocks/normalize";
 import type { ScannerTickerDataStatus } from "@/core/calculations/scanner/scanner-ticker-records";
 import type { ScannerRefreshProgress } from "@/core/services/scanner-refresh-orchestrator";
 import {
@@ -62,7 +63,13 @@ function mapMetadataToUiStatus(
 }
 
 export function ScannerView() {
-  const { scannerData, services, refreshScannerPricesOnly, isLoaded } = usePortfolio();
+  const {
+    scannerData,
+    services,
+    refreshScannerPricesOnly,
+    isLoaded,
+    scannerSnapshotVersion,
+  } = usePortfolio();
   const [strategyFilter, setStrategyFilter] = useState<StrategyFilter>("all");
   const [categoryFilter, setCategoryFilter] = useState<CategoryFilter>("all");
   const [systemFilter, setSystemFilter] = useState<SystemFilter>("all");
@@ -100,6 +107,16 @@ export function ScannerView() {
         return a.ticker.localeCompare(b.ticker);
       });
   }, [displayRun, strategyFilter, categoryFilter, systemFilter, tradableOnly]);
+
+  const tickerRefreshedAt = useMemo(() => {
+    const map: Record<string, string | null> = {};
+    for (const result of filteredResults) {
+      const key = normalizeTicker(result.ticker);
+      const record = services.scannerSnapshot.getLatestScannerRecord(result.ticker);
+      map[key] = record?.refreshedAt ?? null;
+    }
+    return map;
+  }, [filteredResults, services, scannerSnapshotVersion]);
 
   const runRefresh = useCallback(
     async (mode: "all" | "failed") => {
@@ -223,6 +240,7 @@ export function ScannerView() {
           <ScannerOpportunityCards
             results={filteredResults}
             tickerStatuses={tickerStatuses}
+            tickerRefreshedAt={tickerRefreshedAt}
           />
         </>
       )}

@@ -116,7 +116,7 @@ export function FoundationCard({ foundation, atrMultiplier }: FoundationCardProp
           <div className="grid grid-cols-2 gap-2 text-xs text-slate-400">
             <Metric label="Current Price" value={formatUsd(currentPriceUsd)} />
             {currentPriceSourceLabel && (
-              <p className="col-span-2 text-[10px] text-slate-500">
+              <p className="col-span-2 whitespace-pre-line text-[10px] text-slate-500">
                 {currentPriceSourceLabel}
               </p>
             )}

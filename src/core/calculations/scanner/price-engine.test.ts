@@ -37,34 +37,10 @@ describe("getLatestTickerPrice", () => {
     expect(resolved.priceAsOf).toBe("2026-07-15");
   });
 
-  it("prefers scanner refreshed price over manual and saved fallbacks", () => {
-    const resolved = getLatestTickerPrice({
-      ticker: "QQQ",
-      scannerScanPrice: { priceUsd: 510.25, priceAsOf: "2025-06-13" },
-      manualPriceUsd: 500,
-      watchlist,
-      prices: [
-        {
-          market: "US",
-          ticker: "QQQ",
-          latestPrice: 505,
-          lastPriceUpdate: "2025-06-12",
-          priceAsOf: "2025-06-12",
-          source: "yahoo",
-        },
-      ],
-      dailyCandles: [],
-    });
-
-    expect(resolved.source).toBe("scanner_refreshed");
-    expect(resolved.priceUsd).toBe(510.25);
-    expect(resolved.priceAsOf).toBe("2025-06-13");
-  });
-
-  it("falls back to manual Module 5 price when scanner price is invalid", () => {
+  it("falls back to manual Module 5 price when scanner record is missing", () => {
     const resolved = getLatestTickerPrice({
       ticker: "VRT",
-      scannerScanPrice: { priceUsd: 0, priceAsOf: "2025-06-13" },
+      scannerScanPrice: { priceUsd: 510.25, priceAsOf: "2025-06-13" },
       manualPriceUsd: 142.5,
       watchlist,
       prices: [],

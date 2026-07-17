@@ -54,6 +54,30 @@ export function validateTickerScanResult(
     return { ok: false, error: "Current price is invalid" };
   }
 
+  if (Math.abs(result.currentPrice - latest.close) > 1e-6) {
+    return {
+      ok: false,
+      error: "Current price must equal latest completed candle close",
+    };
+  }
+
+  if (result.priceAsOf !== latest.date) {
+    return {
+      ok: false,
+      error: "Market date must match latest completed candle date",
+    };
+  }
+
+  if (
+    result.currentPrice < latest.low ||
+    result.currentPrice > latest.high
+  ) {
+    return {
+      ok: false,
+      error: "Current price outside latest candle high-low range",
+    };
+  }
+
   if (previousRecord) {
     const marketCmp = result.priceAsOf.localeCompare(previousRecord.marketDate);
     if (marketCmp < 0) {

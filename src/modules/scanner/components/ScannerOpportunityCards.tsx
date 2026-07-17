@@ -8,11 +8,13 @@ import { ScannerOpportunityCard } from "./ScannerOpportunityCard";
 interface ScannerOpportunityCardsProps {
   results: ScannerTickerResult[];
   tickerStatuses?: Record<string, ScannerTickerDataStatus>;
+  tickerRefreshedAt?: Record<string, string | null>;
 }
 
 export function ScannerOpportunityCards({
   results,
   tickerStatuses = {},
+  tickerRefreshedAt = {},
 }: ScannerOpportunityCardsProps) {
   if (results.length === 0) {
     return (
@@ -29,6 +31,7 @@ export function ScannerOpportunityCards({
           key={result.ticker}
           result={result}
           dataStatus={tickerStatuses[normalizeTicker(result.ticker)]}
+          refreshedAt={tickerRefreshedAt[normalizeTicker(result.ticker)]}
         />
       ))}
     </div>

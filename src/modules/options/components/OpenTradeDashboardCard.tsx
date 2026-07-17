@@ -441,7 +441,7 @@ export function OpenTradeDashboardCard({
                     : "—"}
                 </p>
                 {dashboard.currentPriceSourceLabel && (
-                  <p className="text-[10px] text-slate-500">
+                  <p className="whitespace-pre-line text-[10px] text-slate-500">
                     {dashboard.currentPriceSourceLabel}
                   </p>
                 )}

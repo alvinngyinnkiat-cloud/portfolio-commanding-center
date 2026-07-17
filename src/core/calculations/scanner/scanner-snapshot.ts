@@ -165,18 +165,26 @@ export function formatScannerRecordMarketDateLabel(
   record: LatestScannerRecord | null
 ): string | null {
   if (!record) return null;
-  const market = record.marketDate ?? "—";
-  const refreshed = new Intl.DateTimeFormat("en-SG", {
-    timeZone: "Asia/Singapore",
-    day: "2-digit",
-    month: "short",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-    hour12: false,
-  })
-    .format(new Date(record.refreshedAt))
-    .replace(",", "");
 
-  return `Scanner market date: ${market} · refreshed ${refreshed}`;
+  const lines = [
+    `Market session: ${record.marketDate ?? "—"}`,
+    "Source: Scanner",
+  ];
+
+  if (record.refreshedAt) {
+    const refreshed = new Intl.DateTimeFormat("en-SG", {
+      timeZone: "Asia/Singapore",
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: false,
+    })
+      .format(new Date(record.refreshedAt))
+      .replace(",", "");
+    lines.push(`Refreshed: ${refreshed} SGT`);
+  }
+
+  return lines.join("\n");
 }

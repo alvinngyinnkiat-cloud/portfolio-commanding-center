@@ -1,16 +1,23 @@
 import type { ScannerCandleBar } from "@/core/domain/types/scanner";
+import { assertCurrentPriceWithinLatestCandle } from "@/core/calculations/scanner/canonical-current-price";
 
 interface FiveDayCandlestickChartProps {
   candles: ScannerCandleBar[];
   avgPrice: number | null;
+  currentPriceUsd?: number | null;
+  ticker?: string;
   sellPutZone: { low: number; high: number } | null;
   sellCallZone: { low: number; high: number } | null;
   icMidZone: { low: number; high: number } | null;
 }
 
+const LABEL_GUTTER = 72;
+
 export function FiveDayCandlestickChart({
   candles,
   avgPrice,
+  currentPriceUsd = null,
+  ticker,
   sellPutZone,
   sellCallZone,
   icMidZone,
@@ -23,9 +30,16 @@ export function FiveDayCandlestickChart({
     );
   }
 
-  const width = 320;
+  const showCurrentPrice =
+    currentPriceUsd != null && Number.isFinite(currentPriceUsd);
+  const width = 320 + (showCurrentPrice ? LABEL_GUTTER : 0);
   const height = 180;
-  const padding = { top: 14, right: 8, bottom: 8, left: 8 };
+  const padding = {
+    top: 14,
+    right: showCurrentPrice ? LABEL_GUTTER + 8 : 8,
+    bottom: 8,
+    left: 8,
+  };
   const chartWidth = width - padding.left - padding.right;
   const chartHeight = height - padding.top - padding.bottom;
 
@@ -42,6 +56,7 @@ export function FiveDayCandlestickChart({
     icMidZone?.low,
     icMidZone?.high,
     avgPrice,
+    showCurrentPrice ? currentPriceUsd : null,
     ...avgSeries,
     ...emaSeries.filter((value): value is number => value != null),
   ].filter((value): value is number => value != null);
@@ -56,6 +71,18 @@ export function FiveDayCandlestickChart({
 
   const toX = (index: number) => padding.left + index * xStep + xStep / 2;
 
+  const lineEndX = padding.left + chartWidth;
+  const labelX = lineEndX + 4;
+
+  const latestCandle = candles[candles.length - 1] ?? null;
+  if (showCurrentPrice && latestCandle) {
+    assertCurrentPriceWithinLatestCandle({
+      currentPrice: currentPriceUsd,
+      latestCandle,
+      ticker,
+    });
+  }
+
   const avgPoints = avgSeries
     .map((value, index) => (value != null ? `${toX(index)},${toY(value)}` : null))
     .filter((point): point is string => point != null)
@@ -66,6 +93,8 @@ export function FiveDayCandlestickChart({
     .filter((point): point is string => point != null)
     .join(" ");
 
+  const zoneWidth = chartWidth;
+
   return (
     <div className="w-full overflow-hidden">
       <svg
@@ -73,10 +102,12 @@ export function FiveDayCandlestickChart({
         className="h-44 w-full"
         preserveAspectRatio="xMidYMid meet"
         role="img"
-        aria-label="Five day candlestick chart with zones, average price, and EMA20"
+        aria-label="Five day candlestick chart with zones, average price, EMA20, and current price"
       >
         {sellPutZone && (
           <ZoneBand
+            x={padding.left}
+            width={zoneWidth}
             yTop={toY(sellPutZone.high)}
             yBottom={toY(sellPutZone.low)}
             color="#22c55e"
@@ -85,6 +116,8 @@ export function FiveDayCandlestickChart({
         )}
         {icMidZone && (
           <ZoneBand
+            x={padding.left}
+            width={zoneWidth}
             yTop={toY(icMidZone.high)}
             yBottom={toY(icMidZone.low)}
             color="#eab308"
@@ -93,6 +126,8 @@ export function FiveDayCandlestickChart({
         )}
         {sellCallZone && (
           <ZoneBand
+            x={padding.left}
+            width={zoneWidth}
             yTop={toY(sellCallZone.high)}
             yBottom={toY(sellCallZone.low)}
             color="#ef4444"
@@ -163,6 +198,28 @@ export function FiveDayCandlestickChart({
             />
           ) : null
         )}
+
+        {showCurrentPrice && (
+          <g>
+            <line
+              x1={padding.left}
+              x2={lineEndX}
+              y1={toY(currentPriceUsd)}
+              y2={toY(currentPriceUsd)}
+              stroke="#ffffff"
+              strokeWidth={2}
+            />
+            <text
+              x={labelX}
+              y={toY(currentPriceUsd) + 3}
+              fill="#ffffff"
+              fontSize={9}
+              fontWeight={600}
+            >
+              Current Price
+            </text>
+          </g>
+        )}
       </svg>
       <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-[10px] text-slate-500">
         <span>
@@ -171,6 +228,11 @@ export function FiveDayCandlestickChart({
         <span>
           <span className="text-purple-400">—</span> EMA20
         </span>
+        {showCurrentPrice && (
+          <span>
+            <span className="text-white">—</span> Current Price
+          </span>
+        )}
         <span>
           <span className="text-accent-green">░</span> Put Zone
         </span>
@@ -186,11 +248,15 @@ export function FiveDayCandlestickChart({
 }
 
 function ZoneBand({
+  x,
+  width,
   yTop,
   yBottom,
   color,
   opacity,
 }: {
+  x: number;
+  width: number;
   yTop: number;
   yBottom: number;
   color: string;
@@ -198,9 +264,9 @@ function ZoneBand({
 }) {
   return (
     <rect
-      x={8}
+      x={x}
       y={yTop}
-      width={304}
+      width={width}
       height={Math.max(yBottom - yTop, 1)}
       fill={color}
       opacity={opacity}

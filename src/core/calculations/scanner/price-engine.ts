@@ -206,14 +206,6 @@ export function getLatestTickerPrice(input: {
     };
   }
 
-  if (isValidTickerPrice(input.scannerScanPrice?.priceUsd)) {
-    return {
-      priceUsd: input.scannerScanPrice.priceUsd,
-      source: "scanner_refreshed",
-      priceAsOf: input.scannerScanPrice.priceAsOf ?? null,
-    };
-  }
-
   if (isValidTickerPrice(input.manualPriceUsd)) {
     return {
       priceUsd: input.manualPriceUsd,
@@ -276,9 +268,11 @@ export function formatTickerPriceSourceLabel(
   if (source === "scanner_refreshed") {
     const recordLabel = formatScannerRecordMarketDateLabel(scannerRecord ?? null);
     if (recordLabel) return recordLabel;
-    return priceAsOf
-      ? `Scanner market date: ${priceAsOf}`
-      : "Scanner refreshed";
+    const lines = ["Source: Scanner"];
+    if (priceAsOf) {
+      lines.unshift(`Market session: ${priceAsOf}`);
+    }
+    return lines.join("\n");
   }
   if (source === "manual_fallback") return "Manual fallback";
   if (source === "saved_fallback") {

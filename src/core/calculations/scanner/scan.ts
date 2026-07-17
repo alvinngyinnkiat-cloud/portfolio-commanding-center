@@ -6,6 +6,7 @@ import type {
   ScannerTickerResult,
 } from "@/core/domain/types/scanner";
 import { computeIndicators, filterCompletedDailyCandles } from "./indicators";
+import { resolveCanonicalScannerCurrentPrice } from "./canonical-current-price";
 import { computeStructure } from "./structure";
 import {
   scoreBearCall,
@@ -52,13 +53,12 @@ const EMPTY_MAIN: MainSystemDisplay = {
 };
 
 export function scanTicker(input: ScanTickerInput): ScannerTickerResult {
-  const { entry, dailyCandles, weeklyCandles, price } = input;
+  const { entry, dailyCandles, weeklyCandles } = input;
   const notes: string[] = [];
 
   if (dailyCandles.length < 200) {
     return incompleteResult(
       entry,
-      price,
       notes,
       `Insufficient daily history: ${dailyCandles.length}/200 sessions`
     );
@@ -81,23 +81,24 @@ export function scanTicker(input: ScanTickerInput): ScannerTickerResult {
     close: bar.close,
   }));
 
-  const currentPrice = price?.currentPrice ?? price?.latestPrice ?? null;
-  if (price?.priceUnavailable) {
-    notes.push("Stock Tracker price unavailable — using last candle close");
+  const canonical = resolveCanonicalScannerCurrentPrice(dailyCandles);
+  if (!canonical) {
+    return incompleteResult(
+      entry,
+      notes,
+      "Latest completed daily candle is missing or invalid"
+    );
   }
 
-  const indicatorValues = computeIndicators(
-    dailyBars,
-    currentPrice ?? dailyBars[dailyBars.length - 1]?.close ?? null
-  );
+  const indicatorValues = computeIndicators(dailyBars, canonical.currentPrice);
   const structure = computeStructure(
     dailyBars,
     weeklyBars,
     indicatorValues.atr14
   );
 
-  const resolvedPrice =
-    currentPrice ?? dailyBars[dailyBars.length - 1]?.close ?? null;
+  const resolvedPrice = canonical.currentPrice;
+  const marketDateUsed = canonical.marketDate;
   const ema20Prev = computeEma20Prev(dailyBars);
   const sma50Prev = computeSma50Prev(dailyBars);
   const sma200Prev = computeSma200Prev(dailyBars);
@@ -185,7 +186,7 @@ export function scanTicker(input: ScanTickerInput): ScannerTickerResult {
     category: entry.category,
     market: entry.market,
     currentPrice: resolvedPrice,
-    priceAsOf: price?.priceAsOf ?? dailyBars[dailyBars.length - 1]?.date ?? null,
+    priceAsOf: marketDateUsed,
     indicators: {
       ema20: indicatorValues.ema20,
       ema20Prev,
@@ -229,7 +230,6 @@ export function scanTicker(input: ScanTickerInput): ScannerTickerResult {
 
 function incompleteResult(
   entry: WatchlistEntry,
-  price: StockPrice | null,
   notes: string[],
   reason: string
 ): ScannerTickerResult {
@@ -245,8 +245,8 @@ function incompleteResult(
     ticker: entry.ticker,
     category: entry.category,
     market: entry.market,
-    currentPrice: price?.currentPrice ?? price?.latestPrice ?? null,
-    priceAsOf: price?.priceAsOf ?? null,
+    currentPrice: null,
+    priceAsOf: null,
     indicators: {
       ema20: null,
       ema20Prev: null,

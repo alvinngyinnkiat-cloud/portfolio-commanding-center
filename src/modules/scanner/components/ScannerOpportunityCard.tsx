@@ -17,6 +17,7 @@ import { ChevronDown, ChevronUp } from "lucide-react";
 interface ScannerOpportunityCardProps {
   result: ScannerTickerResult;
   dataStatus?: ScannerTickerDataStatus;
+  refreshedAt?: string | null;
 }
 
 const OUTPUT_STYLES: Record<StrategyOutput, string> = {
@@ -26,7 +27,7 @@ const OUTPUT_STYLES: Record<StrategyOutput, string> = {
   "NO TRADE": "border-surface-border bg-surface/60 text-slate-400",
 };
 
-export function ScannerOpportunityCard({ result, dataStatus }: ScannerOpportunityCardProps) {
+export function ScannerOpportunityCard({ result, dataStatus, refreshedAt }: ScannerOpportunityCardProps) {
   const [expanded, setExpanded] = useState(false);
 
   return (
@@ -46,7 +47,7 @@ export function ScannerOpportunityCard({ result, dataStatus }: ScannerOpportunit
         </div>
 
         <div className="grid min-w-0 gap-4 lg:grid-cols-3 lg:gap-5">
-          <ChartColumn result={result} />
+          <ChartColumn result={result} refreshedAt={refreshedAt} dataStatus={dataStatus} />
           <EarlyReversalPanel result={result} />
           <MainStrategyPanel result={result} />
         </div>
@@ -57,7 +58,15 @@ export function ScannerOpportunityCard({ result, dataStatus }: ScannerOpportunit
   );
 }
 
-function ChartColumn({ result }: { result: ScannerTickerResult }) {
+function ChartColumn({
+  result,
+  refreshedAt,
+  dataStatus,
+}: {
+  result: ScannerTickerResult;
+  refreshedAt?: string | null;
+  dataStatus?: ScannerTickerDataStatus;
+}) {
   const { structure, indicators } = result;
 
   return (
@@ -67,9 +76,33 @@ function ChartColumn({ result }: { result: ScannerTickerResult }) {
         <p className="text-sm text-slate-500">{result.category}</p>
       </div>
 
+      <div className="rounded-xl border border-surface-border/70 bg-surface/30 p-4">
+        <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+          Current Price
+        </p>
+        <p className="mt-1 text-lg font-bold text-white">
+          {result.currentPrice != null ? formatUsd(result.currentPrice) : "—"}
+        </p>
+        <p className="mt-2 text-xs text-slate-400">
+          Market session: {result.priceAsOf ?? "—"}
+        </p>
+        {refreshedAt && (
+          <p className="mt-1 text-[10px] text-slate-500">
+            Refreshed: {formatScannerRefreshTime(refreshedAt)}
+          </p>
+        )}
+        {dataStatus === "stale" && (
+          <p className="mt-1 text-[10px] text-yellow-400/90">
+            Current price may be stale — last refresh did not update this ticker.
+          </p>
+        )}
+      </div>
+
       <FiveDayCandlestickChart
         candles={result.recentCandles}
         avgPrice={indicators.avgPrice}
+        currentPriceUsd={result.currentPrice}
+        ticker={result.ticker}
         sellPutZone={structure.sellPutRange}
         sellCallZone={structure.sellCallRange}
         icMidZone={resolveAdjustedMidZone(structure, indicators.atr14)}
@@ -453,6 +486,7 @@ function ExpandedDetails({ result }: { result: ScannerTickerResult }) {
       <DetailSection title="Indicators">
         <DetailGrid
           items={[
+            ["Current Price", result.currentPrice != null ? formatUsd(result.currentPrice) : "—"],
             ["Current Average Price", formatNum(indicators.avgPrice)],
             ["Previous Average Price", formatNum(indicators.avgPricePrev)],
             ["EMA20", formatNum(indicators.ema20)],
@@ -758,6 +792,20 @@ function formatNum(value: number | null, digits = 2): string {
     return "—";
   }
   return value.toFixed(digits);
+}
+
+function formatScannerRefreshTime(iso: string): string {
+  return `${new Intl.DateTimeFormat("en-SG", {
+    timeZone: "Asia/Singapore",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  })
+    .format(new Date(iso))
+    .replace(",", "")} SGT`;
 }
 
 function SoWindowTable({ label, values }: { label: string; values: number[] }) {
