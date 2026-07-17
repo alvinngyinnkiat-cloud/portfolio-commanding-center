@@ -1,14 +1,10 @@
-import type { StockDailyCandle, StockPrice, ContributionTransaction } from "@/core/domain/types";
+import type { ContributionTransaction } from "@/core/domain/types";
 import type { StockFxConversion } from "@/core/domain/types/stock-fx-conversion";
 import type { StockTransaction } from "@/core/domain/types/stock";
-import type { LatestScannerRecord } from "@/core/calculations/scanner/scanner-snapshot";
-import type { WatchlistEntry } from "@/core/calculations/scanner/watchlist";
+import type { MarketDataRecord } from "@/core/domain/types/market-data";
 import {
-  findWatchlistEntry,
   getLatestTickerPrice,
-  indexUsDailyCandlesByTicker,
   resolvedTickerPriceToScannerPrice,
-  resolveScannerWatchlistPrice,
 } from "@/core/calculations/scanner/price-engine";
 import { normalizeTicker } from "@/core/calculations/stocks/normalize";
 import type {
@@ -72,22 +68,16 @@ import {
   buildOpenTradeDashboardMetrics,
 } from "./open-trade-dashboard";
 
-export interface OptionsScannerPriceContext {
-  watchlist: WatchlistEntry[];
-  prices: StockPrice[];
-  dailyCandles: StockDailyCandle[];
-  scannerSnapshot: Map<string, LatestScannerRecord>;
+export interface OptionsMarketDataContext {
+  marketData: Map<string, MarketDataRecord>;
 }
 
 export function buildOpenTradeRows(
   trades: OptionsTrade[],
   asOfDate?: string,
-  scannerPriceContext?: OptionsScannerPriceContext
+  marketDataContext?: OptionsMarketDataContext
 ): OptionsOpenTradeRow[] {
-  const scannerSnapshot = scannerPriceContext?.scannerSnapshot ?? new Map();
-  const candlesByTicker = indexUsDailyCandlesByTicker(
-    scannerPriceContext?.dailyCandles ?? []
-  );
+  const marketDataMap = marketDataContext?.marketData ?? new Map();
 
   const rows = trades
     .filter((trade) => trade.status === "open")
@@ -112,18 +102,14 @@ export function buildOpenTradeRows(
           ? { userLegUsd: null, clientLegUsd: null }
           : splitForTrade(trade, unrealizedPlUsd);
       const ticker = normalizeTicker(trade.underlying);
-      const scannerRecord = scannerSnapshot.get(ticker) ?? null;
-      const scannerIndicators = scannerRecord?.indicators ?? null;
-      const tickerCandles = candlesByTicker.get(ticker) ?? [];
+      const marketDataRecord = marketDataMap.get(ticker) ?? null;
+      const scannerIndicators = marketDataRecord?.scannerResult.indicators ?? null;
 
-      const resolvedTickerPrice = scannerPriceContext
+      const resolvedTickerPrice = marketDataContext
         ? getLatestTickerPrice({
             ticker: trade.underlying,
-            scannerRecord,
+            marketData: marketDataRecord,
             manualPriceUsd: trade.underlyingPriceUsd,
-            watchlist: scannerPriceContext.watchlist,
-            prices: scannerPriceContext.prices,
-            dailyCandles: tickerCandles,
           })
         : {
             priceUsd: trade.underlyingPriceUsd ?? null,
@@ -131,30 +117,9 @@ export function buildOpenTradeRows(
             priceAsOf: null,
           };
 
-      const cachedFallback = scannerPriceContext
-        ? resolveScannerWatchlistPrice({
-            underlying: trade.underlying,
-            watchlist: scannerPriceContext.watchlist,
-            prices: scannerPriceContext.prices,
-            dailyCandles: tickerCandles,
-            scannerScanPrice: null,
-            storedManualFallback: undefined,
-          })
-        : null;
-
-      const savedScannerSource =
-        cachedFallback &&
-        cachedFallback.source !== "unavailable" &&
-        cachedFallback.source !== "manual_fallback"
-          ? cachedFallback.source
-          : undefined;
-
-      const underlyingPrice = scannerPriceContext
+      const underlyingPrice = marketDataContext
         ? resolvedTickerPriceToScannerPrice(resolvedTickerPrice, {
-            isWatchlistTicker:
-              findWatchlistEntry(trade.underlying, scannerPriceContext.watchlist) !=
-              null,
-            savedScannerSource,
+            isWatchlistTicker: marketDataRecord != null,
           })
         : {
             priceUsd: resolvedTickerPrice.priceUsd,
@@ -169,7 +134,8 @@ export function buildOpenTradeRows(
         tradeEconomics: buildTradeEconomicsFromTrade(effectiveTrade),
         underlyingPrice,
         resolvedTickerPrice,
-        scannerRecord,
+        marketDataRecord,
+        scannerRecord: marketDataRecord,
         unrealizedPlUsd,
         userUnrealizedPlUsd: split.userLegUsd,
         clientUnrealizedPlUsd: split.clientLegUsd,

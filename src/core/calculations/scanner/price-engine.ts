@@ -1,8 +1,7 @@
 import type { StockDailyCandle, StockPrice } from "@/core/domain/types";
 import { normalizeTicker } from "@/core/calculations/stocks/normalize";
 import { resolveEffectivePrice } from "@/core/calculations/stocks/price-normalize";
-import type { LatestScannerRecord } from "@/core/calculations/scanner/scanner-snapshot";
-import { formatScannerRecordMarketDateLabel } from "@/core/calculations/scanner/scanner-snapshot";
+import type { MarketDataRecord } from "@/core/domain/types/market-data";
 import { formatScannerPriceSourceForModules } from "@/core/calculations/scanner/resolve-scanner-ticker-price";
 import type { WatchlistEntry } from "./watchlist";
 import { getActiveWatchlistEntries } from "./watchlist";
@@ -188,22 +187,18 @@ function isValidTickerPrice(price: number | null | undefined): price is number {
 
 /**
  * Shared current-price resolver for Modules 5 and 6.
- * Priority: scanner refresh → manual Module 5 input → cached quote/candle.
+ * Priority: central market-data record → manual Module 5 input only.
  */
 export function getLatestTickerPrice(input: {
   ticker: string;
-  scannerRecord?: LatestScannerRecord | null;
-  scannerScanPrice?: ScannerScanPriceCache | null;
+  marketData?: MarketDataRecord | null;
   manualPriceUsd?: number | null;
-  watchlist?: WatchlistEntry[];
-  prices?: StockPrice[];
-  dailyCandles?: StockDailyCandle[];
 }): ResolvedTickerPrice {
-  if (input.scannerRecord && isValidTickerPrice(input.scannerRecord.currentPrice)) {
+  if (input.marketData && isValidTickerPrice(input.marketData.currentPrice)) {
     return {
-      priceUsd: input.scannerRecord.currentPrice,
+      priceUsd: input.marketData.currentPrice,
       source: "scanner_refreshed",
-      priceAsOf: input.scannerRecord.marketDate,
+      priceAsOf: input.marketData.marketSession,
     };
   }
 
@@ -213,24 +208,6 @@ export function getLatestTickerPrice(input: {
       source: "manual_fallback",
       priceAsOf: null,
     };
-  }
-
-  if (input.watchlist && input.prices && input.dailyCandles) {
-    const cached = resolveScannerWatchlistPrice({
-      underlying: input.ticker,
-      watchlist: input.watchlist,
-      prices: input.prices,
-      dailyCandles: input.dailyCandles,
-      scannerScanPrice: null,
-      storedManualFallback: undefined,
-    });
-    if (isValidTickerPrice(cached.priceUsd)) {
-      return {
-        priceUsd: cached.priceUsd,
-        source: "saved_fallback",
-        priceAsOf: cached.priceAsOf,
-      };
-    }
   }
 
   return {
@@ -264,18 +241,27 @@ export function resolvedTickerPriceToScannerPrice(
 export function formatTickerPriceSourceLabel(
   source: TickerPriceResolutionSource,
   priceAsOf?: string | null,
-  scannerRecord?: LatestScannerRecord | null
+  marketData?: MarketDataRecord | null
 ): string {
   if (source === "scanner_refreshed") {
-    if (scannerRecord?.indicatorStatus === "insufficient_history") {
+    if (marketData) {
       const lines = [
-        `Market session: ${scannerRecord.marketDate ?? priceAsOf ?? "—"}`,
-        formatScannerPriceSourceForModules({
-          priceSource: scannerRecord.priceSource,
-          indicatorStatus: scannerRecord.indicatorStatus,
-        }),
+        `Market session: ${marketData.marketSession ?? priceAsOf ?? "—"}`,
       ];
-      if (scannerRecord.refreshedAt) {
+      if (marketData.indicatorStatus === "insufficient_history") {
+        lines.push(
+          formatScannerPriceSourceForModules({
+            priceSource: marketData.priceSource,
+            indicatorStatus: marketData.indicatorStatus,
+          })
+        );
+      } else {
+        lines.push(`Source: Scanner`);
+        if (marketData.priceSource) {
+          lines.push(`Price source: ${marketData.priceSource}`);
+        }
+      }
+      if (marketData.refreshedAt) {
         const refreshed = new Intl.DateTimeFormat("en-SG", {
           timeZone: "Asia/Singapore",
           year: "numeric",
@@ -285,15 +271,13 @@ export function formatTickerPriceSourceLabel(
           minute: "2-digit",
           hour12: false,
         })
-          .format(new Date(scannerRecord.refreshedAt))
+          .format(new Date(marketData.refreshedAt))
           .replace(",", "");
         lines.push(`Refreshed: ${refreshed} SGT`);
       }
       return lines.join("\n");
     }
 
-    const recordLabel = formatScannerRecordMarketDateLabel(scannerRecord ?? null);
-    if (recordLabel) return recordLabel;
     const lines = ["Source: Scanner"];
     if (priceAsOf) {
       lines.unshift(`Market session: ${priceAsOf}`);

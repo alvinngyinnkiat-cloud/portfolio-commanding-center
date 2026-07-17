@@ -294,6 +294,7 @@ describe("open-trade-dashboard", () => {
           priceAsOf: "2025-06-13",
         },
         scannerRecord: null,
+        marketDataRecord: null,
       };
 
       const metrics = buildOpenTradeDashboardMetrics(row);
@@ -341,6 +342,7 @@ describe("open-trade-dashboard", () => {
           priceAsOf: null,
         },
         scannerRecord: null,
+        marketDataRecord: null,
       };
 
       const metrics = buildOpenTradeDashboardMetrics(row);

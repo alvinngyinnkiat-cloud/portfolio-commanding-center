@@ -117,7 +117,7 @@ function buildFoundationView(
   settings: IncomeOverlaySettings,
   asOf: Date
 ): FoundationPositionView {
-  const scannerRecord = foundationRow.scannerRecord;
+  const scannerRecord = foundationRow.marketDataRecord ?? foundationRow.scannerRecord;
   const activeSellCallRow = findActiveSellCallRow(openRows, ticker);
   const isCovered = activeSellCallRow != null;
   const foundationType = getFoundationTypeLabel(foundationRow.trade.strategy);
@@ -132,8 +132,7 @@ function buildFoundationView(
   const currentPriceSourceLabel = foundationRow.dashboard.currentPriceSourceLabel;
   const currentPriceAsOf = foundationRow.dashboard.currentPriceAsOf;
   const latestCandleDate =
-    scannerRecord?.recentCandles[scannerRecord.recentCandles.length - 1]?.date ??
-    null;
+    scannerRecord?.candles[scannerRecord.candles.length - 1]?.date ?? null;
   const priceNewerThanCandle =
     currentPriceAsOf != null &&
     latestCandleDate != null &&
@@ -141,13 +140,14 @@ function buildFoundationView(
   const foundationBreakevenUsd = foundationRow.dashboard.breakevenPriceUsd;
   const callBreakevenUsd = activeSellCallRow?.dashboard.breakevenPriceUsd ?? null;
 
-  const avgPriceUsd = scannerRecord?.indicators.avgPrice ?? null;
-  const avgPricePrevUsd = scannerRecord?.indicators.avgPricePrev ?? null;
-  const atr14 = scannerRecord?.indicators.atr14 ?? null;
+  const avgPriceUsd = scannerRecord?.currentAveragePrice ?? null;
+  const avgPricePrevUsd = scannerRecord?.previousAveragePrice ?? null;
+  const atr14 = scannerRecord?.atr14 ?? null;
   const scannerIndicatorsAvailable =
     scannerRecord != null &&
     (scannerRecord.indicatorStatus === "ready" ||
-      (scannerRecord.indicatorStatus == null && scannerRecord.status === "ok"));
+      (scannerRecord.indicatorStatus == null &&
+        scannerRecord.scannerResult.status === "ok"));
 
   const scannerIndicatorFailures: string[] = [];
   if (!scannerIndicatorsAvailable) {
@@ -200,7 +200,7 @@ function buildFoundationView(
     foundationRow,
     activeSellCallRow,
     isCovered,
-    scannerCandles: scannerRecord?.recentCandles ?? [],
+    scannerCandles: scannerRecord?.candles ?? [],
     currentPriceUsd,
     currentPriceSourceLabel,
     currentPriceAsOf,

@@ -1,6 +1,6 @@
 "use client";
 
-import type { ScannerHealth } from "@/core/domain/types/scanner";
+import type { ScannerRefreshRunMetadata } from "@/core/calculations/scanner/scanner-ticker-records";
 import type { ScannerRefreshProgress } from "@/core/services/scanner-refresh-orchestrator";
 import { Card } from "@/shared/components/ui/Card";
 import { RefreshCw } from "lucide-react";
@@ -15,10 +15,11 @@ export type ScannerRefreshUiStatus =
   | "failed";
 
 interface ScannerHealthCardProps {
-  health: ScannerHealth | null;
+  health: import("@/core/domain/types/scanner").ScannerHealth | null;
   refreshStatus?: ScannerRefreshUiStatus;
   progressMessage?: string | null;
   failedTickers?: string[];
+  lastRefreshRun?: ScannerRefreshRunMetadata | null;
   onRefresh?: () => void;
   onRetryFailed?: () => void;
 }
@@ -69,6 +70,7 @@ export function ScannerHealthCard({
   refreshStatus = "idle",
   progressMessage,
   failedTickers = [],
+  lastRefreshRun = null,
   onRefresh,
   onRetryFailed,
 }: ScannerHealthCardProps) {
@@ -139,15 +141,27 @@ export function ScannerHealthCard({
             Last Successful Refresh
           </p>
           <p className="mt-1 text-lg font-semibold text-white">
-            {formatScanTime(health?.lastSuccessfulRefresh ?? null)}
+            {formatScanTime(
+              lastRefreshRun?.completedAt ??
+                health?.lastSuccessfulRefresh ??
+                null
+            )}
           </p>
         </div>
         <div>
           <p className="text-xs uppercase tracking-wide text-slate-500">
-            Failed Refresh Count
+            Successful Tickers
           </p>
           <p className="mt-1 text-lg font-semibold text-white">
-            {health?.failedRefreshCount ?? 0}
+            {lastRefreshRun?.successfulTickers.length ?? "—"}
+          </p>
+        </div>
+        <div>
+          <p className="text-xs uppercase tracking-wide text-slate-500">
+            Failed Tickers
+          </p>
+          <p className="mt-1 text-lg font-semibold text-white">
+            {lastRefreshRun?.failedTickers.length ?? failedTickers.length ?? 0}
           </p>
         </div>
         <div>

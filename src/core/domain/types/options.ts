@@ -233,7 +233,7 @@ export interface OptionsSplitLegs {
 }
 
 import type { ResolvedScannerPrice, ResolvedTickerPrice } from "@/core/calculations/scanner/price-engine";
-import type { LatestScannerRecord } from "@/core/calculations/scanner/scanner-snapshot";
+import type { MarketDataRecord } from "@/core/domain/types/market-data";
 import type { OptionsTradeEconomics } from "@/core/calculations/options/trade-economics";
 import type { ScannerIndicators } from "@/core/domain/types/scanner";
 
@@ -245,8 +245,10 @@ export interface OptionsOpenTradeRow {
   underlyingPrice: ResolvedScannerPrice;
   /** Shared resolver output — scanner refresh → manual → saved fallback. */
   resolvedTickerPrice: ResolvedTickerPrice;
-  /** Latest persisted scanner snapshot record for this ticker. */
-  scannerRecord: LatestScannerRecord | null;
+  /** Latest centrally persisted market-data record for this ticker. */
+  marketDataRecord: MarketDataRecord | null;
+  /** @deprecated Use marketDataRecord */
+  scannerRecord: MarketDataRecord | null;
   unrealizedPlUsd: number | null;
   userUnrealizedPlUsd: number | null;
   clientUnrealizedPlUsd: number | null;

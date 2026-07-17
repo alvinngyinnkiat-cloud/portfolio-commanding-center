@@ -19,6 +19,7 @@ import { createStockMarketDataReader } from "./stock-market-data-reader";
 import { ScannerService } from "./scanner-service";
 import { ScannerWatchlistService } from "./scanner-watchlist-service";
 import { ScannerSnapshotService } from "./scanner-snapshot-service";
+import { MarketDataService } from "./market-data-service";
 import { ScannerRefreshOrchestrator } from "./scanner-refresh-orchestrator";
 import {
   retryFailedScannerTickers,
@@ -84,7 +85,9 @@ export function createPortfolioServices(
     repos.scannerWatchlist
   );
 
-  const scannerSnapshot = new ScannerSnapshotService(repos.scannerResults);
+  const marketData = new MarketDataService(repos.scannerResults);
+
+  const scannerSnapshot = new ScannerSnapshotService(repos.scannerResults, marketData);
 
   const scannerRefresh = new ScannerRefreshOrchestrator(
     repos.scannerWatchlist,
@@ -109,10 +112,7 @@ export function createPortfolioServices(
     repos.contributions,
     repos.stockTransactions,
     repos.dashboardSettings,
-    repos.scannerWatchlist,
-    repos.stockPrices,
-    repos.stockDailyCandles,
-    scannerSnapshot,
+    marketData,
     repos.stockFxConversions
   );
 
@@ -143,6 +143,7 @@ export function createPortfolioServices(
     stockCandleUpdates,
     scannerWatchlist,
     scannerSnapshot,
+    marketData,
     scannerRefresh,
     scanner,
     cryptoHoldings: new CryptoHoldingService(repos.cryptoHoldings),

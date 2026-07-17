@@ -6,30 +6,37 @@ import {
   resolveScannerWatchlistPrice,
 } from "./price-engine";
 import { DEFAULT_SCANNER_WATCHLIST } from "./watchlist";
+import type { MarketDataRecord } from "@/core/domain/types/market-data";
 
 const watchlist = DEFAULT_SCANNER_WATCHLIST;
 
+function makeMarketData(overrides: Partial<MarketDataRecord> = {}): MarketDataRecord {
+  return {
+    ticker: "QQQ",
+    currentPrice: 512,
+    marketSession: "2026-07-15",
+    refreshedAt: "2026-07-15T05:52:00.000Z",
+    priceSource: "Daily close",
+    priceSourceKey: "daily_close",
+    priceStatus: "fresh",
+    candles: [],
+    atr14: 5,
+    currentAveragePrice: 510,
+    previousAveragePrice: 508,
+    indicatorStatus: "ready",
+    refreshRunId: "run-b",
+    scannerResult: {} as never,
+    isStale: false,
+    ...overrides,
+  };
+}
+
 describe("getLatestTickerPrice", () => {
-  it("prefers scanner snapshot record over manual and saved fallbacks", () => {
+  it("prefers central market-data record over manual fallback", () => {
     const resolved = getLatestTickerPrice({
       ticker: "QQQ",
-      scannerRecord: {
-        ticker: "QQQ",
-        currentPrice: 512,
-        marketDate: "2026-07-15",
-        refreshedAt: "2026-07-15T05:52:00.000Z",
-        scanDate: "2026-07-15",
-        indicators: {} as never,
-        recentCandles: [],
-        status: "ok",
-        sourceRunId: "run-b",
-        isTickerStale: false,
-      },
-      scannerScanPrice: { priceUsd: 510.25, priceAsOf: "2025-06-13" },
+      marketData: makeMarketData(),
       manualPriceUsd: 500,
-      watchlist,
-      prices: [],
-      dailyCandles: [],
     });
 
     expect(resolved.source).toBe("scanner_refreshed");
@@ -37,41 +44,15 @@ describe("getLatestTickerPrice", () => {
     expect(resolved.priceAsOf).toBe("2026-07-15");
   });
 
-  it("falls back to manual Module 5 price when scanner record is missing", () => {
+  it("falls back to manual Module 5 price when market data is missing", () => {
     const resolved = getLatestTickerPrice({
       ticker: "VRT",
-      scannerScanPrice: { priceUsd: 510.25, priceAsOf: "2025-06-13" },
+      marketData: null,
       manualPriceUsd: 142.5,
-      watchlist,
-      prices: [],
-      dailyCandles: [],
     });
 
     expect(resolved.source).toBe("manual_fallback");
     expect(resolved.priceUsd).toBe(142.5);
-  });
-
-  it("falls back to saved quote/candle when scanner and manual are missing", () => {
-    const resolved = getLatestTickerPrice({
-      ticker: "AVGO",
-      scannerScanPrice: null,
-      manualPriceUsd: undefined,
-      watchlist,
-      prices: [
-        {
-          market: "US",
-          ticker: "AVGO",
-          latestPrice: 172.25,
-          lastPriceUpdate: "2025-06-13",
-          priceAsOf: "2025-06-13",
-          source: "yahoo",
-        },
-      ],
-      dailyCandles: [],
-    });
-
-    expect(resolved.source).toBe("saved_fallback");
-    expect(resolved.priceUsd).toBe(172.25);
   });
 });
 
@@ -88,65 +69,6 @@ describe("resolveScannerWatchlistPrice", () => {
     expect(resolved.source).toBe("watchlist_scan");
     expect(resolved.priceUsd).toBe(195.5);
     expect(resolved.isWatchlistTicker).toBe(true);
-  });
-
-  it("falls back to quote cache when scan cache is missing", () => {
-    const resolved = resolveScannerWatchlistPrice({
-      underlying: "AVGO",
-      watchlist,
-      prices: [
-        {
-          market: "US",
-          ticker: "AVGO",
-          latestPrice: 172.25,
-          lastPriceUpdate: "2025-06-13",
-          priceAsOf: "2025-06-13",
-          source: "yahoo",
-        },
-      ],
-      dailyCandles: [],
-      scannerScanPrice: null,
-    });
-
-    expect(resolved.source).toBe("watchlist_quote");
-    expect(resolved.priceUsd).toBe(172.25);
-  });
-
-  it("falls back to latest daily candle close", () => {
-    const resolved = resolveScannerWatchlistPrice({
-      underlying: "MSFT",
-      watchlist,
-      prices: [],
-      dailyCandles: [
-        {
-          market: "US",
-          ticker: "MSFT",
-          date: "2025-06-12",
-          open: 420,
-          high: 425,
-          low: 418,
-          close: 422.5,
-        },
-      ],
-      scannerScanPrice: null,
-    });
-
-    expect(resolved.source).toBe("watchlist_candle");
-    expect(resolved.priceUsd).toBe(422.5);
-  });
-
-  it("returns unavailable for non-watchlist tickers without manual fallback", () => {
-    const resolved = resolveScannerWatchlistPrice({
-      underlying: "UNKNOWN",
-      watchlist,
-      prices: [],
-      dailyCandles: [],
-      scannerScanPrice: null,
-    });
-
-    expect(resolved.source).toBe("unavailable");
-    expect(resolved.priceUsd).toBeNull();
-    expect(resolved.isWatchlistTicker).toBe(false);
   });
 });
 

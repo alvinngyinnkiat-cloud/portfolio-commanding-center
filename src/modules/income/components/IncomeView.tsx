@@ -28,7 +28,7 @@ function IncomeSkeleton() {
 }
 
 export function IncomeView() {
-  const { isLoaded, optionsData, scannerSnapshotVersion } = usePortfolio();
+  const { isLoaded, optionsData, marketDataVersion } = usePortfolio();
   const [settings, setSettings] = useState<IncomeOverlaySettings>(() =>
     readIncomeOverlaySettings()
   );
@@ -41,7 +41,7 @@ export function IncomeView() {
       closedRows: optionsData.closedRows,
       settings,
     });
-  }, [optionsData, scannerSnapshotVersion, settings]);
+  }, [optionsData, marketDataVersion, settings]);
 
   if (!isLoaded || !optionsData || !overlay) {
     return <IncomeSkeleton />;

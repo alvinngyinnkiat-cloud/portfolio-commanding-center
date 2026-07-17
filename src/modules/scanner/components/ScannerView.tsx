@@ -5,6 +5,7 @@ import { useCallback, useMemo, useRef, useState } from "react";
 import { List } from "lucide-react";
 import { usePortfolio } from "@/context/PortfolioContext";
 import { normalizeTicker } from "@/core/calculations/stocks/normalize";
+import { useMarketDataRecordMap } from "@/hooks/useLatestMarketData";
 import type { ScannerTickerDataStatus } from "@/core/calculations/scanner/scanner-ticker-records";
 import type { ScannerRefreshProgress } from "@/core/services/scanner-refresh-orchestrator";
 import {
@@ -68,7 +69,7 @@ export function ScannerView() {
     services,
     refreshScannerPricesOnly,
     isLoaded,
-    scannerSnapshotVersion,
+    marketDataVersion,
   } = usePortfolio();
   const [strategyFilter, setStrategyFilter] = useState<StrategyFilter>("all");
   const [categoryFilter, setCategoryFilter] = useState<CategoryFilter>("all");
@@ -108,15 +109,20 @@ export function ScannerView() {
       });
   }, [displayRun, strategyFilter, categoryFilter, systemFilter, tradableOnly]);
 
+  const marketDataMap = useMarketDataRecordMap();
+  const lastRefreshRun = useMemo(
+    () => services.marketData.getLastRefreshRun(),
+    [services, marketDataVersion]
+  );
+
   const tickerRefreshedAt = useMemo(() => {
     const map: Record<string, string | null> = {};
     for (const result of filteredResults) {
       const key = normalizeTicker(result.ticker);
-      const record = services.scannerSnapshot.getLatestScannerRecord(result.ticker);
-      map[key] = record?.refreshedAt ?? null;
+      map[key] = marketDataMap.get(key)?.refreshedAt ?? null;
     }
     return map;
-  }, [filteredResults, services, scannerSnapshotVersion]);
+  }, [filteredResults, marketDataMap]);
 
   const runRefresh = useCallback(
     async (mode: "all" | "failed") => {
@@ -209,6 +215,7 @@ export function ScannerView() {
         refreshStatus={refreshStatus}
         progressMessage={progressMessage}
         failedTickers={failedTickers}
+        lastRefreshRun={lastRefreshRun}
         onRefresh={handleManualRefresh}
         onRetryFailed={handleRetryFailed}
       />
@@ -241,6 +248,7 @@ export function ScannerView() {
             results={filteredResults}
             tickerStatuses={tickerStatuses}
             tickerRefreshedAt={tickerRefreshedAt}
+            marketDataMap={marketDataMap}
           />
         </>
       )}

@@ -1,46 +1,38 @@
-import type { ScannerScanRun } from "@/core/domain/types/scanner";
+import type { MarketDataRecord } from "@/core/domain/types/market-data";
 import type { ScannerResultRepository } from "@/core/database/repositories/scanner-repository";
-import {
-  buildLatestScannerRecordMapFromSources,
-  type LatestScannerRecord,
-} from "@/core/calculations/scanner/scanner-snapshot";
-import { normalizeTicker } from "@/core/calculations/stocks/normalize";
+import { MarketDataService } from "./market-data-service";
+
+/** @deprecated Use MarketDataService — kept for backward-compatible imports. */
+export type LatestScannerRecord = MarketDataRecord;
 
 /**
- * Shared read-only scanner snapshot for Modules 5 and 6.
- * Reads persisted per-ticker records first, then scan-run fallbacks.
+ * Thin compatibility wrapper — delegates to MarketDataService.
  */
 export class ScannerSnapshotService {
-  private version = 0;
+  private readonly marketData: MarketDataService;
 
-  constructor(private readonly scannerResultRepo: ScannerResultRepository) {}
+  constructor(
+    scannerResultRepo: ScannerResultRepository,
+    marketData?: MarketDataService
+  ) {
+    this.marketData = marketData ?? new MarketDataService(scannerResultRepo);
+  }
 
   invalidate(): void {
-    this.version += 1;
+    this.marketData.invalidate();
   }
 
   getVersion(): number {
-    return this.version;
+    return this.marketData.getVersion();
   }
 
-  private loadRuns(): ScannerScanRun[] {
-    return [this.scannerResultRepo.getLatest(), this.scannerResultRepo.getPrevious()].filter(
-      (run): run is ScannerScanRun => run != null
-    );
+  getLatestScannerRecord(ticker: string): MarketDataRecord | null {
+    return this.marketData.getLatestMarketData(ticker);
   }
 
-  getLatestScannerRecord(ticker: string): LatestScannerRecord | null {
-    return this.getRecordMap().get(normalizeTicker(ticker)) ?? null;
-  }
-
-  getRecordMap(): Map<string, LatestScannerRecord> {
-    const store = this.scannerResultRepo.readStore();
-    return buildLatestScannerRecordMapFromSources({
-      persisted: this.scannerResultRepo.getAllLatestTickerRecords(),
-      runs: this.loadRuns(),
-      latestRunId: store.lastRefreshRun?.refreshRunId ?? store.latest?.id ?? null,
-    });
+  getRecordMap(): Map<string, MarketDataRecord> {
+    return this.marketData.getRecordMap();
   }
 }
 
-export type { LatestScannerRecord };
+export type { MarketDataRecord };

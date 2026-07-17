@@ -36,7 +36,9 @@ interface PortfolioContextValue {
   refreshCryptoOnly: () => void;
   /** Refresh scanner + options tracker only — does not touch crypto, stocks, or snapshots. */
   refreshScannerPricesOnly: () => Promise<void>;
-  /** Bumps when shared scanner snapshot reloads after refresh. */
+  /** Bumps when shared market-data store reloads after Scanner refresh. */
+  marketDataVersion: number;
+  /** @deprecated Use marketDataVersion */
   scannerSnapshotVersion: number;
   isLoaded: boolean;
   isLoading: boolean;
@@ -58,7 +60,7 @@ export function PortfolioProvider({ children }: { children: ReactNode }) {
   const [cryptoData, setCryptoData] = useState<CryptoTrackerData | null>(null);
   const [scannerData, setScannerData] = useState<ScannerTrackerData | null>(null);
   const [optionsData, setOptionsData] = useState<OptionsTrackerData | null>(null);
-  const [scannerSnapshotVersion, setScannerSnapshotVersion] = useState(0);
+  const [marketDataVersion, setMarketDataVersion] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
   const [isLoaded, setIsLoaded] = useState(false);
   const [initError, setInitError] = useState<string | null>(null);
@@ -140,6 +142,7 @@ export function PortfolioProvider({ children }: { children: ReactNode }) {
       await manager.drainSyncQueue();
     }
 
+    services.marketData.invalidate();
     services.scannerSnapshot.invalidate();
 
     try {
@@ -154,7 +157,8 @@ export function PortfolioProvider({ children }: { children: ReactNode }) {
       console.error("[PortfolioProvider] options tracker refresh failed", error);
     }
 
-    setScannerSnapshotVersion(services.scannerSnapshot.getVersion());
+    const version = services.marketData.getVersion();
+    setMarketDataVersion(version);
   }, [services]);
 
   const clearPersistenceError = useCallback(() => {
@@ -204,20 +208,23 @@ export function PortfolioProvider({ children }: { children: ReactNode }) {
 
     const runScheduledMarketAndScan = async () => {
       let shouldRefreshAll = false;
-      let shouldRefreshScannerPrices = false;
       if ((await services.stockPriceUpdates.updateAllDuePrices()).length > 0) {
         shouldRefreshAll = true;
       }
       if ((await services.stockCandleUpdates.updateUsCandlesIfDue()).updated) {
         shouldRefreshAll = true;
       }
-      if (services.scanner.runScanIfDue()) {
-        shouldRefreshScannerPrices = true;
+      if (services.scanner.isScanDue()) {
+        try {
+          await services.refreshScannerNow(new Date());
+          await refreshScannerPricesOnly();
+        } catch (error) {
+          console.error("[PortfolioProvider] scheduled scanner refresh failed", error);
+        }
+        return;
       }
       if (shouldRefreshAll) {
         refresh();
-      } else if (shouldRefreshScannerPrices) {
-        await refreshScannerPricesOnly();
       }
     };
 
@@ -241,7 +248,8 @@ export function PortfolioProvider({ children }: { children: ReactNode }) {
         refresh,
         refreshCryptoOnly,
         refreshScannerPricesOnly,
-        scannerSnapshotVersion,
+        marketDataVersion,
+        scannerSnapshotVersion: marketDataVersion,
         isLoaded,
         isLoading,
         initError,

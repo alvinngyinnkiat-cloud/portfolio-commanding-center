@@ -5,6 +5,7 @@ import type {
   ScannerTickerResult,
   StrategyOutput,
 } from "@/core/domain/types/scanner";
+import type { MarketDataRecord } from "@/core/domain/types/market-data";
 import type { ScannerTickerDataStatus } from "@/core/calculations/scanner/scanner-ticker-records";
 import { STRATEGY_LABELS, STRATEGY_OUTPUT_LABELS } from "@/core/domain/types/scanner";
 import { buildSuggestedTradeFromResult } from "@/core/calculations/scanner/suggested-trade";
@@ -16,6 +17,7 @@ import { ChevronDown, ChevronUp } from "lucide-react";
 
 interface ScannerOpportunityCardProps {
   result: ScannerTickerResult;
+  marketData?: MarketDataRecord | null;
   dataStatus?: ScannerTickerDataStatus;
   refreshedAt?: string | null;
 }
@@ -27,7 +29,12 @@ const OUTPUT_STYLES: Record<StrategyOutput, string> = {
   "NO TRADE": "border-surface-border bg-surface/60 text-slate-400",
 };
 
-export function ScannerOpportunityCard({ result, dataStatus, refreshedAt }: ScannerOpportunityCardProps) {
+export function ScannerOpportunityCard({
+  result,
+  marketData = null,
+  dataStatus,
+  refreshedAt,
+}: ScannerOpportunityCardProps) {
   const [expanded, setExpanded] = useState(false);
   const priceOnly = isPriceOnlyScannerResult(result);
 
@@ -52,7 +59,12 @@ export function ScannerOpportunityCard({ result, dataStatus, refreshedAt }: Scan
         </div>
 
         <div className={`grid min-w-0 gap-4 ${priceOnly ? "lg:grid-cols-2" : "lg:grid-cols-3"} lg:gap-5`}>
-          <ChartColumn result={result} refreshedAt={refreshedAt} dataStatus={dataStatus} />
+          <ChartColumn
+            result={result}
+            marketData={marketData}
+            refreshedAt={refreshedAt}
+            dataStatus={dataStatus}
+          />
           {priceOnly ? (
             <InsufficientHistoryPanel result={result} />
           ) : (
@@ -78,14 +90,22 @@ function isPriceOnlyScannerResult(result: ScannerTickerResult): boolean {
 
 function ChartColumn({
   result,
+  marketData,
   refreshedAt,
   dataStatus,
 }: {
   result: ScannerTickerResult;
+  marketData: MarketDataRecord | null;
   refreshedAt?: string | null;
   dataStatus?: ScannerTickerDataStatus;
 }) {
   const { structure, indicators } = result;
+  const sharedPrice = marketData?.currentPrice ?? null;
+  const sharedSession = marketData?.marketSession ?? result.priceAsOf;
+  const sharedPriceStatus = marketData?.priceStatus ?? result.priceStatus;
+  const sharedPriceSource = marketData?.priceSource ?? result.priceSource;
+  const chartCandles = marketData?.candles ?? result.recentCandles;
+  const displayRefreshedAt = marketData?.refreshedAt ?? refreshedAt ?? null;
 
   return (
     <div className="min-w-0 space-y-4 overflow-hidden">
@@ -99,19 +119,29 @@ function ChartColumn({
           Current Price
         </p>
         <p className="mt-1 text-lg font-bold text-white">
-          {result.currentPrice != null ? formatUsd(result.currentPrice) : "—"}
+          {sharedPrice != null ? formatUsd(sharedPrice) : "—"}
         </p>
         <p className="mt-2 text-xs text-slate-400">
-          Market session: {result.priceAsOf ?? "—"}
+          Market session: {sharedSession ?? "—"}
         </p>
-        {result.priceStatus && (
+        {sharedPriceStatus && (
           <p className="mt-1 text-xs text-slate-400">
             Price status:{" "}
-            <span className="capitalize text-slate-200">{result.priceStatus}</span>
+            <span className="capitalize text-slate-200">{sharedPriceStatus}</span>
           </p>
         )}
-        {result.priceSource && (
-          <p className="mt-1 text-[10px] text-slate-500">Source: {result.priceSource}</p>
+        {sharedPriceSource && (
+          <p className="mt-1 text-[10px] text-slate-500">Source: {sharedPriceSource}</p>
+        )}
+        {displayRefreshedAt && (
+          <p className="mt-1 text-[10px] text-slate-500">
+            Refreshed: {formatScannerRefreshTime(displayRefreshedAt)}
+          </p>
+        )}
+        {marketData?.isStale && (
+          <p className="mt-1 text-[10px] text-yellow-400/90">
+            Shared market data may be stale for this ticker.
+          </p>
         )}
         {isPriceOnlyScannerResult(result) && (
           <div className="mt-3 space-y-1 border-t border-surface-border/50 pt-3">
@@ -127,11 +157,6 @@ function ChartColumn({
             </p>
           </div>
         )}
-        {refreshedAt && (
-          <p className="mt-1 text-[10px] text-slate-500">
-            Refreshed: {formatScannerRefreshTime(refreshedAt)}
-          </p>
-        )}
         {dataStatus === "stale" && (
           <p className="mt-1 text-[10px] text-yellow-400/90">
             Current price may be stale — last refresh did not update this ticker.
@@ -140,9 +165,9 @@ function ChartColumn({
       </div>
 
       <FiveDayCandlestickChart
-        candles={result.recentCandles}
+        candles={chartCandles}
         avgPrice={indicators.avgPrice}
-        currentPriceUsd={result.currentPrice}
+        currentPriceUsd={sharedPrice}
         ticker={result.ticker}
         sellPutZone={structure.sellPutRange}
         sellCallZone={structure.sellCallRange}

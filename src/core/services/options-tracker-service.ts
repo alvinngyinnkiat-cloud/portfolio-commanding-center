@@ -7,11 +7,6 @@ import type {
   OptionsTradeRepository,
 } from "@/core/database/repositories/options-repository";
 import type { StockFxConversionRepository } from "@/core/database/repositories/stock-fx-conversion-repository";
-import type { ScannerWatchlistRepository } from "@/core/database/repositories/scanner-watchlist-repository";
-import type { StockDailyCandleRepository } from "@/core/database/repositories/stock-daily-candle-repository";
-import type { StockPriceRepository } from "@/core/database/repositories/stock-price-repository";
-import { isValidFxRate } from "@/core/calculations/fx-validation";
-import { normalizeStockPrices } from "@/core/calculations/stocks/price-normalize";
 import {
   buildClosedTradeRows,
   buildOpenTradeRows,
@@ -22,7 +17,7 @@ import {
   buildOptionsClientSummary,
   buildTradeTypePerformanceDetail,
 } from "@/core/calculations/options";
-import type { ScannerSnapshotService } from "./scanner-snapshot-service";
+import type { MarketDataService } from "./market-data-service";
 
 export class OptionsTrackerService {
   constructor(
@@ -31,10 +26,7 @@ export class OptionsTrackerService {
     private contributionRepo: ContributionRepository,
     private stockTransactionRepo: StockTransactionRepository,
     private dashboardSettingsRepo: DashboardSettingsRepository,
-    private watchlistRepo: ScannerWatchlistRepository,
-    private priceRepo: StockPriceRepository,
-    private dailyCandleRepo: StockDailyCandleRepository,
-    private scannerSnapshot: ScannerSnapshotService,
+    private marketData: MarketDataService,
     private fxConversionRepo: StockFxConversionRepository
   ) {}
 
@@ -58,11 +50,8 @@ export class OptionsTrackerService {
       fxRate: fxRateValid ? fxRate : null,
     };
 
-    const scannerPriceContext = {
-      watchlist: this.watchlistRepo.get(),
-      prices: normalizeStockPrices(this.priceRepo.list()),
-      dailyCandles: this.dailyCandleRepo.list(),
-      scannerSnapshot: this.scannerSnapshot.getRecordMap(),
+    const marketDataContext = {
+      marketData: this.marketData.getRecordMap(),
     };
 
     return {
@@ -74,11 +63,11 @@ export class OptionsTrackerService {
       performance: buildOptionsPerformanceSummary(trades),
       personalPerformance: buildTradeTypePerformanceDetail(trades, "personal"),
       sharedPerformance: buildTradeTypePerformanceDetail(trades, "shared"),
-      openRows: buildOpenTradeRows(trades, undefined, scannerPriceContext),
+      openRows: buildOpenTradeRows(trades, undefined, marketDataContext),
       closedRows: buildClosedTradeRows(trades),
       clientSummary: buildOptionsClientSummary(
         settings,
-        buildOpenTradeRows(trades, undefined, scannerPriceContext),
+        buildOpenTradeRows(trades, undefined, marketDataContext),
         buildClosedTradeRows(trades)
       ),
       fxRate: fxRateValid ? fxRate : null,
@@ -86,3 +75,5 @@ export class OptionsTrackerService {
     };
   }
 }
+
+import { isValidFxRate } from "@/core/calculations/fx-validation";

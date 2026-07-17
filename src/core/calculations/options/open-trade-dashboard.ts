@@ -370,7 +370,7 @@ export function buildOpenTradeDashboardMetrics(
       ? formatTickerPriceSourceLabel(
           row.resolvedTickerPrice.source,
           row.resolvedTickerPrice.priceAsOf,
-          row.scannerRecord
+          row.marketDataRecord ?? row.scannerRecord
         )
       : null;
   const currentPriceAsOf = row.resolvedTickerPrice.priceAsOf;
