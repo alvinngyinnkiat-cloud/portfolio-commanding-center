@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { resolveScannerTickerCurrentPrice } from "./resolve-scanner-ticker-price";
 
 describe("resolveScannerTickerCurrentPrice", () => {
-  it("prefers latest completed daily close over quote", () => {
+  it("returns latest completed daily close", () => {
     const resolved = resolveScannerTickerCurrentPrice({
       dailyCandles: [
         {
@@ -13,36 +13,20 @@ describe("resolveScannerTickerCurrentPrice", () => {
           high: 136,
           low: 129,
           close: 135.27,
+          source: "yahoo",
+          fetchedAt: "x",
         },
       ],
-      price: {
-        market: "US",
-        ticker: "SPCX",
-        latestPrice: 140,
-        priceAsOf: "2020-01-10",
-        source: "fmp",
-      },
     });
 
     expect(resolved?.currentPrice).toBe(135.27);
     expect(resolved?.priceSourceKey).toBe("daily_close");
+    expect(resolved?.priceSource).toBe("Daily close");
     expect(resolved?.priceStatus).toBe("fresh");
   });
 
-  it("falls back to quote when no daily candles exist", () => {
-    const resolved = resolveScannerTickerCurrentPrice({
-      dailyCandles: [],
-      price: {
-        market: "US",
-        ticker: "SPCX",
-        latestPrice: 135.27,
-        priceAsOf: "2026-07-15",
-        source: "fmp",
-      },
-    });
-
-    expect(resolved?.currentPrice).toBe(135.27);
-    expect(resolved?.priceSourceKey).toBe("fmp_fallback");
-    expect(resolved?.priceStatus).toBe("fallback");
+  it("returns null when no daily candles exist", () => {
+    const resolved = resolveScannerTickerCurrentPrice({ dailyCandles: [] });
+    expect(resolved).toBeNull();
   });
 });

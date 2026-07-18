@@ -91,17 +91,14 @@ export function createPortfolioServices(
 
   const currentPrice = new CurrentPriceService(
     repos.scannerResults,
-    repos.stockPrices,
     repos.stockDailyCandles,
-    stockPriceUpdates,
+    stockCandleUpdates,
     marketData
   );
 
   const alignedChart = new AlignedChartDataService(
     marketData,
-    repos.stockDailyCandles,
-    repos.scannerWatchlist,
-    stockHistoryFetcher
+    repos.stockDailyCandles
   );
 
   const scannerSnapshot = new ScannerSnapshotService(repos.scannerResults, marketData);

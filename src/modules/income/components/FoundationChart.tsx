@@ -227,9 +227,6 @@ export function FoundationChart({
       </svg>
 
       <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-[10px] text-slate-500">
-        {aligned.statusMessage && (
-          <span className="text-amber-400/90">{aligned.statusMessage}</span>
-        )}
         <span>
           <span className="text-sky-400">---</span> Avg Price
         </span>

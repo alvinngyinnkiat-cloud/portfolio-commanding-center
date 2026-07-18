@@ -2,7 +2,7 @@ import type { OptionsOpenTradeRow } from "@/core/domain/types/options";
 import { normalizeTicker } from "@/core/calculations/stocks/normalize";
 import type { CurrentPriceTickerInput } from "@/core/services/current-price-service";
 
-/** Collect unique open-trade tickers with Module 5 manual/saved fallbacks. */
+/** Collect unique open-trade tickers with Module 5 manual fallback only. */
 export function collectOpenTradeCurrentPriceInputs(
   rows: OptionsOpenTradeRow[]
 ): CurrentPriceTickerInput[] {
@@ -16,7 +16,6 @@ export function collectOpenTradeCurrentPriceInputs(
     map.set(ticker, {
       ticker,
       manualPriceUsd,
-      savedTradePriceUsd: manualPriceUsd,
     });
   }
 
@@ -36,11 +35,9 @@ export function collectFoundationCurrentPriceInputs(
   return tickers.map((ticker) => {
     const normalized = normalizeTicker(ticker);
     const row = openByTicker.get(normalized);
-    const manualPriceUsd = row?.trade.underlyingPriceUsd ?? null;
     return {
       ticker: normalized,
-      manualPriceUsd,
-      savedTradePriceUsd: manualPriceUsd,
+      manualPriceUsd: row?.trade.underlyingPriceUsd ?? null,
     };
   });
 }

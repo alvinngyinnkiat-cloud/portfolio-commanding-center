@@ -258,7 +258,7 @@ export function formatTickerPriceSourceLabel(
       } else if (marketData.priceSource) {
         lines.push(`Source: ${marketData.priceSource}`);
       } else {
-        lines.push("Source: Scanner");
+        lines.push("Source: Daily close");
       }
       if (marketData.refreshedAt) {
         const refreshed = new Intl.DateTimeFormat("en-SG", {
@@ -277,7 +277,7 @@ export function formatTickerPriceSourceLabel(
       return lines.join("\n");
     }
 
-    const lines = ["Source: Scanner"];
+    const lines = ["Source: Daily close"];
     if (priceAsOf) {
       lines.unshift(`Market session: ${priceAsOf}`);
     }

@@ -228,100 +228,111 @@ export class StockCandleUpdateService {
 
 
 
-    const histories = await this.fetchHistory(
-
+    return this.fetchAndPersistCandles(
       symbols.map((symbol) => ({
-
         market: symbol.market,
-
-        ticker: symbol.fetchSymbol,
-
+        fetchSymbol: symbol.fetchSymbol,
         displayTicker: symbol.ticker,
-
-      }))
-
+      })),
+      fetchedAt,
+      today
     );
 
-    let symbolsUpdated = 0;
+  }
 
-    let symbolsFailed = 0;
+  /** Force-fetch completed daily candles for specific US tickers (Modules 5/6 refresh). */
+  async refreshDailyCandlesForTickers(
+    tickers: Array<{ ticker: string; fetchSymbol?: string }>,
+    date: Date = new Date()
+  ): Promise<StockCandleUpdateResult> {
+    const fetchedAt = date.toISOString();
+    const today = getSingaporeDateString(date);
+    const seen = new Set<string>();
+    const symbols: Array<{
+      market: StockMarket;
+      fetchSymbol: string;
+      displayTicker: string;
+    }> = [];
 
-
-
-    for (const history of histories) {
-
-      if (history.candles.length === 0) {
-
-        symbolsFailed += 1;
-
-        continue;
-
-      }
-
-
-
-      const normalized = normalizeTicker(history.ticker);
-
-      const daily: StockDailyCandle[] = history.candles.map((candle) => ({
-
-        market: history.market,
-
-        ticker: normalized,
-
-        date: candle.date,
-
-        open: candle.open,
-
-        high: candle.high,
-
-        low: candle.low,
-
-        close: candle.close,
-
-        source: "yahoo",
-
-        fetchedAt,
-
-      }));
-
-
-
-      this.dailyRepo.replaceForTicker(history.market, normalized, daily);
-
-      this.weeklyRepo.replaceForTicker(
-
-        history.market,
-
-        normalized,
-
-        aggregateWeeklyCandles(daily)
-
-      );
-
-      symbolsUpdated += 1;
-
+    for (const row of tickers) {
+      const normalized = normalizeTicker(row.ticker);
+      if (!normalized || seen.has(normalized)) continue;
+      seen.add(normalized);
+      symbols.push({
+        market: "US",
+        fetchSymbol: row.fetchSymbol ?? normalized,
+        displayTicker: normalized,
+      });
     }
 
+    if (symbols.length === 0) {
+      return {
+        updated: true,
+        symbolsRequested: 0,
+        symbolsUpdated: 0,
+        symbolsFailed: 0,
+      };
+    }
 
+    return this.fetchAndPersistCandles(symbols, fetchedAt, today);
+  }
+
+  private async fetchAndPersistCandles(
+    symbols: Array<{
+      market: StockMarket;
+      fetchSymbol: string;
+      displayTicker: string;
+    }>,
+    fetchedAt: string,
+    today: string
+  ): Promise<StockCandleUpdateResult> {
+    const histories = await this.fetchHistory(
+      symbols.map((symbol) => ({
+        market: symbol.market,
+        ticker: symbol.fetchSymbol,
+        displayTicker: symbol.displayTicker,
+      }))
+    );
+    let symbolsUpdated = 0;
+    let symbolsFailed = 0;
+
+    for (const history of histories) {
+      if (history.candles.length === 0) {
+        symbolsFailed += 1;
+        continue;
+      }
+
+      const normalized = normalizeTicker(history.ticker);
+      const daily: StockDailyCandle[] = history.candles.map((candle) => ({
+        market: history.market,
+        ticker: normalized,
+        date: candle.date,
+        open: candle.open,
+        high: candle.high,
+        low: candle.low,
+        close: candle.close,
+        source: "yahoo",
+        fetchedAt,
+      }));
+
+      this.dailyRepo.replaceForTicker(history.market, normalized, daily);
+      this.weeklyRepo.replaceForTicker(
+        history.market,
+        normalized,
+        aggregateWeeklyCandles(daily)
+      );
+      symbolsUpdated += 1;
+    }
 
     const state = this.scheduleRepo.get();
-
     this.scheduleRepo.set({ ...state, usLastCandleUpdateDate: today });
 
-
-
     return {
-
       updated: true,
-
       symbolsRequested: symbols.length,
-
       symbolsUpdated,
-
       symbolsFailed,
-
     };
-
   }
 
 }

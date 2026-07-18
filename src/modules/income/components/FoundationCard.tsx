@@ -102,16 +102,10 @@ export function FoundationCard({ foundation, atrMultiplier }: FoundationCardProp
   const { chart: aligned, loading: chartLoading } = useAlignedChartData(ticker);
 
   const displayCurrentPrice =
-    aligned?.status === "aligned"
-      ? aligned.currentPrice
-      : aligned?.displayCurrentPrice ?? currentPriceUsd;
-  const displayMarketSession =
-    aligned?.status === "aligned"
-      ? aligned.marketSession
-      : foundation.currentPriceAsOf;
+    aligned?.currentPrice ?? currentPriceUsd;
+  const displayMarketSession = aligned?.marketSession ?? foundation.currentPriceAsOf;
 
-  const chartPriceForMetrics =
-    aligned?.status === "aligned" ? aligned.currentPrice : displayCurrentPrice;
+  const chartPriceForMetrics = aligned?.currentPrice ?? displayCurrentPrice;
   const alignedDistanceToTrigger = deriveDistanceToTriggerUsd(
     chartPriceForMetrics,
     foundationTriggerPriceUsd
@@ -144,11 +138,7 @@ export function FoundationCard({ foundation, atrMultiplier }: FoundationCardProp
             {displayMarketSession && (
               <Metric label="Market session" value={displayMarketSession} />
             )}
-            {aligned?.status === "chart_data_pending" && (
-              <p className="col-span-2 text-[10px] text-amber-400/90">
-                {aligned.statusMessage}
-              </p>
-            )}
+            <Metric label="Source" value={aligned?.source ?? "Daily close"} />
             {currentPriceSourceLabel && (
               <p className="col-span-2 whitespace-pre-line text-[10px] text-slate-500">
                 {currentPriceSourceLabel}

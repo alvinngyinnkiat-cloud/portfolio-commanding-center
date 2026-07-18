@@ -57,9 +57,8 @@ export function mapPersistedToMarketDataRecord(
 function toScannerPriceSourceKey(
   key: import("@/core/domain/types/current-price").CurrentPriceSourceKey
 ): ScannerTickerPriceSourceKey {
-  if (key === "primary_quote") return "quote";
   if (key === "manual_fallback" || key === "saved_trade") return "stored_candle";
-  return key;
+  return "daily_close";
 }
 
 function mapPriceOnlyMarketDataRecord(

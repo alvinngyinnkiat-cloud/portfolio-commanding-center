@@ -59,12 +59,12 @@ export function scanTicker(input: ScanTickerInput): ScannerTickerResult {
   const notes: string[] = [];
   const candlesAvailable = dailyCandles.length;
 
-  const resolvedPrice = resolveScannerTickerCurrentPrice({ dailyCandles, price });
+  const resolvedPrice = resolveScannerTickerCurrentPrice({ dailyCandles });
   if (!resolvedPrice) {
     return incompleteResult(
       entry,
       notes,
-      "Current price unavailable — no quote or daily candle data",
+      "Current price unavailable — no completed daily candle data",
       candlesAvailable
     );
   }

@@ -1,14 +1,12 @@
 import type { ScannerCandleBar } from "@/core/domain/types/scanner";
 
-export type AlignedChartStatus = "aligned" | "chart_data_pending";
+export type AlignedChartStatus = "aligned" | "unavailable";
 
 export interface AlignedChartData {
   ticker: string;
   marketSession: string | null;
-  /** Chart-aligned completed-session close — use for line, triggers, and aligned display. */
+  /** Latest completed daily candle close — same as latestCandle.close when aligned. */
   currentPrice: number | null;
-  /** Central persisted price — shown in info card when chart is pending. */
-  displayCurrentPrice: number | null;
   candles: ScannerCandleBar[];
   latestCandle: ScannerCandleBar | null;
   currentAveragePrice: number | null;
@@ -17,9 +15,5 @@ export interface AlignedChartData {
   source: string | null;
   refreshedAt: string | null;
   status: AlignedChartStatus;
-  statusMessage: string | null;
   showCurrentPriceLine: boolean;
 }
-
-export const CHART_DATA_PENDING_MESSAGE =
-  "CHART DATA PENDING — PRICE SESSION NEWER THAN CANDLES";

@@ -103,16 +103,11 @@ function ChartColumn({
   const { structure, indicators } = result;
   const { chart: aligned, loading: chartLoading } = useAlignedChartData(result.ticker);
 
-  const infoPrice =
-    aligned?.status === "aligned"
-      ? aligned.currentPrice
-      : aligned?.displayCurrentPrice ?? marketData?.currentPrice ?? result.currentPrice;
+  const infoPrice = aligned?.currentPrice ?? marketData?.currentPrice ?? result.currentPrice;
   const infoSession =
-    aligned?.status === "aligned"
-      ? aligned.marketSession
-      : marketData?.marketSession ?? result.priceAsOf;
-  const sharedPriceStatus = marketData?.priceStatus ?? result.priceStatus;
-  const sharedPriceSource = marketData?.priceSource ?? result.priceSource;
+    aligned?.marketSession ?? marketData?.marketSession ?? result.priceAsOf;
+  const sharedPriceSource =
+    aligned?.source ?? marketData?.priceSource ?? result.priceSource ?? "Daily close";
   const displayRefreshedAt =
     aligned?.refreshedAt ?? marketData?.refreshedAt ?? refreshedAt ?? null;
 
@@ -133,20 +128,15 @@ function ChartColumn({
         <p className="mt-2 text-xs text-slate-400">
           Market session: {infoSession ?? "—"}
         </p>
-        {aligned?.status === "chart_data_pending" && aligned.displayCurrentPrice != null && (
-          <p className="mt-1 text-[10px] text-amber-400/90">
-            Chart pending — price session {aligned.marketSession ?? "—"} newer than candles
-          </p>
-        )}
-        {sharedPriceStatus && (
+        {(marketData?.priceStatus ?? result.priceStatus) && (
           <p className="mt-1 text-xs text-slate-400">
             Price status:{" "}
-            <span className="capitalize text-slate-200">{sharedPriceStatus}</span>
+            <span className="capitalize text-slate-200">
+              {marketData?.priceStatus ?? result.priceStatus}
+            </span>
           </p>
         )}
-        {sharedPriceSource && (
-          <p className="mt-1 text-[10px] text-slate-500">Source: {sharedPriceSource}</p>
-        )}
+        <p className="mt-1 text-[10px] text-slate-500">Source: {sharedPriceSource}</p>
         {displayRefreshedAt && (
           <p className="mt-1 text-[10px] text-slate-500">
             Refreshed: {formatScannerRefreshTime(displayRefreshedAt)}
@@ -188,7 +178,6 @@ function ChartColumn({
           avgPrice={aligned.currentAveragePrice ?? indicators.avgPrice}
           currentPriceUsd={aligned.showCurrentPriceLine ? aligned.currentPrice : null}
           showCurrentPriceLine={aligned.showCurrentPriceLine}
-          chartStatusMessage={aligned.statusMessage}
           ticker={result.ticker}
           sellPutZone={structure.sellPutRange}
           sellCallZone={structure.sellCallRange}

@@ -5,21 +5,21 @@ import type {
   PersistedCurrentPriceRecord,
 } from "@/core/domain/types/current-price";
 import type { PersistedScannerTickerRecord } from "@/core/calculations/scanner/scanner-ticker-records";
-import { resolveCurrentPrice } from "@/core/calculations/scanner/resolve-current-price";
-import { normalizeStockPrices } from "@/core/calculations/stocks/price-normalize";
+import {
+  DAILY_CLOSE_SOURCE_LABEL,
+  resolveCurrentPrice,
+} from "@/core/calculations/scanner/resolve-current-price";
 import { normalizeTicker } from "@/core/calculations/stocks/normalize";
 import type { ScannerResultRepository } from "@/core/database/repositories/scanner-repository";
 import type { StockDailyCandleRepository } from "@/core/database/repositories/stock-daily-candle-repository";
-import type { StockPriceRepository } from "@/core/database/repositories/stock-price-repository";
 import { generateId } from "@/core/database/local/local-storage";
-import type { StockPriceUpdateService } from "./stock-price-update-service";
+import type { StockCandleUpdateService } from "./stock-candle-update-service";
 import type { MarketDataService } from "./market-data-service";
 
 export interface CurrentPriceTickerInput {
   ticker: string;
   fetchSymbol?: string;
   manualPriceUsd?: number | null;
-  savedTradePriceUsd?: number | null;
 }
 
 function isValidPrice(price: number | null | undefined): price is number {
@@ -57,24 +57,13 @@ function mapPersistedToResult(record: PersistedCurrentPriceRecord): CurrentPrice
   };
 }
 
-function mapScannerSourceKey(
-  key: import("@/core/domain/types/scanner").ScannerTickerPriceSourceKey | null | undefined
-): import("@/core/domain/types/current-price").CurrentPriceSourceKey | null {
-  if (key === "quote") return "primary_quote";
-  if (key === "daily_close") return "daily_close";
-  if (key === "fmp_fallback") return "fmp_fallback";
-  if (key === "stored_candle") return "stored_candle";
-  return null;
-}
-
 export class CurrentPriceService {
   private activeRefreshRunId: string | null = null;
 
   constructor(
     private readonly scannerResultRepo: ScannerResultRepository,
-    private readonly priceRepo: StockPriceRepository,
     private readonly dailyRepo: StockDailyCandleRepository,
-    private readonly stockPriceUpdates: StockPriceUpdateService,
+    private readonly stockCandleUpdates: StockCandleUpdateService,
     private readonly marketData: MarketDataService
   ) {}
 
@@ -83,27 +72,44 @@ export class CurrentPriceService {
   }
 
   getCurrentPrice(ticker: string): CurrentPriceResult {
-    const stored = this.scannerResultRepo.getCurrentPriceRecord(ticker);
+    const key = normalizeTicker(ticker);
+    const dailyCandles = this.dailyRepo.listByTicker("US", key);
+    const fromCandles = resolveCurrentPrice({ dailyCandles });
+    if (fromCandles) {
+      const stored = this.scannerResultRepo.getCurrentPriceRecord(key);
+      return {
+        ticker: key,
+        currentPrice: fromCandles.currentPrice,
+        marketSession: fromCandles.marketSession,
+        refreshedAt: stored?.refreshedAt ?? null,
+        source: fromCandles.source,
+        sourceKey: fromCandles.sourceKey,
+        status: fromCandles.status,
+        error: null,
+      };
+    }
+
+    const stored = this.scannerResultRepo.getCurrentPriceRecord(key);
     if (stored && isValidPrice(stored.currentPrice)) {
       return mapPersistedToResult(stored);
     }
 
-    const scannerRecord = this.scannerResultRepo.getLatestTickerRecord(ticker);
+    const scannerRecord = this.scannerResultRepo.getLatestTickerRecord(key);
     if (scannerRecord && isValidPrice(scannerRecord.result.currentPrice)) {
       return {
-        ticker: normalizeTicker(ticker),
+        ticker: key,
         currentPrice: scannerRecord.result.currentPrice,
         marketSession: scannerRecord.marketDate,
         refreshedAt: scannerRecord.refreshedAt,
-        source: scannerRecord.result.priceSource ?? "Scanner",
-        sourceKey: mapScannerSourceKey(scannerRecord.result.priceSourceKey),
+        source: scannerRecord.result.priceSource ?? DAILY_CLOSE_SOURCE_LABEL,
+        sourceKey: "daily_close",
         status: scannerRecord.result.priceStatus ?? "fresh",
         error: null,
       };
     }
 
     return {
-      ticker: normalizeTicker(ticker),
+      ticker: key,
       currentPrice: null,
       marketSession: null,
       refreshedAt: null,
@@ -119,26 +125,14 @@ export class CurrentPriceService {
     const price = record.result.currentPrice;
     if (!isValidPrice(price) || !record.result.priceAsOf) return;
 
-    const scannerKey = record.result.priceSourceKey;
-    const sourceKey =
-      scannerKey === "quote"
-        ? "primary_quote"
-        : scannerKey === "daily_close"
-          ? "daily_close"
-          : scannerKey === "fmp_fallback"
-            ? "fmp_fallback"
-            : scannerKey === "stored_candle"
-              ? "stored_candle"
-              : "daily_close";
-
     this.scannerResultRepo.upsertCurrentPriceRecord({
       ticker: normalizeTicker(record.ticker),
       currentPrice: price,
       marketSession: record.marketDate,
       refreshedAt: record.refreshedAt,
-      source: record.result.priceSource ?? "Daily close",
-      sourceKey,
-      status: record.result.priceStatus ?? "fresh",
+      source: DAILY_CLOSE_SOURCE_LABEL,
+      sourceKey: "daily_close",
+      status: "fresh",
       refreshRunId: record.refreshRunId,
     });
   }
@@ -174,7 +168,7 @@ export class CurrentPriceService {
       });
 
       if (tickers.length > 0) {
-        await this.stockPriceUpdates.refreshPricesForTickers(
+        await this.stockCandleUpdates.refreshDailyCandlesForTickers(
           tickers.map((row) => ({
             ticker: row.ticker,
             fetchSymbol: row.fetchSymbol,
@@ -189,22 +183,14 @@ export class CurrentPriceService {
         message: "Saving...",
       });
 
-      const prices = normalizeStockPrices(this.priceRepo.list());
       const settled = await Promise.allSettled(
         tickers.map(async (row, index) => {
           const ticker = normalizeTicker(row.ticker);
-          const priceRow =
-            prices.find(
-              (price) =>
-                price.market === "US" && normalizeTicker(price.ticker) === ticker
-            ) ?? null;
           const dailyCandles = this.dailyRepo.listByTicker("US", ticker);
 
           const resolved = resolveCurrentPrice({
             dailyCandles,
-            price: priceRow,
             manualPriceUsd: row.manualPriceUsd,
-            savedTradePriceUsd: row.savedTradePriceUsd,
           });
 
           if (!resolved) {
@@ -220,7 +206,7 @@ export class CurrentPriceService {
                   source: previous.source,
                   sourceKey: previous.sourceKey,
                   status: "stale" as const,
-                  error: "Live refresh failed — kept previous price",
+                  error: "No completed candle — kept previous price",
                 },
                 persisted: null,
               };
@@ -236,7 +222,7 @@ export class CurrentPriceService {
                 source: null,
                 sourceKey: null,
                 status: "unavailable" as const,
-                error: "No valid current price source",
+                error: "No completed daily candle available",
               },
               persisted: null,
             };
