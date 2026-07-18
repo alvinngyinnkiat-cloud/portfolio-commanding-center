@@ -150,6 +150,7 @@ export function PortfolioProvider({ children }: { children: ReactNode }) {
 
     services.marketData.invalidate();
     services.scannerSnapshot.invalidate();
+    services.alignedChart.invalidate();
 
     try {
       setScannerData(services.scanner.getData());

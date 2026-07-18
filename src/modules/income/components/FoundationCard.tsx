@@ -1,7 +1,14 @@
 "use client";
 
 import type { FoundationPositionView } from "@/core/domain/types/income";
-import { recoveryPhaseLabel } from "@/core/calculations/income";
+import {
+  recoveryPhaseLabel,
+} from "@/core/calculations/income";
+import {
+  deriveDistanceToTriggerUsd,
+  deriveTriggerStatusLabel,
+} from "@/core/calculations/income/sell-call-window";
+import { useAlignedChartData } from "@/hooks/useAlignedChartData";
 import { Card } from "@/shared/components/ui/Card";
 import { formatUsd, formatPercent, formatDate } from "@/shared/lib/format";
 import { plColorClass } from "@/modules/options/components/options-utils";
@@ -71,19 +78,14 @@ export function FoundationCard({ foundation, atrMultiplier }: FoundationCardProp
     foundationType,
     foundationRow,
     activeSellCallRow,
-    scannerCandles,
     currentPriceUsd,
     currentPriceSourceLabel,
-    currentPriceAsOf,
-    priceNewerThanCandle,
     avgPriceUsd,
     foundationBreakevenUsd,
     callBreakevenUsd,
     foundationChecklist,
     timingRules,
     foundationTriggerPriceUsd,
-    distanceToTriggerUsd,
-    triggerStatusLabel,
     decisionStatus,
     decisionLabel,
     recoveryPct,
@@ -97,6 +99,28 @@ export function FoundationCard({ foundation, atrMultiplier }: FoundationCardProp
     scannerIndicatorFailures,
   } = foundation;
 
+  const { chart: aligned, loading: chartLoading } = useAlignedChartData(ticker);
+
+  const displayCurrentPrice =
+    aligned?.status === "aligned"
+      ? aligned.currentPrice
+      : aligned?.displayCurrentPrice ?? currentPriceUsd;
+  const displayMarketSession =
+    aligned?.status === "aligned"
+      ? aligned.marketSession
+      : foundation.currentPriceAsOf;
+
+  const chartPriceForMetrics =
+    aligned?.status === "aligned" ? aligned.currentPrice : displayCurrentPrice;
+  const alignedDistanceToTrigger = deriveDistanceToTriggerUsd(
+    chartPriceForMetrics,
+    foundationTriggerPriceUsd
+  );
+  const alignedTriggerStatus = deriveTriggerStatusLabel(
+    chartPriceForMetrics,
+    foundationTriggerPriceUsd
+  );
+
   return (
     <Card
       title={ticker}
@@ -108,17 +132,23 @@ export function FoundationCard({ foundation, atrMultiplier }: FoundationCardProp
             Foundation Chart
           </h4>
           <FoundationChart
-            candles={scannerCandles}
-            avgPrice={avgPriceUsd}
-            currentPriceUsd={currentPriceUsd}
-            currentPriceAsOf={currentPriceAsOf}
-            priceNewerThanCandle={priceNewerThanCandle}
+            aligned={aligned}
+            loading={chartLoading}
+            avgPrice={aligned?.currentAveragePrice ?? avgPriceUsd}
             foundationBreakevenUsd={foundationBreakevenUsd}
             triggerPriceUsd={foundationTriggerPriceUsd}
             callBreakevenUsd={callBreakevenUsd}
           />
           <div className="grid grid-cols-2 gap-2 text-xs text-slate-400">
-            <Metric label="Current Price" value={formatUsd(currentPriceUsd)} />
+            <Metric label="Current Price" value={formatUsd(displayCurrentPrice)} />
+            {displayMarketSession && (
+              <Metric label="Market session" value={displayMarketSession} />
+            )}
+            {aligned?.status === "chart_data_pending" && (
+              <p className="col-span-2 text-[10px] text-amber-400/90">
+                {aligned.statusMessage}
+              </p>
+            )}
             {currentPriceSourceLabel && (
               <p className="col-span-2 whitespace-pre-line text-[10px] text-slate-500">
                 {currentPriceSourceLabel}
@@ -156,7 +186,7 @@ export function FoundationCard({ foundation, atrMultiplier }: FoundationCardProp
               Foundation Trigger Panel
             </h4>
             <dl className="mt-3 space-y-2 text-sm">
-              <Row label="Current Price" value={formatUsd(currentPriceUsd)} />
+              <Row label="Current Price" value={formatUsd(chartPriceForMetrics)} />
               <Row label="Foundation BE" value={formatUsd(foundationBreakevenUsd)} />
               <Row label="ATR14" value={formatUsd(atr14)} />
               <Row label="ATR Multiplier" value={String(atrMultiplier)} />
@@ -164,12 +194,12 @@ export function FoundationCard({ foundation, atrMultiplier }: FoundationCardProp
               <Row
                 label="Distance to Trigger"
                 value={
-                  distanceToTriggerUsd != null
-                    ? formatUsd(distanceToTriggerUsd)
+                  alignedDistanceToTrigger != null
+                    ? formatUsd(alignedDistanceToTrigger)
                     : "—"
                 }
               />
-              <Row label="Trigger Status" value={triggerStatusLabel} />
+              <Row label="Trigger Status" value={alignedTriggerStatus} />
             </dl>
           </div>
 

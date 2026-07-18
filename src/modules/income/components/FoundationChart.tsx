@@ -1,16 +1,5 @@
+import type { AlignedChartData } from "@/core/domain/types/aligned-chart-data";
 import type { ScannerCandleBar } from "@/core/domain/types/scanner";
-import { FiveDayCandlestickChart } from "@/modules/scanner/components/FiveDayCandlestickChart";
-
-interface FoundationChartProps {
-  candles: ScannerCandleBar[];
-  avgPrice: number | null;
-  currentPriceUsd: number | null;
-  currentPriceAsOf?: string | null;
-  priceNewerThanCandle?: boolean;
-  foundationBreakevenUsd: number | null;
-  triggerPriceUsd: number | null;
-  callBreakevenUsd: number | null;
-}
 
 interface HorizontalGuide {
   price: number;
@@ -71,43 +60,6 @@ function buildUnifiedScale(
   return { priceMin, priceMax, toY, toX, xStep };
 }
 
-/** Display-only: widen last candle when price shares the latest candle market date. */
-function patchLastCandleForDisplay(
-  candles: ScannerCandleBar[],
-  currentPriceUsd: number | null,
-  priceAsOf: string | null
-): { candles: ScannerCandleBar[]; priceNewerThanCandle: boolean } {
-  if (candles.length === 0) {
-    return { candles, priceNewerThanCandle: false };
-  }
-
-  const cloned = candles.map((bar) => ({ ...bar }));
-  if (currentPriceUsd == null || !Number.isFinite(currentPriceUsd)) {
-    return { candles: cloned, priceNewerThanCandle: false };
-  }
-
-  const lastIndex = cloned.length - 1;
-  const last = cloned[lastIndex];
-  const sameMarketDate =
-    priceAsOf != null && last.date != null && priceAsOf === last.date;
-
-  if (!sameMarketDate) {
-    return {
-      candles: cloned,
-      priceNewerThanCandle: priceAsOf != null && last.date != null && priceAsOf > last.date,
-    };
-  }
-
-  cloned[lastIndex] = {
-    ...last,
-    high: Math.max(last.high, currentPriceUsd),
-    low: Math.min(last.low, currentPriceUsd),
-    close: currentPriceUsd,
-  };
-
-  return { candles: cloned, priceNewerThanCandle: false };
-}
-
 function buildGuides(
   currentPriceUsd: number | null,
   foundationBreakevenUsd: number | null,
@@ -143,72 +95,48 @@ function buildGuides(
   return guides;
 }
 
-/** Dev-only: current price should map to the latest bar when inside its range. */
-function assertCurrentPriceAlignment(
-  candles: ScannerCandleBar[],
-  currentPriceUsd: number | null,
-  toY: (price: number) => number
-): void {
-  if (process.env.NODE_ENV === "production") return;
-  if (currentPriceUsd == null || candles.length === 0) return;
-
-  const latest = candles[candles.length - 1];
-  const priceY = toY(currentPriceUsd);
-  const highY = toY(latest.high);
-  const lowY = toY(latest.low);
-  const wickTop = Math.min(highY, lowY);
-  const wickBottom = Math.max(highY, lowY);
-
-  const insideWick =
-    currentPriceUsd >= Math.min(latest.low, latest.high) &&
-    currentPriceUsd <= Math.max(latest.low, latest.high);
-
-  if (insideWick && (priceY < wickTop - 0.5 || priceY > wickBottom + 0.5)) {
-    console.warn(
-      "[FoundationChart] Current Price line misaligned with latest candle wick.",
-      { currentPriceUsd, latest, priceY, wickTop, wickBottom }
-    );
-  }
+interface FoundationChartProps {
+  aligned: AlignedChartData | null;
+  loading?: boolean;
+  avgPrice: number | null;
+  foundationBreakevenUsd: number | null;
+  triggerPriceUsd: number | null;
+  callBreakevenUsd: number | null;
 }
 
 export function FoundationChart({
-  candles,
+  aligned,
+  loading = false,
   avgPrice,
-  currentPriceUsd,
-  currentPriceAsOf = null,
-  priceNewerThanCandle = false,
   foundationBreakevenUsd,
   triggerPriceUsd,
   callBreakevenUsd,
 }: FoundationChartProps) {
-  if (candles.length === 0) {
+  if (loading || !aligned) {
     return (
-      <FiveDayCandlestickChart
-        candles={[]}
-        avgPrice={avgPrice}
-        sellPutZone={null}
-        sellCallZone={null}
-        icMidZone={null}
-      />
+      <div className="flex h-44 w-full items-center justify-center rounded-xl border border-surface-border/60 bg-surface/40 text-xs text-slate-500">
+        {loading ? "Loading chart…" : "No candle data"}
+      </div>
     );
   }
 
-  const { candles: displayCandles, priceNewerThanCandle: chartPriceNewer } =
-    patchLastCandleForDisplay(
-      candles.slice(-5).map((bar) => ({ ...bar })),
-      currentPriceUsd,
-      currentPriceAsOf
+  const displayCandles = aligned.candles;
+  if (displayCandles.length === 0) {
+    return (
+      <div className="flex h-44 w-full items-center justify-center rounded-xl border border-surface-border/60 bg-surface/40 text-xs text-slate-500">
+        No candle data
+      </div>
     );
-  const showPriceNewerNote = priceNewerThanCandle || chartPriceNewer;
+  }
+
+  const chartCurrentPrice = aligned.showCurrentPriceLine ? aligned.currentPrice : null;
   const guides = buildGuides(
-    currentPriceUsd,
+    chartCurrentPrice,
     foundationBreakevenUsd,
     triggerPriceUsd,
     callBreakevenUsd
   );
   const { toY, toX, xStep } = buildUnifiedScale(displayCandles, avgPrice, guides);
-
-  assertCurrentPriceAlignment(displayCandles, currentPriceUsd, toY);
 
   const avgSeries = displayCandles.map(
     (bar) => bar.avgPrice ?? (bar.high + bar.low) / 2
@@ -299,18 +227,17 @@ export function FoundationChart({
       </svg>
 
       <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-[10px] text-slate-500">
-        {showPriceNewerNote && (
-          <span className="text-amber-400/90">
-            Price newer than candle
-            {currentPriceAsOf ? ` · ${currentPriceAsOf}` : ""}
-          </span>
+        {aligned.statusMessage && (
+          <span className="text-amber-400/90">{aligned.statusMessage}</span>
         )}
         <span>
           <span className="text-sky-400">---</span> Avg Price
         </span>
-        <span>
-          <span className="text-white">—</span> Current Price
-        </span>
+        {aligned.showCurrentPriceLine && (
+          <span>
+            <span className="text-white">—</span> Current Price
+          </span>
+        )}
         <span>
           <span className="text-emerald-400">---</span> Foundation BE
         </span>

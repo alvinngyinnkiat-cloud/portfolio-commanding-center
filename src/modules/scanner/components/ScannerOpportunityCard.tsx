@@ -12,6 +12,7 @@ import { buildSuggestedTradeFromResult } from "@/core/calculations/scanner/sugge
 import { buildEmaSuggestedTrade } from "@/core/calculations/scanner/ema-suggested-trade";
 import { Card } from "@/shared/components/ui/Card";
 import { formatUsd } from "@/shared/lib/format";
+import { useAlignedChartData } from "@/hooks/useAlignedChartData";
 import { FiveDayCandlestickChart } from "./FiveDayCandlestickChart";
 import { ChevronDown, ChevronUp } from "lucide-react";
 
@@ -100,12 +101,20 @@ function ChartColumn({
   dataStatus?: ScannerTickerDataStatus;
 }) {
   const { structure, indicators } = result;
-  const sharedPrice = marketData?.currentPrice ?? null;
-  const sharedSession = marketData?.marketSession ?? result.priceAsOf;
+  const { chart: aligned, loading: chartLoading } = useAlignedChartData(result.ticker);
+
+  const infoPrice =
+    aligned?.status === "aligned"
+      ? aligned.currentPrice
+      : aligned?.displayCurrentPrice ?? marketData?.currentPrice ?? result.currentPrice;
+  const infoSession =
+    aligned?.status === "aligned"
+      ? aligned.marketSession
+      : marketData?.marketSession ?? result.priceAsOf;
   const sharedPriceStatus = marketData?.priceStatus ?? result.priceStatus;
   const sharedPriceSource = marketData?.priceSource ?? result.priceSource;
-  const chartCandles = marketData?.candles ?? result.recentCandles;
-  const displayRefreshedAt = marketData?.refreshedAt ?? refreshedAt ?? null;
+  const displayRefreshedAt =
+    aligned?.refreshedAt ?? marketData?.refreshedAt ?? refreshedAt ?? null;
 
   return (
     <div className="min-w-0 space-y-4 overflow-hidden">
@@ -119,11 +128,16 @@ function ChartColumn({
           Current Price
         </p>
         <p className="mt-1 text-lg font-bold text-white">
-          {sharedPrice != null ? formatUsd(sharedPrice) : "—"}
+          {infoPrice != null ? formatUsd(infoPrice) : "—"}
         </p>
         <p className="mt-2 text-xs text-slate-400">
-          Market session: {sharedSession ?? "—"}
+          Market session: {infoSession ?? "—"}
         </p>
+        {aligned?.status === "chart_data_pending" && aligned.displayCurrentPrice != null && (
+          <p className="mt-1 text-[10px] text-amber-400/90">
+            Chart pending — price session {aligned.marketSession ?? "—"} newer than candles
+          </p>
+        )}
         {sharedPriceStatus && (
           <p className="mt-1 text-xs text-slate-400">
             Price status:{" "}
@@ -164,15 +178,23 @@ function ChartColumn({
         )}
       </div>
 
-      <FiveDayCandlestickChart
-        candles={chartCandles}
-        avgPrice={indicators.avgPrice}
-        currentPriceUsd={sharedPrice}
-        ticker={result.ticker}
-        sellPutZone={structure.sellPutRange}
-        sellCallZone={structure.sellCallRange}
-        icMidZone={resolveAdjustedMidZone(structure, indicators.atr14)}
-      />
+      {chartLoading || !aligned ? (
+        <div className="flex h-44 w-full items-center justify-center rounded-xl border border-surface-border/60 bg-surface/40 text-xs text-slate-500">
+          {chartLoading ? "Loading chart…" : "No candle data"}
+        </div>
+      ) : (
+        <FiveDayCandlestickChart
+          candles={aligned.candles}
+          avgPrice={aligned.currentAveragePrice ?? indicators.avgPrice}
+          currentPriceUsd={aligned.showCurrentPriceLine ? aligned.currentPrice : null}
+          showCurrentPriceLine={aligned.showCurrentPriceLine}
+          chartStatusMessage={aligned.statusMessage}
+          ticker={result.ticker}
+          sellPutZone={structure.sellPutRange}
+          sellCallZone={structure.sellCallRange}
+          icMidZone={resolveAdjustedMidZone(structure, indicators.atr14)}
+        />
+      )}
     </div>
   );
 }

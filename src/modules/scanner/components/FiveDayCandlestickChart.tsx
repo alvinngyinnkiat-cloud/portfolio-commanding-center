@@ -5,6 +5,8 @@ interface FiveDayCandlestickChartProps {
   candles: ScannerCandleBar[];
   avgPrice: number | null;
   currentPriceUsd?: number | null;
+  showCurrentPriceLine?: boolean;
+  chartStatusMessage?: string | null;
   ticker?: string;
   sellPutZone: { low: number; high: number } | null;
   sellCallZone: { low: number; high: number } | null;
@@ -17,6 +19,8 @@ export function FiveDayCandlestickChart({
   candles,
   avgPrice,
   currentPriceUsd = null,
+  showCurrentPriceLine = true,
+  chartStatusMessage = null,
   ticker,
   sellPutZone,
   sellCallZone,
@@ -30,13 +34,15 @@ export function FiveDayCandlestickChart({
     );
   }
 
-  const showCurrentPrice =
-    currentPriceUsd != null && Number.isFinite(currentPriceUsd);
-  const width = 320 + (showCurrentPrice ? LABEL_GUTTER : 0);
+  const drawCurrentPrice =
+    showCurrentPriceLine &&
+    currentPriceUsd != null &&
+    Number.isFinite(currentPriceUsd);
+  const width = 320 + (drawCurrentPrice ? LABEL_GUTTER : 0);
   const height = 180;
   const padding = {
     top: 14,
-    right: showCurrentPrice ? LABEL_GUTTER + 8 : 8,
+    right: drawCurrentPrice ? LABEL_GUTTER + 8 : 8,
     bottom: 8,
     left: 8,
   };
@@ -56,7 +62,7 @@ export function FiveDayCandlestickChart({
     icMidZone?.low,
     icMidZone?.high,
     avgPrice,
-    showCurrentPrice ? currentPriceUsd : null,
+    drawCurrentPrice ? currentPriceUsd : null,
     ...avgSeries,
     ...emaSeries.filter((value): value is number => value != null),
   ].filter((value): value is number => value != null);
@@ -75,7 +81,7 @@ export function FiveDayCandlestickChart({
   const labelX = lineEndX + 4;
 
   const latestCandle = candles[candles.length - 1] ?? null;
-  if (showCurrentPrice && latestCandle) {
+  if (drawCurrentPrice && latestCandle) {
     assertCurrentPriceWithinLatestCandle({
       currentPrice: currentPriceUsd,
       latestCandle,
@@ -199,13 +205,13 @@ export function FiveDayCandlestickChart({
           ) : null
         )}
 
-        {showCurrentPrice && (
+        {drawCurrentPrice && (
           <g>
             <line
               x1={padding.left}
               x2={lineEndX}
-              y1={toY(currentPriceUsd)}
-              y2={toY(currentPriceUsd)}
+              y1={toY(currentPriceUsd!)}
+              y2={toY(currentPriceUsd!)}
               stroke="#ffffff"
               strokeWidth={2}
             />
@@ -222,13 +228,16 @@ export function FiveDayCandlestickChart({
         )}
       </svg>
       <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-[10px] text-slate-500">
+        {chartStatusMessage && (
+          <span className="text-amber-400/90">{chartStatusMessage}</span>
+        )}
         <span>
           <span className="text-sky-400">---</span> Avg Price
         </span>
         <span>
           <span className="text-purple-400">—</span> EMA20
         </span>
-        {showCurrentPrice && (
+        {drawCurrentPrice && (
           <span>
             <span className="text-white">—</span> Current Price
           </span>

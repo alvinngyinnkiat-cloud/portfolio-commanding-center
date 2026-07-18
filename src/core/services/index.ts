@@ -21,6 +21,7 @@ import { ScannerWatchlistService } from "./scanner-watchlist-service";
 import { ScannerSnapshotService } from "./scanner-snapshot-service";
 import { MarketDataService } from "./market-data-service";
 import { CurrentPriceService } from "./current-price-service";
+import { AlignedChartDataService } from "./aligned-chart-data-service";
 import { ScannerRefreshOrchestrator } from "./scanner-refresh-orchestrator";
 import {
   retryFailedScannerTickers,
@@ -96,6 +97,13 @@ export function createPortfolioServices(
     marketData
   );
 
+  const alignedChart = new AlignedChartDataService(
+    marketData,
+    repos.stockDailyCandles,
+    repos.scannerWatchlist,
+    stockHistoryFetcher
+  );
+
   const scannerSnapshot = new ScannerSnapshotService(repos.scannerResults, marketData);
 
   const scannerRefresh = new ScannerRefreshOrchestrator(
@@ -155,6 +163,7 @@ export function createPortfolioServices(
     scannerSnapshot,
     marketData,
     currentPrice,
+    alignedChart,
     scannerRefresh,
     scanner,
     cryptoHoldings: new CryptoHoldingService(repos.cryptoHoldings),
