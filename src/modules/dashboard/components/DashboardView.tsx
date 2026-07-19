@@ -10,6 +10,7 @@ import { AssetAllocationChart } from "./AssetAllocationChart";
 import { DailyPortfolioChart } from "./DailyPortfolioChart";
 import { MonthlyContributionChart } from "./MonthlyContributionChart";
 import { GoalProgressCards } from "./GoalProgressCards";
+import { PortfolioPerformanceSection } from "./PortfolioPerformanceSection";
 import { isEmptyPortfolio } from "@/shared/lib/portfolio-empty";
 import {
   Wallet,
@@ -51,6 +52,7 @@ export function DashboardView() {
 
   const {
     metrics,
+    inputs,
     settings,
     allocation,
     goalProgress,
@@ -134,6 +136,10 @@ export function DashboardView() {
           />
         </div>
       </section>
+
+      {inputs && (
+        <PortfolioPerformanceSection metrics={metrics} inputs={inputs} />
+      )}
 
       <section>
         <SectionHeader
