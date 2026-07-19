@@ -118,6 +118,8 @@ export interface OpenTradeDashboardMetrics {
 export interface OptionsSettings {
   clientName: string;
   clientStartingCapitalUsd: number;
+  /** Historical SGD amount recorded when client starting capital was set. */
+  clientStartingCapitalSgd?: number;
   defaultSharedUserPercent: number;
   defaultSharedClientPercent: number;
   updatedAt: string;

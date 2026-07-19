@@ -47,6 +47,9 @@ import {
 } from "@/core/domain/defaults";
 import { isValidFxRate } from "@/core/calculations/fx-validation";
 import { usdToSgd } from "@/core/calculations/fx";
+import { resolveClientContributionSgd } from "@/core/calculations/dashboard-historical-contributions";
+import { normalizeOptionsSettings } from "@/core/domain/defaults-options";
+import type { OptionsSettings } from "@/core/domain/types/options";
 
 export interface PortfolioDashboardData {
   settings: DashboardSettings;
@@ -107,7 +110,10 @@ export class PortfolioAggregator {
     const stockOutputs = deriveDashboardStockOutputs(stockSummary);
     const cryptoData = this.cryptoTracker.getData();
     const cryptoOutputs = deriveDashboardCryptoOutputs(cryptoData.summary);
-    const optionsSettings = this.optionsSettingsRepo.get();
+    const optionsSettings = this.ensureClientStartingCapitalSgdRecorded(
+      this.optionsSettingsRepo.get(),
+      fxRate
+    );
     const clientSummary = buildOptionsClientSummary(
       optionsSettings,
       buildOpenTradeRows(optionsTrades),
@@ -136,10 +142,7 @@ export class PortfolioAggregator {
       clientPortfolioUsd: clientPortfolio.clientPortfolioUsd,
       clientPortfolioSgd: clientPortfolio.clientPortfolioSgd,
       clientStartingCapitalUsd: clientSummary.startingCapitalUsd,
-      clientStartingCapitalSgd: usdToSgd(
-        clientSummary.startingCapitalUsd,
-        fxRate
-      ),
+      clientStartingCapitalSgd: resolveClientContributionSgd(optionsSettings),
       clientRealizedPlUsd: clientSummary.clientRealizedPlUsd,
       clientUnrealizedPlSgd: clientUnrealizedPlSgd,
       fxRate,
@@ -248,5 +251,32 @@ export class PortfolioAggregator {
       goals,
       snapshots: sortByDateDesc(this.snapshotRepo.list()),
     };
+  }
+
+  /** One-time legacy migration — freeze client contribution SGD at first valid FX load. */
+  private ensureClientStartingCapitalSgdRecorded(
+    settings: OptionsSettings,
+    fxRate: number
+  ): OptionsSettings {
+    if (
+      settings.clientStartingCapitalUsd <= 0 ||
+      settings.clientStartingCapitalSgd != null
+    ) {
+      return settings;
+    }
+
+    if (!isValidFxRate(fxRate)) {
+      return settings;
+    }
+
+    const updated = normalizeOptionsSettings({
+      ...settings,
+      clientStartingCapitalSgd: usdToSgd(
+        settings.clientStartingCapitalUsd,
+        fxRate
+      ),
+    });
+    this.optionsSettingsRepo.save(updated);
+    return updated;
   }
 }

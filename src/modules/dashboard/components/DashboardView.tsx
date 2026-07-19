@@ -138,7 +138,11 @@ export function DashboardView() {
       </section>
 
       {inputs && (
-        <PortfolioPerformanceSection metrics={metrics} inputs={inputs} />
+        <PortfolioPerformanceSection
+          metrics={metrics}
+          contributions={contributions}
+          clientContributionSgd={inputs.clientStartingCapitalSgd}
+        />
       )}
 
       <section>

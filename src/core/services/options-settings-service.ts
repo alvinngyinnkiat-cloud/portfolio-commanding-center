@@ -1,10 +1,13 @@
 import { normalizeOptionsSettings } from "@/core/domain/defaults-options";
 import type { OptionsSettings } from "@/core/domain/types/options";
 import type { OptionsSettingsRepository } from "@/core/database/repositories/options-repository";
+import { usdToSgd } from "@/core/calculations/fx";
+import { isValidFxRate } from "@/core/calculations/fx-validation";
 
 export interface OptionsSettingsDraft {
   clientName?: string;
   clientStartingCapitalUsd?: number;
+  clientStartingCapitalSgd?: number;
   defaultSharedUserPercent?: number;
   defaultSharedClientPercent?: number;
 }
@@ -22,7 +25,10 @@ export class OptionsSettingsService {
     return this.settingsRepo.get();
   }
 
-  update(draft: OptionsSettingsDraft): OptionsSettingsMutationResult {
+  update(
+    draft: OptionsSettingsDraft,
+    dashboardFxRate?: number | null
+  ): OptionsSettingsMutationResult {
     const errors: Array<{ field: string; message: string }> = [];
 
     if (draft.clientName !== undefined && draft.clientName.trim() === "") {
@@ -45,11 +51,27 @@ export class OptionsSettingsService {
     }
 
     const current = this.settingsRepo.get();
+    const nextStartingCapitalUsd =
+      draft.clientStartingCapitalUsd !== undefined
+        ? draft.clientStartingCapitalUsd
+        : current.clientStartingCapitalUsd;
+
+    let nextStartingCapitalSgd = draft.clientStartingCapitalSgd;
+    if (
+      draft.clientStartingCapitalUsd !== undefined &&
+      nextStartingCapitalSgd === undefined &&
+      isValidFxRate(dashboardFxRate)
+    ) {
+      nextStartingCapitalSgd = usdToSgd(nextStartingCapitalUsd, dashboardFxRate!);
+    }
+
     const updated = normalizeOptionsSettings({
       ...current,
       ...draft,
       clientName:
         draft.clientName !== undefined ? draft.clientName.trim() : current.clientName,
+      clientStartingCapitalUsd: nextStartingCapitalUsd,
+      clientStartingCapitalSgd: nextStartingCapitalSgd,
       updatedAt: new Date().toISOString(),
     });
 

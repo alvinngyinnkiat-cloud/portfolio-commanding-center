@@ -29,6 +29,7 @@ export function normalizeOptionsSettings(raw?: Partial<OptionsSettings>): Option
       : DEFAULT_OPTIONS_SETTINGS.defaultSharedClientPercent
   );
   const startingCapital = Number(raw?.clientStartingCapitalUsd);
+  const startingCapitalSgd = Number(raw?.clientStartingCapitalSgd);
   const name = raw?.clientName?.trim();
 
   return {
@@ -36,6 +37,10 @@ export function normalizeOptionsSettings(raw?: Partial<OptionsSettings>): Option
     clientStartingCapitalUsd: Number.isFinite(startingCapital)
       ? Math.max(0, startingCapital)
       : DEFAULT_OPTIONS_SETTINGS.clientStartingCapitalUsd,
+    clientStartingCapitalSgd:
+      Number.isFinite(startingCapitalSgd) && startingCapitalSgd >= 0
+        ? startingCapitalSgd
+        : undefined,
     defaultSharedUserPercent: split.userSharePercent,
     defaultSharedClientPercent: split.clientSharePercent,
     updatedAt: raw?.updatedAt ?? new Date().toISOString(),

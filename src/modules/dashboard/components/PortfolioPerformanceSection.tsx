@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo } from "react";
-import type { PortfolioInputs, PortfolioMetrics } from "@/core/domain/types";
+import type { ContributionTransaction, PortfolioMetrics } from "@/core/domain/types";
 import { calculatePortfolioPerformance } from "@/core/calculations/dashboard-portfolio-performance";
 import { formatSgd } from "@/shared/lib/format";
 import { coerceNumber } from "@/shared/lib/coerce-number";
@@ -79,16 +79,23 @@ function PerformanceCard({ title, leg }: PerformanceCardProps) {
 
 interface PortfolioPerformanceSectionProps {
   metrics: PortfolioMetrics;
-  inputs: PortfolioInputs;
+  contributions: ContributionTransaction[];
+  clientContributionSgd: number;
 }
 
 export function PortfolioPerformanceSection({
   metrics,
-  inputs,
+  contributions,
+  clientContributionSgd,
 }: PortfolioPerformanceSectionProps) {
   const portfolioPerformance = useMemo(
-    () => calculatePortfolioPerformance({ metrics, inputs }),
-    [metrics, inputs]
+    () =>
+      calculatePortfolioPerformance({
+        metrics,
+        contributions,
+        clientContributionSgd,
+      }),
+    [metrics, contributions, clientContributionSgd]
   );
 
   if (!portfolioPerformance) {

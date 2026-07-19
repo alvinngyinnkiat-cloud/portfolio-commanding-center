@@ -93,7 +93,7 @@ function ClientSummaryCards() {
 }
 
 function ClientSettingsCard() {
-  const { optionsData, services, refresh } = usePortfolio();
+  const { data, optionsData, services, refresh } = usePortfolio();
   const settings = optionsData?.settings;
   const [form, setForm] = useState({
     clientName: "",
@@ -116,12 +116,15 @@ function ClientSettingsCard() {
 
   const handleSave = () => {
     setSaving(true);
-    const result = services.optionsSettings.update({
-      clientName: form.clientName,
-      clientStartingCapitalUsd: parseFloat(form.clientStartingCapitalUsd),
-      defaultSharedUserPercent: parseFloat(form.defaultSharedUserPercent),
-      defaultSharedClientPercent: parseFloat(form.defaultSharedClientPercent),
-    });
+    const result = services.optionsSettings.update(
+      {
+        clientName: form.clientName,
+        clientStartingCapitalUsd: parseFloat(form.clientStartingCapitalUsd),
+        defaultSharedUserPercent: parseFloat(form.defaultSharedUserPercent),
+        defaultSharedClientPercent: parseFloat(form.defaultSharedClientPercent),
+      },
+      data?.settings.usdSgdFxRate
+    );
     setSaving(false);
 
     if (!result.ok) {

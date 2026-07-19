@@ -9,19 +9,36 @@ function performanceSource(
   overrides: Partial<{
     totalPortfolio: number;
     clientPortfolio: number;
-    totalContribution: number;
-    clientStartingCapitalSgd: number;
+    totalContributionSgd: number;
+    clientContributionSgd: number;
   }> = {}
 ) {
+  const totalContributionSgd = overrides.totalContributionSgd ?? 35_000;
+  const stockContribution = totalContributionSgd - 5_000;
+  const cryptoContribution = 5_000;
+
   return {
     metrics: {
-      totalPortfolio: overrides.totalPortfolio ?? 0,
-      clientPortfolio: overrides.clientPortfolio ?? 0,
-      totalContribution: overrides.totalContribution ?? 0,
+      totalPortfolio: overrides.totalPortfolio ?? 50_000,
+      clientPortfolio: overrides.clientPortfolio ?? 10_000,
     },
-    inputs: {
-      clientStartingCapitalSgd: overrides.clientStartingCapitalSgd ?? 0,
-    },
+    contributions: [
+      {
+        id: "stock",
+        date: "2024-01-01",
+        type: "deposit" as const,
+        category: "stock" as const,
+        amountSgd: stockContribution,
+      },
+      {
+        id: "crypto",
+        date: "2024-02-01",
+        type: "deposit" as const,
+        category: "crypto" as const,
+        amountSgd: cryptoContribution,
+      },
+    ],
+    clientContributionSgd: overrides.clientContributionSgd ?? 8_000,
   };
 }
 
@@ -35,8 +52,8 @@ describe("calculatePortfolioPerformance", () => {
       performanceSource({
         totalPortfolio: 50_000,
         clientPortfolio: 10_000,
-        totalContribution: 35_000,
-        clientStartingCapitalSgd: 8_000,
+        totalContributionSgd: 35_000,
+        clientContributionSgd: 8_000,
       })
     );
 
@@ -52,8 +69,8 @@ describe("calculatePortfolioPerformance", () => {
       performanceSource({
         totalPortfolio: 50_000,
         clientPortfolio: 10_000,
-        totalContribution: 35_000,
-        clientStartingCapitalSgd: 8_000,
+        totalContributionSgd: 35_000,
+        clientContributionSgd: 8_000,
       })
     );
 
@@ -68,8 +85,8 @@ describe("calculatePortfolioPerformance", () => {
       performanceSource({
         totalPortfolio: 50_000,
         clientPortfolio: 10_000,
-        totalContribution: 35_000,
-        clientStartingCapitalSgd: 8_000,
+        totalContributionSgd: 35_000,
+        clientContributionSgd: 8_000,
       })
     );
 
@@ -80,14 +97,22 @@ describe("calculatePortfolioPerformance", () => {
   });
 
   it("Test 4 — Zero Contribution shows null return", () => {
-    const summary = calculatePortfolioPerformance(
-      performanceSource({
+    const summary = calculatePortfolioPerformance({
+      metrics: {
         totalPortfolio: 10_000,
         clientPortfolio: 0,
-        totalContribution: 5_000,
-        clientStartingCapitalSgd: 0,
-      })
-    );
+      },
+      contributions: [
+        {
+          id: "stock",
+          date: "2024-01-01",
+          type: "deposit",
+          category: "stock",
+          amountSgd: 5_000,
+        },
+      ],
+      clientContributionSgd: 0,
+    });
 
     expect(summary!.client.returnPercent).toBeNull();
     expect(summary!.own.returnPercent).not.toBeNull();
@@ -98,8 +123,8 @@ describe("calculatePortfolioPerformance", () => {
       performanceSource({
         totalPortfolio: 50_000,
         clientPortfolio: 10_000,
-        totalContribution: 35_000,
-        clientStartingCapitalSgd: 8_000,
+        totalContributionSgd: 35_000,
+        clientContributionSgd: 8_000,
       })
     );
 
@@ -120,6 +145,47 @@ describe("calculatePortfolioPerformance", () => {
     ).toBeLessThanOrEqual(PORTFOLIO_PERFORMANCE_ROUNDING_TOLERANCE);
   });
 
+  it("contribution values stay fixed when portfolio values move with FX", () => {
+    const contributions = [
+      {
+        id: "stock",
+        date: "2024-01-01",
+        type: "deposit" as const,
+        category: "stock" as const,
+        amountSgd: 30_000,
+        fxRate: 1.32,
+      },
+      {
+        id: "crypto",
+        date: "2024-02-01",
+        type: "deposit" as const,
+        category: "crypto" as const,
+        amountSgd: 5_000,
+      },
+    ];
+
+    const atLowerFx = calculatePortfolioPerformance({
+      metrics: { totalPortfolio: 50_000, clientPortfolio: 10_000 },
+      contributions,
+      clientContributionSgd: 8_000,
+    });
+    const atHigherFx = calculatePortfolioPerformance({
+      metrics: { totalPortfolio: 52_000, clientPortfolio: 10_500 },
+      contributions,
+      clientContributionSgd: 8_000,
+    });
+
+    expect(atLowerFx!.total.contribution).toBe(35_000);
+    expect(atHigherFx!.total.contribution).toBe(35_000);
+    expect(atLowerFx!.client.contribution).toBe(8_000);
+    expect(atHigherFx!.client.contribution).toBe(8_000);
+    expect(atLowerFx!.own.contribution).toBe(27_000);
+    expect(atHigherFx!.own.contribution).toBe(27_000);
+    expect(atLowerFx!.total.portfolioValue).not.toBe(
+      atHigherFx!.total.portfolioValue
+    );
+  });
+
   it("logs reconciliation warnings in development only", () => {
     const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
 
@@ -127,8 +193,8 @@ describe("calculatePortfolioPerformance", () => {
       performanceSource({
         totalPortfolio: 50_000,
         clientPortfolio: 10_000,
-        totalContribution: 35_000,
-        clientStartingCapitalSgd: 8_000,
+        totalContributionSgd: 35_000,
+        clientContributionSgd: 8_000,
       })
     );
 
@@ -140,11 +206,9 @@ describe("calculatePortfolioPerformance", () => {
       metrics: {
         totalPortfolio: Number.NaN,
         clientPortfolio: 10_000,
-        totalContribution: 35_000,
       },
-      inputs: {
-        clientStartingCapitalSgd: 8_000,
-      },
+      contributions: [],
+      clientContributionSgd: 8_000,
     });
 
     expect(summary).toBeNull();

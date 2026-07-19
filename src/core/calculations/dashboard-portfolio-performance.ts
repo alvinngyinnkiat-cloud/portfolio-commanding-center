@@ -1,4 +1,6 @@
-import type { PortfolioInputs, PortfolioMetrics } from "@/core/domain/types";
+import type { ContributionTransaction } from "@/core/domain/types";
+import type { PortfolioMetrics } from "@/core/domain/types";
+import { calculateHistoricalTotalContributionSgd } from "./dashboard-historical-contributions";
 
 export const PORTFOLIO_PERFORMANCE_ROUNDING_TOLERANCE = 0.01;
 
@@ -80,22 +82,20 @@ function reconcilePortfolioPerformance(summary: PortfolioPerformanceSummary): vo
 }
 
 export interface PortfolioPerformanceSource {
-  metrics: Pick<
-    PortfolioMetrics,
-    "totalPortfolio" | "clientPortfolio" | "totalContribution"
-  >;
-  inputs: Pick<PortfolioInputs, "clientStartingCapitalSgd">;
+  metrics: Pick<PortfolioMetrics, "totalPortfolio" | "clientPortfolio">;
+  contributions: ContributionTransaction[];
+  clientContributionSgd: number;
 }
 
 export function calculatePortfolioPerformance(
   source: PortfolioPerformanceSource
 ): PortfolioPerformanceSummary | null {
-  const { metrics, inputs } = source;
+  const { metrics, contributions, clientContributionSgd } = source;
 
   const totalPortfolioValue = metrics.totalPortfolio;
   const clientPortfolioValue = metrics.clientPortfolio;
-  const totalContribution = metrics.totalContribution;
-  const clientContribution = inputs.clientStartingCapitalSgd;
+  const totalContribution = calculateHistoricalTotalContributionSgd(contributions);
+  const clientContribution = clientContributionSgd;
 
   const required = [
     totalPortfolioValue,
