@@ -19,7 +19,7 @@ export function AssetAllocationChart({ data, total }: AssetAllocationChartProps)
   return (
     <Card
       title="Asset Allocation"
-      subtitle="US holdings · SG holdings · Crypto holdings · Total Cash"
+      subtitle="US stock holdings · SG holdings · Crypto holdings · Total Cash"
     >
       {chartData.length === 0 ? (
         <div className="flex h-48 items-center justify-center rounded-xl border border-dashed border-surface-border bg-surface/40">

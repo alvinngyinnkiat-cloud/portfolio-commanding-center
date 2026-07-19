@@ -6,13 +6,17 @@ import {
   buildStockPortfolioSummary,
   deriveUsStockHoldingsDisplay,
 } from "@/core/calculations/stocks/summary";
+import {
+  buildDashboardAssetBreakdown,
+  type DashboardAssetBreakdown,
+} from "../lib/dashboard-asset-breakdown";
 
-/** Module 2 US Stock Holdings Value — shared display source for Dashboard. */
-export function useUsStockHoldingsValue(): number | null {
+/** Dashboard asset breakdown — shared by summary cards and allocation chart. */
+export function useDashboardAssetBreakdown(): DashboardAssetBreakdown | null {
   const { data, stockData, optionsData } = usePortfolio();
 
   return useMemo(() => {
-    if (!data?.fxRateValid || !stockData) {
+    if (!data?.fxRateValid || !data.metrics || !stockData) {
       return null;
     }
 
@@ -26,9 +30,16 @@ export function useUsStockHoldingsValue(): number | null {
       data.settings.brokerUsdCashOverride ?? null
     );
 
-    return deriveUsStockHoldingsDisplay(summary).sgd;
+    const usStockHoldingsValueSgd =
+      deriveUsStockHoldingsDisplay(summary).sgd;
+
+    return buildDashboardAssetBreakdown(
+      usStockHoldingsValueSgd,
+      data.metrics
+    );
   }, [
     data?.fxRateValid,
+    data?.metrics,
     data?.contributions,
     data?.settings.brokerUsdCashOverride,
     stockData,

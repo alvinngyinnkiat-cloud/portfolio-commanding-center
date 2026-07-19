@@ -10,7 +10,7 @@ import { DailyPortfolioChart } from "./DailyPortfolioChart";
 import { MonthlyContributionChart } from "./MonthlyContributionChart";
 import { GoalProgressCards } from "./GoalProgressCards";
 import { PortfolioPerformanceSection } from "./PortfolioPerformanceSection";
-import { useUsStockHoldingsValue } from "../hooks/useUsStockHoldingsValue";
+import { useDashboardAssetBreakdown } from "../hooks/useDashboardAssetBreakdown";
 import { isEmptyPortfolio } from "@/shared/lib/portfolio-empty";
 import {
   Wallet,
@@ -42,7 +42,7 @@ function DashboardSkeleton() {
 
 export function DashboardView() {
   const { data, isLoaded } = usePortfolio();
-  const usStockHoldingsValueSgd = useUsStockHoldingsValue();
+  const assetBreakdown = useDashboardAssetBreakdown();
 
   if (!isLoaded || !data) {
     return <DashboardSkeleton />;
@@ -52,14 +52,13 @@ export function DashboardView() {
     metrics,
     inputs,
     settings,
-    allocation,
     goalProgress,
     contributions,
     snapshots,
     fxRateValid,
   } = data;
 
-  if (!fxRateValid || !metrics) {
+  if (!fxRateValid || !metrics || !assetBreakdown) {
     return (
       <div className="min-w-0 space-y-8 pb-8">
         <header className="space-y-1">
@@ -75,11 +74,6 @@ export function DashboardView() {
       </div>
     );
   }
-
-  const assetAllocationTotal = (allocation ?? []).reduce(
-    (sum, item) => sum + (item?.value ?? 0),
-    0
-  );
 
   return (
     <div className="min-w-0 space-y-8 pb-8">
@@ -151,32 +145,32 @@ export function DashboardView() {
           <SummaryCard
             compact
             label="US Stock Holdings Value (SGD)"
-            value={formatSgd(usStockHoldingsValueSgd)}
+            value={formatSgd(assetBreakdown.usStockHoldingsValueSgd)}
             icon={<Globe size={16} />}
           />
           <SummaryCard
             compact
-            label="SG Holding Value (SGD)"
-            value={formatSgd(metrics.sgStocksSgd)}
+            label="SG Holdings Value (SGD)"
+            value={formatSgd(assetBreakdown.sgHoldingsValueSgd)}
             icon={<Globe size={16} />}
           />
           <SummaryCard
             compact
-            label="Crypto Holding Value (SGD)"
-            value={formatSgd(metrics.cryptoHoldingsValueSgd)}
+            label="Crypto Holdings Value (SGD)"
+            value={formatSgd(assetBreakdown.cryptoHoldingsValueSgd)}
             icon={<Bitcoin size={16} />}
           />
           <SummaryCard
             compact
             label="Total Cash"
-            value={formatSgd(metrics.totalCashSgd)}
+            value={formatSgd(assetBreakdown.totalCashSgd)}
             subValue={`US ${formatSgd(metrics.usdTradingCashSgd)} · SG ${formatSgd(metrics.sgdTradingCashSgd)} · Crypto ${formatSgd(metrics.cryptoCashSgd)}`}
             icon={<Banknote size={16} />}
           />
         </div>
         <AssetAllocationChart
-          data={allocation}
-          total={assetAllocationTotal}
+          data={assetBreakdown.items}
+          total={assetBreakdown.total}
         />
       </section>
 
