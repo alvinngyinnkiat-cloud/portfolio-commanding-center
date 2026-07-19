@@ -2,7 +2,6 @@
 
 import { usePortfolio } from "@/context/PortfolioContext";
 import { formatSgd, formatUsd, formatPercent } from "@/shared/lib/format";
-import { coerceNumber } from "@/shared/lib/coerce-number";
 import { SummaryCard } from "@/shared/components/ui/SummaryCard";
 import { SectionHeader } from "@/shared/components/ui/SectionHeader";
 import { FxRateErrorBanner } from "@/shared/components/ui/FxRateErrorBanner";
@@ -11,13 +10,11 @@ import { DailyPortfolioChart } from "./DailyPortfolioChart";
 import { MonthlyContributionChart } from "./MonthlyContributionChart";
 import { GoalProgressCards } from "./GoalProgressCards";
 import { PortfolioPerformanceSection } from "./PortfolioPerformanceSection";
+import { useUsStockHoldingsValue } from "../hooks/useUsStockHoldingsValue";
 import { isEmptyPortfolio } from "@/shared/lib/portfolio-empty";
 import {
   Wallet,
-  TrendingUp,
-  TrendingDown,
   Users,
-  PiggyBank,
   Bitcoin,
   Banknote,
   Globe,
@@ -45,6 +42,7 @@ function DashboardSkeleton() {
 
 export function DashboardView() {
   const { data, isLoaded } = usePortfolio();
+  const usStockHoldingsValueSgd = useUsStockHoldingsValue();
 
   if (!isLoaded || !data) {
     return <DashboardSkeleton />;
@@ -78,9 +76,8 @@ export function DashboardView() {
     );
   }
 
-  const plTrend = coerceNumber(metrics.totalPL) >= 0 ? "positive" : "negative";
   const assetAllocationTotal = (allocation ?? []).reduce(
-    (sum, item) => sum + coerceNumber(item?.value),
+    (sum, item) => sum + (item?.value ?? 0),
     0
   );
 
@@ -145,39 +142,6 @@ export function DashboardView() {
         />
       )}
 
-      <section>
-        <SectionHeader
-          title="Performance & Contributions"
-          description="Capital model P/L and contribution from Stock + Crypto trackers"
-        />
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          <SummaryCard
-            label="Total P/L"
-            value={formatSgd(metrics.totalPL)}
-            trend={plTrend}
-            icon={
-              metrics.totalPL >= 0 ? (
-                <TrendingUp size={18} />
-              ) : (
-                <TrendingDown size={18} />
-              )
-            }
-          />
-          <SummaryCard
-            label="Total P/L %"
-            value={formatPercent(metrics.totalPLPercent)}
-            trend={plTrend}
-            icon={<TrendingUp size={18} />}
-          />
-          <SummaryCard
-            label="Total Contribution"
-            value={formatSgd(metrics.totalContribution)}
-            subValue={`Stock ${formatSgd(metrics.totalStockContributionSgd)} · Crypto ${formatSgd(metrics.cryptoContributionSgd)}`}
-            icon={<PiggyBank size={18} />}
-          />
-        </div>
-      </section>
-
       <section className="space-y-4">
         <SectionHeader
           title="Asset Breakdown & Allocation"
@@ -186,8 +150,8 @@ export function DashboardView() {
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
           <SummaryCard
             compact
-            label="US Holding Value (SGD)"
-            value={formatSgd(metrics.usStocksEtfSgd)}
+            label="US Stock Holdings Value (SGD)"
+            value={formatSgd(usStockHoldingsValueSgd)}
             icon={<Globe size={16} />}
           />
           <SummaryCard
