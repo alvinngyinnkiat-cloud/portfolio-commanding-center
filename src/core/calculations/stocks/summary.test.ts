@@ -6,6 +6,7 @@ import {
   buildStockPortfolioSummary,
   buildStockTrackerSummary,
   deriveUsStockHoldingsDisplay,
+  deriveUsSummaryCardTotalNetValueSgd,
   summarizeStockHoldings,
 } from "./summary";
 
@@ -392,26 +393,20 @@ describe("buildStockPortfolioSummary", () => {
     );
   });
 
-  it("acceptance: US summary cards decompose total net value without double-counting options", () => {
-    const stockHoldingsSgd = 18_218.65;
+  it("acceptance: US summary card formulas", () => {
+    const originalUsHoldingsSgd = 28_392.45;
     const netOptionsMarketValueSgd = -10_173.8;
     const usCashSgd = 2_610.04;
-    const legacyUsHoldingsDisplaySgd =
-      stockHoldingsSgd - netOptionsMarketValueSgd;
 
-    expect(legacyUsHoldingsDisplaySgd).toBeCloseTo(28_392.45, 2);
-    expect(stockHoldingsSgd).toBeCloseTo(
-      legacyUsHoldingsDisplaySgd + netOptionsMarketValueSgd,
-      2
-    );
+    const usStockHoldingsSgd =
+      originalUsHoldingsSgd + netOptionsMarketValueSgd;
+    expect(usStockHoldingsSgd).toBeCloseTo(18_218.65, 2);
 
-    const totalUsNetValueSgd =
-      stockHoldingsSgd + usCashSgd + netOptionsMarketValueSgd;
-
-    expect(totalUsNetValueSgd).toBeCloseTo(10_654.89, 2);
+    const totalUsNetValueSgd = usStockHoldingsSgd + usCashSgd;
+    expect(totalUsNetValueSgd).toBeCloseTo(20_828.69, 2);
   });
 
-  it("deriveUsStockHoldingsDisplay returns holdings-only values from portfolio summary", () => {
+  it("deriveUsStockHoldingsDisplay adds signed net options to original holdings", () => {
     const holdings: CalculatedHolding[] = [
       holding({ market: "US", marketValue: 10_000, sgdValue: 13_500 }),
     ];
@@ -445,12 +440,16 @@ describe("buildStockPortfolioSummary", () => {
     );
     const usStockHoldings = deriveUsStockHoldingsDisplay(portfolio);
 
-    expect(usStockHoldings.sgd).toBe(portfolio.usMarketValueSgd);
-    expect(usStockHoldings.usd).toBe(portfolio.usMarketValueUsd);
-    expect(portfolio.totalUsNetValueSgd).toBeCloseTo(
-      usStockHoldings.sgd +
-        portfolio.usAvailableTradingCashSgd +
-        (portfolio.netOptionsMarketValueSgd ?? 0),
+    expect(usStockHoldings.sgd).toBeCloseTo(
+      portfolio.usMarketValueSgd + (portfolio.netOptionsMarketValueSgd ?? 0),
+      2
+    );
+    expect(usStockHoldings.usd).toBeCloseTo(
+      portfolio.usMarketValueUsd + (portfolio.netOptionsMarketValueUsd ?? 0),
+      2
+    );
+    expect(deriveUsSummaryCardTotalNetValueSgd(portfolio)).toBeCloseTo(
+      usStockHoldings.sgd + portfolio.usAvailableTradingCashSgd,
       2
     );
   });

@@ -59,14 +59,38 @@ export interface UsStockHoldingsDisplay {
   usd: number;
 }
 
-/** US stock holdings only — excludes US cash and net options market value. */
+/** US stock holdings for Module 2 summary cards — original holdings + signed net options. */
 export function deriveUsStockHoldingsDisplay(
-  summary: Pick<StockPortfolioSummary, "usMarketValueSgd" | "usMarketValueUsd">
+  summary: Pick<
+    StockPortfolioSummary,
+    | "usMarketValueSgd"
+    | "usMarketValueUsd"
+    | "netOptionsMarketValueSgd"
+    | "netOptionsMarketValueUsd"
+  >
 ): UsStockHoldingsDisplay {
+  const netOptionsSgd = summary.netOptionsMarketValueSgd ?? 0;
+  const netOptionsUsd = summary.netOptionsMarketValueUsd ?? 0;
+
   return {
-    sgd: summary.usMarketValueSgd,
-    usd: summary.usMarketValueUsd,
+    sgd: summary.usMarketValueSgd + netOptionsSgd,
+    usd: summary.usMarketValueUsd + netOptionsUsd,
   };
+}
+
+/** Module 2 summary card total — stock holdings + US cash (options shown for reference only). */
+export function deriveUsSummaryCardTotalNetValueSgd(
+  summary: Pick<
+    StockPortfolioSummary,
+    | "usMarketValueSgd"
+    | "usMarketValueUsd"
+    | "netOptionsMarketValueSgd"
+    | "netOptionsMarketValueUsd"
+    | "usAvailableTradingCashSgd"
+  >
+): number {
+  const usStockHoldings = deriveUsStockHoldingsDisplay(summary);
+  return usStockHoldings.sgd + summary.usAvailableTradingCashSgd;
 }
 
 /** Sum current market values; US SGD leg uses portfolio USD total × FX when valid. */
