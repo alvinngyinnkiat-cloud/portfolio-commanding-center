@@ -54,6 +54,21 @@ export interface StockPortfolioSummary extends StockHoldingsSummary {
   fxRateValid: boolean;
 }
 
+export interface UsStockHoldingsDisplay {
+  sgd: number;
+  usd: number;
+}
+
+/** US stock holdings only — excludes US cash and net options market value. */
+export function deriveUsStockHoldingsDisplay(
+  summary: Pick<StockPortfolioSummary, "usMarketValueSgd" | "usMarketValueUsd">
+): UsStockHoldingsDisplay {
+  return {
+    sgd: summary.usMarketValueSgd,
+    usd: summary.usMarketValueUsd,
+  };
+}
+
 /** Sum current market values; US SGD leg uses portfolio USD total × FX when valid. */
 export function summarizeStockHoldings(
   holdings: CalculatedHolding[],

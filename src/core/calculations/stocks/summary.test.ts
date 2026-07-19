@@ -5,6 +5,7 @@ import type { StockFxConversion } from "@/core/domain/types/stock-fx-conversion"
 import {
   buildStockPortfolioSummary,
   buildStockTrackerSummary,
+  deriveUsStockHoldingsDisplay,
   summarizeStockHoldings,
 } from "./summary";
 
@@ -388,6 +389,69 @@ describe("buildStockPortfolioSummary", () => {
     );
     expect(portfolio.allMarketTotalValueSgd).toBeLessThan(
       portfolio.usTotalValueSgd + portfolio.sgTotalValueSgd
+    );
+  });
+
+  it("acceptance: US summary cards decompose total net value without double-counting options", () => {
+    const stockHoldingsSgd = 18_218.65;
+    const netOptionsMarketValueSgd = -10_173.8;
+    const usCashSgd = 2_610.04;
+    const legacyUsHoldingsDisplaySgd =
+      stockHoldingsSgd - netOptionsMarketValueSgd;
+
+    expect(legacyUsHoldingsDisplaySgd).toBeCloseTo(28_392.45, 2);
+    expect(stockHoldingsSgd).toBeCloseTo(
+      legacyUsHoldingsDisplaySgd + netOptionsMarketValueSgd,
+      2
+    );
+
+    const totalUsNetValueSgd =
+      stockHoldingsSgd + usCashSgd + netOptionsMarketValueSgd;
+
+    expect(totalUsNetValueSgd).toBeCloseTo(10_654.89, 2);
+  });
+
+  it("deriveUsStockHoldingsDisplay returns holdings-only values from portfolio summary", () => {
+    const holdings: CalculatedHolding[] = [
+      holding({ market: "US", marketValue: 10_000, sgdValue: 13_500 }),
+    ];
+    const optionsTrades: OptionsTrade[] = [
+      {
+        id: "opt-short",
+        status: "open",
+        tradeType: "personal",
+        userSharePercent: 100,
+        clientSharePercent: 0,
+        strategy: "sellPut",
+        underlying: "SPY",
+        expirationDate: "2026-12-18",
+        contracts: 1,
+        openDate: "2026-01-01",
+        openPremiumUsd: 100,
+        openFeesUsd: 0,
+        maxRiskUsd: 500,
+        currentValueUsd: 120,
+        createdAt: "2026-01-01T00:00:00.000Z",
+        updatedAt: "2026-01-01T00:00:00.000Z",
+      },
+    ];
+
+    const portfolio = buildStockPortfolioSummary(
+      holdings,
+      [],
+      [],
+      1.35,
+      optionsTrades
+    );
+    const usStockHoldings = deriveUsStockHoldingsDisplay(portfolio);
+
+    expect(usStockHoldings.sgd).toBe(portfolio.usMarketValueSgd);
+    expect(usStockHoldings.usd).toBe(portfolio.usMarketValueUsd);
+    expect(portfolio.totalUsNetValueSgd).toBeCloseTo(
+      usStockHoldings.sgd +
+        portfolio.usAvailableTradingCashSgd +
+        (portfolio.netOptionsMarketValueSgd ?? 0),
+      2
     );
   });
 });
