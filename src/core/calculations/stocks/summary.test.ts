@@ -1,3 +1,4 @@
+import { sgdToUsd } from "@/core/calculations/fx";
 import { describe, expect, it } from "vitest";
 import type { CalculatedHolding, StockTransaction } from "@/core/domain/types";
 import type { OptionsTrade } from "@/core/domain/types/options";
@@ -348,6 +349,14 @@ describe("buildStockPortfolioSummary", () => {
       portfolio.totalUsNetValueSgd + portfolio.sgTotalValueSgd,
       2
     );
+    expect(portfolio.usMarketPLSgd).toBeCloseTo(
+      portfolio.totalUsNetValueSgd - portfolio.usStockContributionSgd,
+      2
+    );
+    expect(portfolio.usMarketPLUsd).toBeCloseTo(
+      sgdToUsd(portfolio.usMarketPLSgd, 1.35),
+      2
+    );
   });
 
   it("total stock value equals US net plus SG net when options reduce US net", () => {
@@ -390,6 +399,15 @@ describe("buildStockPortfolioSummary", () => {
     );
     expect(portfolio.allMarketTotalValueSgd).toBeLessThan(
       portfolio.usTotalValueSgd + portfolio.sgTotalValueSgd
+    );
+  });
+
+  it("acceptance: US Market P/L uses Total US Net Value minus US Stock Contribution", () => {
+    const totalUsNetValueSgd = 20_591.84;
+    const usStockContributionSgd = 25_518.51;
+    expect(totalUsNetValueSgd - usStockContributionSgd).toBeCloseTo(
+      -4_926.67,
+      2
     );
   });
 
@@ -450,6 +468,15 @@ describe("buildStockPortfolioSummary", () => {
     );
     expect(deriveUsSummaryCardTotalNetValueSgd(portfolio)).toBeCloseTo(
       usStockHoldings.sgd + portfolio.usAvailableTradingCashSgd,
+      2
+    );
+    expect(portfolio.usMarketPLSgd).toBeCloseTo(
+      deriveUsSummaryCardTotalNetValueSgd(portfolio) -
+        portfolio.usStockContributionSgd,
+      2
+    );
+    expect(portfolio.usMarketPLUsd).toBeCloseTo(
+      sgdToUsd(portfolio.usMarketPLSgd, 1.35),
       2
     );
   });

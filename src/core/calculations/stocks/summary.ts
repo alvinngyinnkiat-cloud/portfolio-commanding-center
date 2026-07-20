@@ -6,7 +6,7 @@ import type {
 } from "@/core/domain/types";
 import type { OptionsTrade } from "@/core/domain/types/options";
 import type { StockFxConversion } from "@/core/domain/types/stock-fx-conversion";
-import { usdToSgd } from "@/core/calculations/fx";
+import { usdToSgd, sgdToUsd } from "@/core/calculations/fx";
 import { isValidFxRate } from "@/core/calculations/fx-validation";
 import { summarizeStockContributionFromDeposits } from "@/core/calculations/stocks/contributions";
 import { summarizeNetStockCashBreakdown } from "@/core/calculations/stocks/contributions";
@@ -285,9 +285,11 @@ export function buildStockPortfolioSummary(
     sgTotalValueSgd
   );
 
+  const usMarketPLSgd = totalUsNetValueSgd - contribution.usStockContributionSgd;
   const usMarketPLUsd =
-    usTotalValueUsd - contribution.usStockContributionUsd;
-  const usMarketPLSgd = usTotalValueSgd - contribution.usStockContributionSgd;
+    fxRateValid && fxRate != null
+      ? sgdToUsd(usMarketPLSgd, fxRate)
+      : totalUsNetValueUsd - contribution.usStockContributionUsd;
   const sgMarketPLSgd = sgTotalValueSgd - contribution.sgStockContributionSgd;
   const allMarketPLSgd = calculateStockProfitLossSgd(
     allMarketTotalValueSgd,
