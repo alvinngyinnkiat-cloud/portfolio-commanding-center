@@ -23,7 +23,7 @@ export interface DailySnapshot {
   personalCashSgd: number;
   /** Legacy alias — same as personalCashSgd for chart series key `cashSgd` */
   cashSgd: number;
-  /** US holdings (SGD) at capture — chart US Stocks adds netOptionsMarketValueSgd */
+  /** US Stock Holdings Value (SGD) at capture — legacy snapshots stored raw US holdings */
   netOptionsMarketValueSgd?: number | null;
   /** Crypto holdings only (SGD) — chart Crypto series */
   cryptoHoldingsValueSgd?: number;

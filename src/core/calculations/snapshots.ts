@@ -11,6 +11,7 @@ import {
 } from "@/shared/lib/date";
 import { buildPortfolioBreakdown } from "./portfolio";
 import { ALLOCATION_COLORS } from "./allocation";
+import { deriveUsStockHoldingsDisplay } from "./stocks/summary";
 
 export const SNAPSHOT_CHART_SERIES: Array<{
   key: SnapshotChartSeries;
@@ -20,7 +21,7 @@ export const SNAPSHOT_CHART_SERIES: Array<{
   { key: "ownPortfolio", label: "Portfolio", color: "#0ea5e9" },
   {
     key: "usStocksEtfSgd",
-    label: "US Stocks",
+    label: "US Stock Holdings Value (SGD)",
     color: ALLOCATION_COLORS.usStocks,
   },
   {
@@ -111,6 +112,52 @@ function resolveSnapshotNetOptionsSgd(
   return null;
 }
 
+/** Legacy snapshots stored raw US holdings; net options were added at chart read time. */
+function usesLegacyUsStocksSnapshotFormat(
+  snapshot: Pick<
+    DailySnapshot,
+    | "usStocksEtfSgd"
+    | "netOptionsMarketValueSgd"
+    | "sgStocksSgd"
+    | "cryptoSgd"
+    | "cryptoHoldingsValueSgd"
+    | "totalCashSgd"
+    | "personalCashSgd"
+    | "ownPortfolio"
+  >
+): boolean {
+  const netOptions = snapshot.netOptionsMarketValueSgd;
+  if (netOptions == null || netOptions === 0) {
+    return false;
+  }
+
+  const usHoldings = snapshot.usStocksEtfSgd || 0;
+  const sgStocksSgd = snapshot.sgStocksSgd || 0;
+  const cryptoHoldingsValueSgd =
+    snapshot.cryptoHoldingsValueSgd ?? snapshot.cryptoSgd ?? 0;
+  const totalCashSgd =
+    snapshot.totalCashSgd ?? snapshot.personalCashSgd ?? 0;
+  const ownPortfolio = snapshot.ownPortfolio;
+  const tolerance = 1;
+
+  const newFormatTotal =
+    usHoldings + sgStocksSgd + cryptoHoldingsValueSgd + totalCashSgd;
+  if (Math.abs(newFormatTotal - ownPortfolio) <= tolerance) {
+    return false;
+  }
+
+  const legacyFormatTotal = newFormatTotal + netOptions;
+  return Math.abs(legacyFormatTotal - ownPortfolio) <= tolerance;
+}
+
+function getSnapshotUsStocksDisplaySgd(snapshot: DailySnapshot): number {
+  const usHoldings = snapshot.usStocksEtfSgd || 0;
+  if (usesLegacyUsStocksSnapshotFormat(snapshot)) {
+    return usHoldings + (snapshot.netOptionsMarketValueSgd ?? 0);
+  }
+  return usHoldings;
+}
+
 export function normalizeDailySnapshot(
   raw: Partial<DailySnapshot> & { date: string }
 ): DailySnapshot {
@@ -122,16 +169,13 @@ export function normalizeDailySnapshot(
   const totalCashSgd = resolveSnapshotTotalCashSgd(raw, breakdown, clientPortfolio);
   const personalCashSgd = totalCashSgd;
   const netOptionsMarketValueSgd = resolveSnapshotNetOptionsSgd(raw);
-  const netOptionsForChart = netOptionsMarketValueSgd ?? 0;
+  const nonUsAssetTotalSgd =
+    sgStocksSgd + cryptoHoldingsValueSgd + totalCashSgd;
 
   const ownPortfolio =
     raw.ownPortfolio !== undefined
       ? num(raw.ownPortfolio)
-      : usStocksEtfSgd +
-        netOptionsForChart +
-        sgStocksSgd +
-        cryptoHoldingsValueSgd +
-        totalCashSgd;
+      : usStocksEtfSgd + nonUsAssetTotalSgd;
   const totalPortfolio = ownPortfolio + clientPortfolio;
 
   return {
@@ -164,7 +208,7 @@ export function getSnapshotChartValue(
     case "ownPortfolio":
       return snapshot.ownPortfolio;
     case "usStocksEtfSgd":
-      return (snapshot.usStocksEtfSgd || 0) + (snapshot.netOptionsMarketValueSgd || 0);
+      return getSnapshotUsStocksDisplaySgd(snapshot);
     case "sgStocksSgd":
       return snapshot.sgStocksSgd;
     case "cryptoSgd":
@@ -234,7 +278,12 @@ export function createDailySnapshot(
     totalPortfolio: metrics.totalPortfolio,
     clientPortfolio: metrics.clientPortfolio,
     totalContribution: metrics.totalContribution,
-    usStocksEtfSgd: metrics.usStocksEtfSgd,
+    usStocksEtfSgd: deriveUsStockHoldingsDisplay({
+      usMarketValueSgd: inputs.usMarketValueSgd,
+      usMarketValueUsd: metrics.usStocksEtfUsd,
+      netOptionsMarketValueSgd: inputs.netOptionsMarketValueSgd ?? null,
+      netOptionsMarketValueUsd: null,
+    }).sgd,
     sgStocksSgd: metrics.sgStocksSgd,
     cryptoSgd: metrics.cryptoHoldingsValueSgd,
     cryptoHoldingsValueSgd: metrics.cryptoHoldingsValueSgd,

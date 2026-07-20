@@ -36,10 +36,26 @@ describe("getSnapshotChartValue", () => {
     expect(getSnapshotChartValue(snapshot, "ownPortfolio")).toBe(42_500);
   });
 
-  it("US Stocks = US holdings + net options market value", () => {
+  it("legacy US Stocks chart adds net options when own portfolio reconciles", () => {
     const snapshot = baseSnapshot({
       usStocksEtfSgd: 20_000,
       netOptionsMarketValueSgd: -500,
+      sgStocksSgd: 5_000,
+      cryptoHoldingsValueSgd: 8_000,
+      totalCashSgd: 17_000,
+      ownPortfolio: 49_500,
+    });
+    expect(getSnapshotChartValue(snapshot, "usStocksEtfSgd")).toBe(19_500);
+  });
+
+  it("new US Stocks chart uses stored US Stock Holdings Value directly", () => {
+    const snapshot = baseSnapshot({
+      usStocksEtfSgd: 19_500,
+      netOptionsMarketValueSgd: -500,
+      sgStocksSgd: 5_000,
+      cryptoHoldingsValueSgd: 8_000,
+      totalCashSgd: 17_000,
+      ownPortfolio: 49_500,
     });
     expect(getSnapshotChartValue(snapshot, "usStocksEtfSgd")).toBe(19_500);
   });
@@ -113,8 +129,9 @@ describe("createDailySnapshot", () => {
     expect(getSnapshotChartValue(snapshot, "ownPortfolio")).toBe(
       metrics.ownPortfolio
     );
+    expect(snapshot.usStocksEtfSgd).toBeCloseTo(13_230, 2);
     expect(getSnapshotChartValue(snapshot, "usStocksEtfSgd")).toBeCloseTo(
-      13_230,
+      snapshot.usStocksEtfSgd,
       2
     );
     expect(getSnapshotChartValue(snapshot, "cryptoSgd")).toBe(10_000);

@@ -221,7 +221,7 @@ export function DailySnapshotTrigger() {
               <th className="px-4 py-3">Created At</th>
               <th className="px-4 py-3">Type</th>
               <th className="px-4 py-3">My Portfolio</th>
-              <th className="px-4 py-3">US Stocks</th>
+              <th className="px-4 py-3">US Stock Holdings Value (SGD)</th>
               <th className="px-4 py-3">SG Stocks</th>
               <th className="px-4 py-3">Crypto</th>
               <th className="px-4 py-3">Personal Cash</th>
