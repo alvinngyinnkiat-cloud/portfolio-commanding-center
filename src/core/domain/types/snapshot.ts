@@ -16,6 +16,7 @@ export interface DailySnapshot {
   totalPortfolio: number;
   clientPortfolio: number;
   totalContribution: number;
+  /** US Stock Holdings Value (SGD) at capture — excludes US Cash (counted in Personal Cash) */
   usStocksEtfSgd: number;
   sgStocksSgd: number;
   cryptoSgd: number;

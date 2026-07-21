@@ -137,4 +137,45 @@ describe("createDailySnapshot", () => {
     expect(getSnapshotChartValue(snapshot, "cryptoSgd")).toBe(10_000);
     expect(getSnapshotChartValue(snapshot, "cashSgd")).toBe(metrics.totalCashSgd);
   });
+
+  it("stores US Stock Holdings Value without US Cash (acceptance)", () => {
+    const fxRate = 1.35;
+    const usStockHoldingsSgd = 17_997.41;
+    const usCashSgd = 2_594.44;
+    const rawUsHoldingsUsd = usStockHoldingsSgd / fxRate;
+    const usCashUsd = usCashSgd / fxRate;
+
+    const inputs = {
+      usStocksEtfUsd: rawUsHoldingsUsd,
+      sgStocksSgd: 0,
+      cryptoSgd: 0,
+      cryptoHoldingCount: 0,
+      clientPortfolioUsd: 0,
+      clientPortfolioSgd: 0,
+      fxRate,
+      contributions: [],
+      ...emptyModuleContributionInputs(),
+      usdTradingCashUsd: usCashUsd,
+      sgdTradingCashSgd: 0,
+      cryptoCashSgd: 0,
+      usAvailableTradingCashUsd: usCashUsd,
+      sgAvailableTradingCashSgd: 0,
+      usMarketValueSgd: usStockHoldingsSgd + usCashSgd,
+      cryptoHoldingsValueSgd: 0,
+      totalCryptoValueSgd: 0,
+      totalStockValueSgd: usStockHoldingsSgd + usCashSgd,
+    };
+    const metrics = calculatePortfolioMetrics(inputs);
+    const snapshot = createDailySnapshot(inputs, metrics, {
+      snapshotType: "manual",
+    });
+
+    expect(snapshot.usStocksEtfSgd).toBeCloseTo(usStockHoldingsSgd, 2);
+    expect(snapshot.usStocksEtfSgd).not.toBeCloseTo(
+      usStockHoldingsSgd + usCashSgd,
+      2
+    );
+    expect(snapshot.personalCashSgd).toBeCloseTo(usCashSgd, 2);
+    expect(snapshot.totalCashSgd).toBeCloseTo(usCashSgd, 2);
+  });
 });

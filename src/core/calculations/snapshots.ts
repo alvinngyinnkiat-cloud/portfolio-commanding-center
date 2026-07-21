@@ -279,7 +279,7 @@ export function createDailySnapshot(
     clientPortfolio: metrics.clientPortfolio,
     totalContribution: metrics.totalContribution,
     usStocksEtfSgd: deriveUsStockHoldingsDisplay({
-      usMarketValueSgd: inputs.usMarketValueSgd,
+      usMarketValueSgd: metrics.usStocksEtfSgd,
       usMarketValueUsd: metrics.usStocksEtfUsd,
       netOptionsMarketValueSgd: inputs.netOptionsMarketValueSgd ?? null,
       netOptionsMarketValueUsd: null,
