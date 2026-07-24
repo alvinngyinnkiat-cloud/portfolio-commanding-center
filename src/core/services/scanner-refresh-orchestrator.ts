@@ -386,7 +386,7 @@ export class ScannerRefreshOrchestrator {
           refreshedAt: input.refreshedAt,
           refreshRunId: input.refreshRunId,
           result,
-          candleCount: result.candlesAvailable,
+          candleCount: result.candlesAvailable ?? 0,
         };
 
         const upsert = this.resultRepo.upsertTickerRecord(record);
