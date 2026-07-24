@@ -1,6 +1,6 @@
 import type { ScannerCandleBar } from "@/core/domain/types/scanner";
 
-export type AlignedChartStatus = "aligned" | "unavailable";
+export type AlignedChartStatus = "aligned" | "stale" | "unavailable";
 
 export interface AlignedChartData {
   ticker: string;

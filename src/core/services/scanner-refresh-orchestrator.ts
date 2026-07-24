@@ -1,6 +1,7 @@
 import type { WatchlistEntry } from "@/core/calculations/scanner/watchlist";
 import { getActiveWatchlistEntries } from "@/core/calculations/scanner/watchlist";
 import { scanTicker } from "@/core/calculations/scanner/scan";
+import { normalizeCompletedDailyCandles } from "@/core/calculations/scanner/indicators";
 import {
   buildRankings,
   countOpportunities,
@@ -344,7 +345,20 @@ export class ScannerRefreshOrchestrator {
       });
 
       try {
-        const result = this.scanTickerFresh(input.entry);
+        const savedCandles = this.dailyRepo.listByTicker(
+          input.entry.market,
+          input.entry.ticker
+        );
+        if (savedCandles.length === 0) {
+          lastError = "No persisted daily candles after refresh";
+          if (attempt < MAX_ATTEMPTS) {
+            await sleep(BASE_BACKOFF_MS * Math.pow(2, attempt - 1));
+            continue;
+          }
+          break;
+        }
+
+        const result = this.scanTickerFresh(input.entry, savedCandles);
         const validation = validateTickerScanResult(result, ticker, previous);
 
         logRefreshDiag("validation", {
@@ -372,7 +386,7 @@ export class ScannerRefreshOrchestrator {
           refreshedAt: input.refreshedAt,
           refreshRunId: input.refreshRunId,
           result,
-          candleCount: result.recentCandles.length,
+          candleCount: result.candlesAvailable,
         };
 
         const upsert = this.resultRepo.upsertTickerRecord(record);
@@ -429,7 +443,10 @@ export class ScannerRefreshOrchestrator {
     };
   }
 
-  private scanTickerFresh(entry: WatchlistEntry): ScannerTickerResult {
+  private scanTickerFresh(
+    entry: WatchlistEntry,
+    savedCandles = this.dailyRepo.listByTicker(entry.market, entry.ticker)
+  ): ScannerTickerResult {
     const prices = normalizeStockPrices(this.priceRepo.list());
     const normalized = normalizeTicker(entry.ticker);
     const price =
@@ -437,9 +454,23 @@ export class ScannerRefreshOrchestrator {
         (row) => row.market === entry.market && normalizeTicker(row.ticker) === normalized
       ) ?? null;
 
+    const verifiedCount = normalizeCompletedDailyCandles(
+      savedCandles.map((bar) => ({
+        date: bar.date,
+        open: bar.open,
+        high: bar.high,
+        low: bar.low,
+        close: bar.close,
+      }))
+    ).length;
+
+    if (verifiedCount === 0) {
+      throw new Error("Verified daily candle set is empty after re-read");
+    }
+
     return scanTicker({
       entry,
-      dailyCandles: this.dailyRepo.listByTicker(entry.market, entry.ticker),
+      dailyCandles: savedCandles,
       weeklyCandles: this.weeklyRepo.listByTicker(entry.market, entry.ticker),
       price,
     });
@@ -536,7 +567,9 @@ export class ScannerRefreshOrchestrator {
     const successCount = input.successfulTickers.size;
     const refreshStatus = deriveRunRefreshStatus(successCount, input.allEntries.length);
 
-    const marketDates = results.flatMap((row) => row.recentCandles.map((bar) => bar.date));
+    const marketDates = results
+      .map((row) => row.priceAsOf)
+      .filter((date): date is string => typeof date === "string" && date.length > 0);
     const marketDateUsed = getLatestCandleDate(
       marketDates.map((dateValue) => ({ date: dateValue }))
     );

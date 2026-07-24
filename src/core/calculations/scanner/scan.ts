@@ -5,7 +5,11 @@ import type {
   MainSystemDisplay,
   ScannerTickerResult,
 } from "@/core/domain/types/scanner";
-import { computeIndicators, filterCompletedDailyCandles } from "./indicators";
+import {
+  computeIndicatorsFromVerifiedBars,
+  normalizeCompletedDailyCandles,
+  type OhlcBar,
+} from "./indicators";
 import { computeStructure } from "./structure";
 import {
   scoreBearCall,
@@ -31,7 +35,7 @@ import {
   computeSma200Prev,
   computeSma50SlopePct,
 } from "./extended-indicators";
-import { resolveScannerTickerCurrentPrice } from "./resolve-scanner-ticker-price";
+import { DAILY_CLOSE_SOURCE_LABEL } from "./resolve-current-price";
 
 export interface ScanTickerInput {
   entry: WatchlistEntry;
@@ -54,13 +58,29 @@ const EMPTY_MAIN: MainSystemDisplay = {
   reasons: ["Insufficient data"],
 };
 
-export function scanTicker(input: ScanTickerInput): ScannerTickerResult {
-  const { entry, dailyCandles, weeklyCandles, price } = input;
-  const notes: string[] = [];
-  const candlesAvailable = dailyCandles.length;
+function toOhlcBars(dailyCandles: StockDailyCandle[]): OhlcBar[] {
+  return dailyCandles.map((bar) => ({
+    date: bar.date,
+    open: bar.open,
+    high: bar.high,
+    low: bar.low,
+    close: bar.close,
+  }));
+}
 
-  const resolvedPrice = resolveScannerTickerCurrentPrice({ dailyCandles });
-  if (!resolvedPrice) {
+function isValidClose(value: number | null | undefined): value is number {
+  return value != null && Number.isFinite(value) && value > 0;
+}
+
+export function scanTicker(input: ScanTickerInput): ScannerTickerResult {
+  const { entry, dailyCandles, weeklyCandles } = input;
+  const notes: string[] = [];
+
+  const verifiedCandles = normalizeCompletedDailyCandles(toOhlcBars(dailyCandles));
+  const latestCandle = verifiedCandles.at(-1) ?? null;
+  const candlesAvailable = verifiedCandles.length;
+
+  if (!latestCandle || !isValidClose(latestCandle.close) || !latestCandle.date) {
     return incompleteResult(
       entry,
       notes,
@@ -69,16 +89,9 @@ export function scanTicker(input: ScanTickerInput): ScannerTickerResult {
     );
   }
 
-  const dailyBars = filterCompletedDailyCandles(
-    dailyCandles.map((bar) => ({
-      date: bar.date,
-      open: bar.open,
-      high: bar.high,
-      low: bar.low,
-      close: bar.close,
-    }))
-  );
-  const recentCandles = buildRecentChartCandles(dailyBars);
+  const currentPrice = latestCandle.close;
+  const marketDate = latestCandle.date;
+  const recentCandles = buildRecentChartCandles(verifiedCandles);
 
   if (candlesAvailable < SCANNER_INDICATOR_CANDLES_REQUIRED) {
     const reason = `Insufficient daily history: ${candlesAvailable}/${SCANNER_INDICATOR_CANDLES_REQUIRED} sessions`;
@@ -86,7 +99,8 @@ export function scanTicker(input: ScanTickerInput): ScannerTickerResult {
     return priceOnlyResult({
       entry,
       notes,
-      resolvedPrice,
+      currentPrice,
+      marketDate,
       recentCandles,
       candlesAvailable,
       indicatorError: reason,
@@ -101,17 +115,20 @@ export function scanTicker(input: ScanTickerInput): ScannerTickerResult {
     close: bar.close,
   }));
 
-  const indicatorValues = computeIndicators(dailyBars, resolvedPrice.currentPrice);
+  const indicatorValues = computeIndicatorsFromVerifiedBars(
+    verifiedCandles,
+    currentPrice
+  );
   const structure = computeStructure(
-    dailyBars,
+    verifiedCandles,
     weeklyBars,
     indicatorValues.atr14
   );
 
-  const ema20Prev = computeEma20Prev(dailyBars);
-  const sma50Prev = computeSma50Prev(dailyBars);
-  const sma200Prev = computeSma200Prev(dailyBars);
-  const avgPricePrev = computeAvgPricePrev(dailyBars);
+  const ema20Prev = computeEma20Prev(verifiedCandles);
+  const sma50Prev = computeSma50Prev(verifiedCandles);
+  const sma200Prev = computeSma200Prev(verifiedCandles);
+  const avgPricePrev = computeAvgPricePrev(verifiedCandles);
   const { emaDiff, emaDiffPct } = computeEmaDiff(
     indicatorValues.avgPrice,
     indicatorValues.ema20
@@ -194,11 +211,11 @@ export function scanTicker(input: ScanTickerInput): ScannerTickerResult {
     ticker: entry.ticker,
     category: entry.category,
     market: entry.market,
-    currentPrice: resolvedPrice.currentPrice,
-    priceAsOf: resolvedPrice.marketDate,
-    priceSource: resolvedPrice.priceSource,
-    priceSourceKey: resolvedPrice.priceSourceKey,
-    priceStatus: resolvedPrice.priceStatus,
+    currentPrice,
+    priceAsOf: marketDate,
+    priceSource: DAILY_CLOSE_SOURCE_LABEL,
+    priceSourceKey: "daily_close",
+    priceStatus: "fresh",
     indicatorStatus: "ready",
     indicatorError: null,
     candlesAvailable,
@@ -305,7 +322,8 @@ function emptyStrategies(reason: string): ScannerTickerResult["strategies"] {
 function priceOnlyResult(input: {
   entry: WatchlistEntry;
   notes: string[];
-  resolvedPrice: NonNullable<ReturnType<typeof resolveScannerTickerCurrentPrice>>;
+  currentPrice: number;
+  marketDate: string;
   recentCandles: ScannerTickerResult["recentCandles"];
   candlesAvailable: number;
   indicatorError: string;
@@ -315,11 +333,11 @@ function priceOnlyResult(input: {
     ticker: input.entry.ticker,
     category: input.entry.category,
     market: input.entry.market,
-    currentPrice: input.resolvedPrice.currentPrice,
-    priceAsOf: input.resolvedPrice.marketDate,
-    priceSource: input.resolvedPrice.priceSource,
-    priceSourceKey: input.resolvedPrice.priceSourceKey,
-    priceStatus: input.resolvedPrice.priceStatus,
+    currentPrice: input.currentPrice,
+    priceAsOf: input.marketDate,
+    priceSource: DAILY_CLOSE_SOURCE_LABEL,
+    priceSourceKey: "daily_close",
+    priceStatus: "fresh",
     indicatorStatus: "insufficient_history",
     indicatorError: reason,
     candlesAvailable: input.candlesAvailable,

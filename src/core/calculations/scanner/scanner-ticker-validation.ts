@@ -19,6 +19,38 @@ function isPriceOnlyResult(result: ScannerTickerResult): boolean {
   );
 }
 
+function validateIndicatorSessionAlignment(
+  result: ScannerTickerResult
+): TickerValidationResult {
+  if (isPriceOnlyResult(result)) {
+    return { ok: true };
+  }
+
+  const sessionDate = result.priceAsOf;
+  if (!sessionDate) {
+    return { ok: false, error: "Market date missing" };
+  }
+
+  const soSession = result.indicators.soDebug?.sessionDate ?? null;
+  const atrSession = result.indicators.atrDebug?.sessionDate ?? null;
+
+  if (soSession && soSession !== sessionDate) {
+    return {
+      ok: false,
+      error: "SO indicator session must match latest completed candle date",
+    };
+  }
+
+  if (atrSession && atrSession !== sessionDate) {
+    return {
+      ok: false,
+      error: "ATR indicator session must match latest completed candle date",
+    };
+  }
+
+  return { ok: true };
+}
+
 function validatePriceAlignment(result: ScannerTickerResult): TickerValidationResult {
   if (result.recentCandles.length === 0) {
     return { ok: true };
@@ -123,6 +155,11 @@ export function validateTickerScanResult(
   const priceValidation = validatePricePersistence(result, previousRecord);
   if (!priceValidation.ok) {
     return priceValidation;
+  }
+
+  const indicatorAlignment = validateIndicatorSessionAlignment(result);
+  if (!indicatorAlignment.ok) {
+    return indicatorAlignment;
   }
 
   if (result.status !== "ok") {

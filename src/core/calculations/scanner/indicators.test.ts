@@ -5,6 +5,7 @@ import {
   computeStochastic1033,
   computeTrueRanges,
   filterCompletedDailyCandles,
+  normalizeCompletedDailyCandles,
   STOCHASTIC_K_PERIOD,
   STOCHASTIC_K_SMOOTHING,
   type OhlcBar,
@@ -65,6 +66,21 @@ describe("filterCompletedDailyCandles", () => {
 
     const filtered = filterCompletedDailyCandles(candles);
     expect(filtered.at(-1)?.date).toBe("2026-06-15");
+  });
+});
+
+describe("normalizeCompletedDailyCandles", () => {
+  it("sorts ascending, dedupes by date, and keeps the last row for duplicates", () => {
+    const candles: OhlcBar[] = [
+      { date: "2026-07-16", open: 1, high: 2, low: 0.5, close: 10 },
+      { date: "2026-07-23", open: 2, high: 3, low: 1.5, close: 20 },
+      { date: "2026-07-16", open: 3, high: 4, low: 2.5, close: 11 },
+    ];
+
+    const normalized = normalizeCompletedDailyCandles(candles);
+    expect(normalized.map((bar) => bar.date)).toEqual(["2026-07-16", "2026-07-23"]);
+    expect(normalized[0]?.close).toBe(11);
+    expect(normalized.at(-1)?.close).toBe(20);
   });
 });
 

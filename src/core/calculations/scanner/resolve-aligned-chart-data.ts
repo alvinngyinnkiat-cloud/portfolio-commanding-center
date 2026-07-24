@@ -2,7 +2,7 @@ import type { StockDailyCandle } from "@/core/domain/types";
 import type { ScannerCandleBar } from "@/core/domain/types/scanner";
 import type { AlignedChartData } from "@/core/domain/types/aligned-chart-data";
 import { buildRecentChartCandles } from "./chart-candles";
-import { filterCompletedDailyCandles, type OhlcBar } from "./indicators";
+import { normalizeCompletedDailyCandles, type OhlcBar } from "./indicators";
 import { normalizeTicker } from "@/core/calculations/stocks/normalize";
 import { DAILY_CLOSE_SOURCE_LABEL } from "./resolve-current-price";
 
@@ -10,6 +10,7 @@ export interface ResolveAlignedChartDataInput {
   ticker: string;
   dailyCandles: StockDailyCandle[];
   scannerChartCandles?: ScannerCandleBar[];
+  scannerMarketSession?: string | null;
   currentAveragePrice?: number | null;
   previousAveragePrice?: number | null;
   atr14?: number | null;
@@ -74,9 +75,7 @@ export function resolveAlignedChartData(
 ): AlignedChartData {
   const ticker = normalizeTicker(input.ticker);
   const rawBars = toOhlcBars(input.dailyCandles, input.scannerChartCandles ?? []);
-  const completed = filterCompletedDailyCandles(
-    [...rawBars].sort((a, b) => a.date.localeCompare(b.date))
-  );
+  const completed = normalizeCompletedDailyCandles(rawBars);
 
   if (completed.length === 0) {
     return buildEmptyResult(ticker);
@@ -86,6 +85,9 @@ export function resolveAlignedChartData(
   const candles = buildRecentChartCandles(completed, 5);
   const latestCandle = candles[candles.length - 1] ?? null;
   const currentPrice = latestBar.close;
+  const scannerSession = normalizeMarketSessionDate(input.scannerMarketSession);
+  const indicatorsAligned =
+    scannerSession != null && scannerSession === latestBar.date;
 
   return {
     ticker,
@@ -93,12 +95,14 @@ export function resolveAlignedChartData(
     currentPrice,
     candles,
     latestCandle,
-    currentAveragePrice: input.currentAveragePrice ?? null,
-    previousAveragePrice: input.previousAveragePrice ?? null,
-    atr14: input.atr14 ?? null,
+    currentAveragePrice: indicatorsAligned ? (input.currentAveragePrice ?? null) : null,
+    previousAveragePrice: indicatorsAligned
+      ? (input.previousAveragePrice ?? null)
+      : null,
+    atr14: indicatorsAligned ? (input.atr14 ?? null) : null,
     source: DAILY_CLOSE_SOURCE_LABEL,
     refreshedAt: input.refreshedAt ?? null,
-    status: "aligned",
+    status: indicatorsAligned || scannerSession == null ? "aligned" : "stale",
     showCurrentPriceLine: latestCandle != null,
   };
 }

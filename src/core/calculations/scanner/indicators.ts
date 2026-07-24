@@ -62,6 +62,29 @@ export function filterCompletedDailyCandles(
   return sorted;
 }
 
+/**
+ * Sort ascending, dedupe by trading date (last row wins), keep completed sessions only.
+ * Single source for scanner price, indicators, and chart latest candle.
+ */
+export function normalizeCompletedDailyCandles(
+  candles: OhlcBar[],
+  asOf: Date = new Date()
+): OhlcBar[] {
+  const sorted = [...candles].sort((a, b) => a.date.localeCompare(b.date));
+  const deduped: OhlcBar[] = [];
+
+  for (const bar of sorted) {
+    const previous = deduped.at(-1);
+    if (previous && previous.date === bar.date) {
+      deduped[deduped.length - 1] = bar;
+      continue;
+    }
+    deduped.push(bar);
+  }
+
+  return filterCompletedDailyCandles(deduped, asOf);
+}
+
 /** TradingView ATR length — Wilder RMA smoothing. */
 export const ATR_PERIOD = 14;
 
@@ -347,11 +370,36 @@ export function computeIndicators(
   trendQualityBullPut: number;
   trendQualityBearCall: number;
 } {
-  const completedDaily = filterCompletedDailyCandles(candles);
-  const closes = completedDaily.map((bar) => bar.close);
-  const last = completedDaily[completedDaily.length - 1];
-  const stochastic = computeStochastic1033(completedDaily);
-  const atrResult = computeAtr14Rma(completedDaily);
+  const completedDaily = normalizeCompletedDailyCandles(candles);
+  return computeIndicatorsFromVerifiedBars(completedDaily, currentPrice);
+}
+
+/** Indicators from a pre-verified completed daily array (no re-filter). */
+export function computeIndicatorsFromVerifiedBars(
+  verifiedCandles: OhlcBar[],
+  currentPrice: number | null
+): {
+  ema20: number | null;
+  sma50: number | null;
+  sma200: number | null;
+  atr14: number | null;
+  atrDebug: AtrDebug;
+  so: number | null;
+  soPrev: number | null;
+  soDebug: StochasticSoDebug;
+  high: number | null;
+  low: number | null;
+  avgPrice: number | null;
+  marketStructure: "Bullish" | "Bearish" | "Neutral";
+  momentum: "Above EMA" | "Below EMA" | "At EMA";
+  trend: "Bullish" | "Bearish" | "Neutral";
+  trendQualityBullPut: number;
+  trendQualityBearCall: number;
+} {
+  const closes = verifiedCandles.map((bar) => bar.close);
+  const last = verifiedCandles[verifiedCandles.length - 1];
+  const stochastic = computeStochastic1033(verifiedCandles);
+  const atrResult = computeAtr14Rma(verifiedCandles);
   const ema20 = ema(closes, 20);
   const sma50Val = sma(closes, 50);
   const sma200Val = sma(closes, 200);

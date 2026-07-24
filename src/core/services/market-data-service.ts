@@ -12,14 +12,25 @@ function isValidPrice(price: number | null | undefined): price is number {
   return price != null && Number.isFinite(price) && price > 0;
 }
 
+function isPriceSessionAlignedWithScanner(
+  record: PersistedScannerTickerRecord,
+  priceRecord?: PersistedCurrentPriceRecord | null
+): boolean {
+  if (!priceRecord) return true;
+  return priceRecord.marketSession === record.marketDate;
+}
+
 export function mapPersistedToMarketDataRecord(
   record: PersistedScannerTickerRecord,
   latestRunId: string | null,
   priceRecord?: PersistedCurrentPriceRecord | null
 ): MarketDataRecord {
   const result = record.result;
+  const priceSessionAligned = isPriceSessionAlignedWithScanner(record, priceRecord);
   const useCentralPrice =
-    priceRecord != null && isValidPrice(priceRecord.currentPrice);
+    priceRecord != null &&
+    isValidPrice(priceRecord.currentPrice) &&
+    priceSessionAligned;
 
   return {
     ticker: normalizeTicker(record.ticker),
@@ -49,6 +60,7 @@ export function mapPersistedToMarketDataRecord(
       : record.refreshRunId,
     scannerResult: result,
     isStale:
+      !priceSessionAligned ||
       priceRecord?.status === "stale" ||
       (latestRunId != null && record.refreshRunId !== latestRunId),
   };

@@ -33,6 +33,7 @@ export class AlignedChartDataService {
       ticker: key,
       dailyCandles,
       scannerChartCandles: record?.candles ?? [],
+      scannerMarketSession: record?.marketSession ?? null,
       currentAveragePrice: record?.currentAveragePrice ?? null,
       previousAveragePrice: record?.previousAveragePrice ?? null,
       atr14: record?.atr14 ?? null,

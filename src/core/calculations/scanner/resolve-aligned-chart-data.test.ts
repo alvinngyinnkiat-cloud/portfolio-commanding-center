@@ -57,4 +57,45 @@ describe("resolveAlignedChartData", () => {
     expect(resolved.currentPrice).toBeNull();
     expect(resolved.showCurrentPriceLine).toBe(false);
   });
+
+  it("marks stale when scanner indicators use an older session than latest candle", () => {
+    const daily = [
+      {
+        market: "US" as const,
+        ticker: "AAPL",
+        date: "2026-07-16",
+        open: 210,
+        high: 215,
+        low: 208,
+        close: 212,
+        source: "yahoo" as const,
+        fetchedAt: "x",
+      },
+      {
+        market: "US" as const,
+        ticker: "AAPL",
+        date: "2026-07-23",
+        open: 214,
+        high: 220,
+        low: 213,
+        close: 218.5,
+        source: "yahoo" as const,
+        fetchedAt: "x",
+      },
+    ];
+
+    const resolved = resolveAlignedChartData({
+      ticker: "AAPL",
+      dailyCandles: daily,
+      scannerMarketSession: "2026-07-16",
+      currentAveragePrice: 211,
+      atr14: 4.2,
+    });
+
+    expect(resolved.marketSession).toBe("2026-07-23");
+    expect(resolved.currentPrice).toBe(218.5);
+    expect(resolved.status).toBe("stale");
+    expect(resolved.currentAveragePrice).toBeNull();
+    expect(resolved.atr14).toBeNull();
+  });
 });

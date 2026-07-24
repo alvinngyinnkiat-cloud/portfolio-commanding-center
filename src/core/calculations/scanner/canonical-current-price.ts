@@ -1,5 +1,5 @@
 import type { OhlcBar } from "./indicators";
-import { filterCompletedDailyCandles } from "./indicators";
+import { normalizeCompletedDailyCandles } from "./indicators";
 
 export interface CanonicalScannerCurrentPrice {
   currentPrice: number;
@@ -15,7 +15,7 @@ export function resolveLatestCompletedDailyBar(
     close: number;
   }>
 ): OhlcBar | null {
-  const completed = filterCompletedDailyCandles(
+  const completed = normalizeCompletedDailyCandles(
     dailyCandles.map((bar) => ({
       date: bar.date,
       open: bar.open,
@@ -27,8 +27,7 @@ export function resolveLatestCompletedDailyBar(
 
   if (completed.length === 0) return null;
 
-  const sorted = [...completed].sort((a, b) => a.date.localeCompare(b.date));
-  return sorted[sorted.length - 1] ?? null;
+  return completed[completed.length - 1] ?? null;
 }
 
 /** Canonical scanner current price = close of latest completed daily candle. */
