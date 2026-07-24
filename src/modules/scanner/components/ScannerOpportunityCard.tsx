@@ -103,9 +103,13 @@ function ChartColumn({
   const { structure, indicators } = result;
   const { chart: aligned, loading: chartLoading } = useAlignedChartData(result.ticker);
 
-  const infoPrice = aligned?.currentPrice ?? marketData?.currentPrice ?? result.currentPrice;
-  const infoSession =
-    aligned?.marketSession ?? marketData?.marketSession ?? result.priceAsOf;
+  const alignedReady = aligned?.status === "aligned";
+  const infoPrice = alignedReady
+    ? aligned.currentPrice
+    : (result.currentPrice ?? marketData?.currentPrice ?? aligned?.currentPrice ?? null);
+  const infoSession = alignedReady
+    ? aligned.marketSession
+    : (result.priceAsOf ?? marketData?.marketSession ?? aligned?.marketSession ?? null);
   const sharedPriceSource =
     aligned?.source ?? marketData?.priceSource ?? result.priceSource ?? "Daily close";
   const displayRefreshedAt =

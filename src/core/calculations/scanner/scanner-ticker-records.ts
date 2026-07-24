@@ -123,16 +123,16 @@ export function upsertTickerRecord(
     return "skipped_stale";
   }
 
+  for (const key of Object.keys(normalized.tickerRecords ?? {})) {
+    const row = normalized.tickerRecords![key];
+    if (row && normalizeTicker(row.ticker) === ticker) {
+      delete normalized.tickerRecords![key];
+    }
+  }
+
   const key = tickerRecordKey(record.ticker, record.marketDate);
   normalized.tickerRecords![key] = record;
-
-  const currentLatest = getLatestPersistedTickerRecord(normalized, ticker);
-  if (currentLatest) {
-    normalized.tickerLatestKeys![ticker] = tickerRecordKey(
-      currentLatest.ticker,
-      currentLatest.marketDate
-    );
-  }
+  normalized.tickerLatestKeys![ticker] = key;
 
   store.tickerRecords = normalized.tickerRecords;
   store.tickerLatestKeys = normalized.tickerLatestKeys;

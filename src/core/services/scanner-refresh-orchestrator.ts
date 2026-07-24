@@ -406,6 +406,48 @@ export class ScannerRefreshOrchestrator {
           break;
         }
 
+        const stored = this.resultRepo.getTickerRecord(ticker, record.marketDate);
+        if (!this.resultRepo.verifyTickerRecord(stored, record)) {
+          lastError = "Post-save verification failed — record mismatch after re-read";
+          if (attempt < MAX_ATTEMPTS) {
+            await sleep(BASE_BACKOFF_MS * Math.pow(2, attempt - 1));
+            continue;
+          }
+          break;
+        }
+
+        const verifiedLatest = normalizeCompletedDailyCandles(
+          savedCandles.map((bar) => ({
+            date: bar.date,
+            open: bar.open,
+            high: bar.high,
+            low: bar.low,
+            close: bar.close,
+          }))
+        ).at(-1);
+
+        if (!verifiedLatest || verifiedLatest.date !== record.marketDate) {
+          lastError = "Saved market date does not match latest verified daily candle";
+          if (attempt < MAX_ATTEMPTS) {
+            await sleep(BASE_BACKOFF_MS * Math.pow(2, attempt - 1));
+            continue;
+          }
+          break;
+        }
+
+        if (
+          result.indicatorStatus === "ready" &&
+          (result.indicators.soDebug?.sessionDate !== record.marketDate ||
+            result.indicators.atrDebug?.sessionDate !== record.marketDate)
+        ) {
+          lastError = "Indicator session dates do not match latest verified candle";
+          if (attempt < MAX_ATTEMPTS) {
+            await sleep(BASE_BACKOFF_MS * Math.pow(2, attempt - 1));
+            continue;
+          }
+          break;
+        }
+
         this.currentPriceService?.persistFromScannerTickerRecord(record);
 
         return {
@@ -493,14 +535,19 @@ export class ScannerRefreshOrchestrator {
     const results: ScannerTickerResult[] = input.allEntries.map((entry) => {
       const ticker = normalizeTicker(entry.ticker);
       const persisted = this.resultRepo.getLatestTickerRecord(ticker);
-      if (persisted) {
+
+      if (input.successfulTickers.has(ticker)) {
+        if (persisted?.refreshRunId === input.refreshRunId) {
+          return persisted.result;
+        }
+      } else if (persisted) {
         return persisted.result;
       }
 
       const previous = latestRun?.results.find(
         (row) => normalizeTicker(row.ticker) === ticker
       );
-      if (previous) return previous;
+      if (previous && !input.successfulTickers.has(ticker)) return previous;
 
       return {
         ticker: entry.ticker,

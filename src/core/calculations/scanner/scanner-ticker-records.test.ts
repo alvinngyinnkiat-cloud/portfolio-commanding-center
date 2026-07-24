@@ -35,4 +35,42 @@ describe("scanner-ticker-records", () => {
     expect(outcome).toBe("skipped_stale");
     expect(store.tickerLatestKeys?.QQQ).toContain("2026-07-15");
   });
+
+  it("replaces older ticker records when saving a newer market date", () => {
+    const store = normalizeScannerResultsStore({
+      latest: null,
+      previous: null,
+    });
+
+    upsertTickerRecord(store, {
+      ticker: "AAPL",
+      marketDate: "2026-07-16",
+      refreshedAt: "2026-07-16T05:52:00.000Z",
+      refreshRunId: "run-old",
+      candleCount: 200,
+      result: {
+        ticker: "AAPL",
+        currentPrice: 210,
+        priceAsOf: "2026-07-16",
+      } as never,
+    });
+
+    const outcome = upsertTickerRecord(store, {
+      ticker: "AAPL",
+      marketDate: "2026-07-23",
+      refreshedAt: "2026-07-23T05:52:00.000Z",
+      refreshRunId: "run-new",
+      candleCount: 200,
+      result: {
+        ticker: "AAPL",
+        currentPrice: 218.5,
+        priceAsOf: "2026-07-23",
+      } as never,
+    });
+
+    expect(outcome).toBe("saved");
+    expect(store.tickerLatestKeys?.AAPL).toBe("AAPL|2026-07-23");
+    expect(store.tickerRecords?.["AAPL|2026-07-16"]).toBeUndefined();
+    expect(store.tickerRecords?.["AAPL|2026-07-23"]?.result.currentPrice).toBe(218.5);
+  });
 });
