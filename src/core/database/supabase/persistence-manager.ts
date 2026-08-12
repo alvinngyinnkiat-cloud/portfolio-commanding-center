@@ -57,6 +57,10 @@ import {
 } from "./supabase-errors";
 import { DEFAULT_SNAPSHOTS } from "@/core/domain/defaults";
 import { normalizeDailySnapshot } from "@/core/calculations/snapshots";
+import {
+  runOptionsRecoveryDiagnostics,
+  type OptionsRecoveryReport,
+} from "@/core/database/options/options-recovery-diagnostics";
 
 export type PersistenceStatus = "local" | "supabase" | "supabase_migrated";
 
@@ -172,7 +176,6 @@ export class PersistenceManager {
       this.cache = await hydrateCacheFromSupabase(this.client);
       const supabaseOptionsCount = this.cache.optionsTrades.length;
       this.persistStockTransactionsLocalBackup();
-      this.persistOptionsTradesLocalBackup();
       if (this.status === "supabase_migrated") {
         this.cache.migratedFromLocal = true;
       }
@@ -182,6 +185,7 @@ export class PersistenceManager {
       this.mergeLocalCryptoTradesIfSupabaseEmpty();
       this.mergeLocalCryptoHoldingsIfSupabaseEmpty();
       this.mergeLocalOptionsTradesIfSupabaseEmpty(supabaseOptionsCount);
+      this.persistOptionsTradesLocalBackup();
       this.mergeLocalSnapshotsIfNeeded();
       this.markCryptoLegacyMigratedIfTradesPresent();
       await this.applyStockCashFlowMigrationIfNeeded();
@@ -348,7 +352,43 @@ export class PersistenceManager {
   /** Mirror options trades to localStorage so refresh survives stale cloud cache. */
   persistOptionsTradesLocalBackup(): void {
     if (typeof window === "undefined") return;
+    if (this.cache.optionsTrades.length === 0) {
+      const existing = readJson<OptionsTrade[]>(STORAGE_KEYS.optionsTrades, []);
+      if (existing.length > 0) {
+        console.warn(
+          "[Options Recovery] Skipped writing empty options backup — existing local trades preserved."
+        );
+        return;
+      }
+    }
     writeJson(STORAGE_KEYS.optionsTrades, this.cache.optionsTrades);
+  }
+
+  async inspectOptionsRecovery(): Promise<OptionsRecoveryReport> {
+    return runOptionsRecoveryDiagnostics(this.client, this.cache.optionsTrades);
+  }
+
+  /** Dev recovery — load trades into Module 5 cache only. Does not sync to Supabase. */
+  restoreOptionsTradesFromRecovery(trades: OptionsTrade[]): void {
+    const normalized = normalizeOptionsTradesForStorage(trades);
+    this.cache.optionsTrades = normalized;
+    writeJson(STORAGE_KEYS.optionsTrades, normalized);
+    const openCount = normalized.filter((trade) => trade.status === "open").length;
+    const closedCount = normalized.filter((trade) => trade.status === "closed").length;
+    this.optionsTradesLoadState = {
+      status: "loaded",
+      error: null,
+      source: "local-merge",
+      supabaseCount: 0,
+      localCount: normalized.length,
+      finalCount: normalized.length,
+    };
+    this.setOptionalTableWarning(
+      `Manually restored ${normalized.length} options trade(s) (${openCount} open, ${closedCount} closed) from recovery — not synced to Supabase.`
+    );
+    if (process.env.NODE_ENV === "development") {
+      console.log("[Options Recovery] Restored trades into cache:", normalized.length);
+    }
   }
 
   /** Merge local options settings or defaults when cloud cache is empty/unset. */

@@ -1,7 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import type { OptionsOpenTradeRow } from "@/core/domain/types/options";
+import type { OptionsRecoveryReport } from "@/core/database/options/options-recovery-diagnostics";
+import { getPersistenceManager } from "@/core/database/supabase";
 import { SectionHeader } from "@/shared/components/ui/SectionHeader";
 import { Tabs } from "@/shared/components/ui/Tabs";
 import { FxRateErrorBanner } from "@/shared/components/ui/FxRateErrorBanner";
@@ -13,6 +15,10 @@ import { ClosedTradesTab } from "./ClosedTradesTab";
 import { CapitalReadinessTab } from "./CapitalReadinessTab";
 import { RiskManagementTab } from "./RiskManagementTab";
 import { PerformanceAnalyticsTab } from "./PerformanceAnalyticsTab";
+import {
+  OptionsRecoveryPanel,
+  OptionsRecoveryPreview,
+} from "./OptionsRecoveryPanel";
 import {
   CloseTradeModal,
   OpenTradeModal,
@@ -41,10 +47,53 @@ export function OptionsView() {
     optionsTradesLoadState,
     initError,
     persistenceError,
+    refresh,
   } = usePortfolio();
   const [openForm, setOpenForm] = useState(false);
   const [editTrade, setEditTrade] = useState<OptionsOpenTradeRow | null>(null);
   const [closeRow, setCloseRow] = useState<OptionsOpenTradeRow | null>(null);
+  const [recoveryReport, setRecoveryReport] = useState<OptionsRecoveryReport | null>(
+    null
+  );
+  const [recoveryChecking, setRecoveryChecking] = useState(true);
+
+  const runRecoveryCheck = useCallback(async () => {
+    if (!optionsData) return;
+    setRecoveryChecking(true);
+    const manager = getPersistenceManager();
+    if (manager) {
+      setRecoveryReport(await manager.inspectOptionsRecovery());
+    } else {
+      const { runOptionsRecoveryDiagnostics } = await import(
+        "@/core/database/options/options-recovery-diagnostics"
+      );
+      setRecoveryReport(
+        await runOptionsRecoveryDiagnostics(null, optionsData.trades)
+      );
+    }
+    setRecoveryChecking(false);
+  }, [optionsData]);
+
+  useEffect(() => {
+    if (!isLoaded || !optionsData || optionsTradesLoadState.status !== "loaded") {
+      return;
+    }
+    void runRecoveryCheck();
+  }, [isLoaded, optionsData, optionsTradesLoadState.status, runRecoveryCheck]);
+
+  const activeTradeCount = optionsData?.trades.length ?? 0;
+  const showVerifiedEmpty =
+    optionsTradesLoadState.status === "loaded" &&
+    activeTradeCount === 0 &&
+    recoveryReport?.investigationComplete === true &&
+    recoveryReport.recoverableTrades.length === 0;
+  const showRecoveryRequired =
+    optionsTradesLoadState.status === "loaded" &&
+    activeTradeCount === 0 &&
+    (recoveryChecking ||
+      !recoveryReport ||
+      recoveryReport.recoverableTrades.length > 0 ||
+      recoveryReport.allSourcesEmpty);
 
   if (!isLoaded || optionsTradesLoadState.status === "loading" || !optionsData) {
     return <OptionsSkeleton />;
@@ -89,7 +138,23 @@ export function OptionsView() {
 
       {!optionsData.fxRateValid && <FxRateErrorBanner />}
 
-      <OptionsSummaryCards />
+      {showRecoveryRequired && !showVerifiedEmpty && (
+        <OptionsRecoveryPanel
+          report={recoveryReport}
+          checking={recoveryChecking}
+          onRecheck={() => void runRecoveryCheck()}
+          onRestored={() => {
+            refresh();
+            void runRecoveryCheck();
+          }}
+        />
+      )}
+
+      {recoveryReport && recoveryReport.recoverableTrades.length > 0 && (
+        <OptionsRecoveryPreview report={recoveryReport} />
+      )}
+
+      <OptionsSummaryCards showVerifiedEmpty={showVerifiedEmpty} />
 
       <ClientPortfolioPanel />
 

@@ -22,14 +22,17 @@ import {
   BarChart3,
 } from "lucide-react";
 
-export function OptionsSummaryCards() {
-  const { optionsData, optionsTradesLoadState } = usePortfolio();
+export function OptionsSummaryCards({
+  showVerifiedEmpty = false,
+}: {
+  showVerifiedEmpty?: boolean;
+}) {
+  const { optionsData } = usePortfolio();
   const summary = optionsData?.summary;
   if (!summary) return null;
 
-  const tradesLoadedSuccessfully = optionsTradesLoadState.status === "loaded";
   const hasNoTrades =
-    tradesLoadedSuccessfully &&
+    showVerifiedEmpty &&
     coerceNumber(summary.openTradeCount) === 0 &&
     coerceNumber(summary.closedTradeCount) === 0;
 
