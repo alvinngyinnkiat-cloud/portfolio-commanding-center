@@ -23,7 +23,10 @@ import {
   getPersistenceManager,
   initializeRepositories,
 } from "@/core/database/supabase";
-import type { PersistenceStatus } from "@/core/database/supabase/persistence-manager";
+import type {
+  PersistenceStatus,
+  OptionsTradesLoadState,
+} from "@/core/database/supabase/persistence-manager";
 import { PersistenceStatusBanner } from "@/shared/components/ui/PersistenceStatusBanner";
 
 interface PortfolioContextValue {
@@ -52,6 +55,7 @@ interface PortfolioContextValue {
   persistenceStatus: PersistenceStatus | null;
   persistenceError: string | null;
   persistenceWarning: string | null;
+  optionsTradesLoadState: OptionsTradesLoadState;
   clearPersistenceError: () => void;
 }
 
@@ -76,6 +80,15 @@ export function PortfolioProvider({ children }: { children: ReactNode }) {
   const [persistenceWarning, setPersistenceWarning] = useState<string | null>(
     null
   );
+  const [optionsTradesLoadState, setOptionsTradesLoadState] =
+    useState<OptionsTradesLoadState>({
+      status: "loading",
+      error: null,
+      source: null,
+      supabaseCount: 0,
+      localCount: 0,
+      finalCount: 0,
+    });
 
   const refresh = useCallback(() => {
     if (!services) return;
@@ -115,6 +128,7 @@ export function PortfolioProvider({ children }: { children: ReactNode }) {
       setPersistenceStatus(manager.getStatus());
       setPersistenceError(manager.getLastError());
       setPersistenceWarning(manager.getLastWarning());
+      setOptionsTradesLoadState(manager.getOptionsTradesLoadState());
     }
   }, [services]);
 
@@ -203,6 +217,16 @@ export function PortfolioProvider({ children }: { children: ReactNode }) {
         setPersistenceStatus(manager?.getStatus() ?? "local");
         setPersistenceError(manager?.getLastError() ?? null);
         setPersistenceWarning(manager?.getLastWarning() ?? null);
+        setOptionsTradesLoadState(
+          manager?.getOptionsTradesLoadState() ?? {
+            status: "loaded",
+            error: null,
+            source: "local",
+            supabaseCount: 0,
+            localCount: 0,
+            finalCount: 0,
+          }
+        );
         setInitError(null);
         setIsLoaded(true);
       })
@@ -283,6 +307,7 @@ export function PortfolioProvider({ children }: { children: ReactNode }) {
         persistenceStatus,
         persistenceError,
         persistenceWarning,
+        optionsTradesLoadState,
         clearPersistenceError,
       }}
     >

@@ -35,13 +35,44 @@ function OptionsSkeleton() {
 }
 
 export function OptionsView() {
-  const { isLoaded, optionsData } = usePortfolio();
+  const {
+    isLoaded,
+    optionsData,
+    optionsTradesLoadState,
+    initError,
+    persistenceError,
+  } = usePortfolio();
   const [openForm, setOpenForm] = useState(false);
   const [editTrade, setEditTrade] = useState<OptionsOpenTradeRow | null>(null);
   const [closeRow, setCloseRow] = useState<OptionsOpenTradeRow | null>(null);
 
-  if (!isLoaded || !optionsData) {
+  if (!isLoaded || optionsTradesLoadState.status === "loading" || !optionsData) {
     return <OptionsSkeleton />;
+  }
+
+  if (optionsTradesLoadState.status === "error") {
+    return (
+      <div className="space-y-6 pb-8">
+        <header className="space-y-1">
+          <h1 className="text-2xl font-bold tracking-tight text-white sm:text-3xl">
+            Options Tracker
+          </h1>
+        </header>
+        <div className="rounded-2xl border border-red-500/40 bg-red-500/10 px-6 py-5">
+          <p className="text-sm font-medium text-red-200">Load Error</p>
+          <p className="mt-2 text-sm text-red-100/90">
+            {optionsTradesLoadState.error ??
+              initError ??
+              persistenceError ??
+              "Options trade records could not be loaded."}
+          </p>
+          <p className="mt-3 text-xs text-red-200/70">
+            Trade data was not confirmed empty — refresh the page or check cloud
+            persistence. US cash may still display from other modules.
+          </p>
+        </div>
+      </div>
+    );
   }
 
   return (

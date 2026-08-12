@@ -42,6 +42,8 @@ import {
   isUnsetOptionsSettings,
   normalizeOptionsSettings,
 } from "@/core/domain/defaults-options";
+import { normalizeOptionsTradesForStorage } from "@/core/calculations/options/trade-dates";
+import type { OptionsTrade } from "@/core/domain/types/options";
 import { STORAGE_KEYS } from "../local/storage-keys";
 import { readJson, writeJson } from "../local/local-storage";
 import {
@@ -58,6 +60,24 @@ import { normalizeDailySnapshot } from "@/core/calculations/snapshots";
 
 export type PersistenceStatus = "local" | "supabase" | "supabase_migrated";
 
+export type OptionsTradesLoadState = {
+  status: "loading" | "loaded" | "error";
+  error: string | null;
+  source: "supabase" | "local" | "local-merge" | "local-fallback" | null;
+  supabaseCount: number;
+  localCount: number;
+  finalCount: number;
+};
+
+const LOADING_OPTIONS_TRADES_STATE: OptionsTradesLoadState = {
+  status: "loading",
+  error: null,
+  source: null,
+  supabaseCount: 0,
+  localCount: 0,
+  finalCount: 0,
+};
+
 export class PersistenceManager {
   private cache: PersistenceCache = createEmptyCache();
   private client: SupabaseClient | null = null;
@@ -68,6 +88,9 @@ export class PersistenceManager {
   private syncQueue: Array<() => Promise<void>> = [];
   private cryptoTradesSyncAvailable = true;
   private allowEmptyStockTransactionsSync = false;
+  private optionsTradesLoadState: OptionsTradesLoadState = {
+    ...LOADING_OPTIONS_TRADES_STATE,
+  };
 
   static async initialize(): Promise<PersistenceManager> {
     const manager = new PersistenceManager();
@@ -98,6 +121,10 @@ export class PersistenceManager {
     return this.lastWarning;
   }
 
+  getOptionsTradesLoadState(): OptionsTradesLoadState {
+    return { ...this.optionsTradesLoadState };
+  }
+
   isCryptoTradesSyncAvailable(): boolean {
     return this.cryptoTradesSyncAvailable;
   }
@@ -118,6 +145,7 @@ export class PersistenceManager {
       this.reconcileCryptoHoldingsWithTrades();
       this.reconcileOptionsSettings();
       this.status = "local";
+      this.finalizeOptionsTradesLoadFromLocalOnly();
       return;
     }
 
@@ -127,6 +155,7 @@ export class PersistenceManager {
       this.reconcileCryptoHoldingsWithTrades();
       this.reconcileOptionsSettings();
       this.status = "local";
+      this.finalizeOptionsTradesLoadFromLocalOnly();
       return;
     }
 
@@ -141,7 +170,9 @@ export class PersistenceManager {
       }
 
       this.cache = await hydrateCacheFromSupabase(this.client);
+      const supabaseOptionsCount = this.cache.optionsTrades.length;
       this.persistStockTransactionsLocalBackup();
+      this.persistOptionsTradesLocalBackup();
       if (this.status === "supabase_migrated") {
         this.cache.migratedFromLocal = true;
       }
@@ -150,6 +181,7 @@ export class PersistenceManager {
       this.mergeLocalStockTransactionsIfSupabaseEmpty();
       this.mergeLocalCryptoTradesIfSupabaseEmpty();
       this.mergeLocalCryptoHoldingsIfSupabaseEmpty();
+      this.mergeLocalOptionsTradesIfSupabaseEmpty(supabaseOptionsCount);
       this.mergeLocalSnapshotsIfNeeded();
       this.markCryptoLegacyMigratedIfTradesPresent();
       await this.applyStockCashFlowMigrationIfNeeded();
@@ -166,6 +198,7 @@ export class PersistenceManager {
       this.status = "local";
       this.client = getSupabaseClient();
       this.cryptoTradesSyncAvailable = false;
+      this.finalizeOptionsTradesLoadAfterBootstrapFailure(error);
     }
   }
 
@@ -290,9 +323,11 @@ export class PersistenceManager {
     this.status = "supabase";
     try {
       this.cache = await hydrateCacheFromSupabase(this.client);
+      const supabaseOptionsCount = this.cache.optionsTrades.length;
       await this.refreshOptionalTableAvailability();
       this.mergeLocalStockTransactionsIfSupabaseEmpty();
       this.mergeLocalCryptoTradesIfSupabaseEmpty();
+      this.mergeLocalOptionsTradesIfSupabaseEmpty(supabaseOptionsCount);
       this.markCryptoLegacyMigratedIfTradesPresent();
       await this.applyStockCashFlowMigrationIfNeeded();
       await this.applyCryptoTradesMigrationIfNeeded();
@@ -308,6 +343,12 @@ export class PersistenceManager {
   persistOptionsSettingsLocalBackup(): void {
     if (typeof window === "undefined") return;
     writeJson(STORAGE_KEYS.optionsSettings, this.cache.optionsSettings);
+  }
+
+  /** Mirror options trades to localStorage so refresh survives stale cloud cache. */
+  persistOptionsTradesLocalBackup(): void {
+    if (typeof window === "undefined") return;
+    writeJson(STORAGE_KEYS.optionsTrades, this.cache.optionsTrades);
   }
 
   /** Merge local options settings or defaults when cloud cache is empty/unset. */
@@ -526,6 +567,114 @@ export class PersistenceManager {
     }
   }
 
+  private mergeLocalOptionsTradesIfSupabaseEmpty(supabaseCount: number): void {
+    const local =
+      typeof window === "undefined"
+        ? []
+        : normalizeOptionsTradesForStorage(
+            readJson<OptionsTrade[]>(STORAGE_KEYS.optionsTrades, [])
+          );
+
+    if (process.env.NODE_ENV === "development") {
+      console.log("[Options] Supabase records:", supabaseCount);
+      console.log("[Options] Local backup records:", local.length);
+    }
+
+    if (supabaseCount > 0) {
+      this.optionsTradesLoadState = {
+        status: "loaded",
+        error: null,
+        source: "supabase",
+        supabaseCount,
+        localCount: local.length,
+        finalCount: supabaseCount,
+      };
+      if (process.env.NODE_ENV === "development") {
+        console.log("[Options] Final hydrated trades:", supabaseCount);
+      }
+      return;
+    }
+
+    if (local.length === 0) {
+      this.optionsTradesLoadState = {
+        status: "loaded",
+        error: null,
+        source: "supabase",
+        supabaseCount: 0,
+        localCount: 0,
+        finalCount: 0,
+      };
+      if (process.env.NODE_ENV === "development") {
+        console.log("[Options] Final hydrated trades:", 0);
+      }
+      return;
+    }
+
+    this.cache.optionsTrades = local;
+    this.persistOptionsTradesLocalBackup();
+    this.setOptionalTableWarning(
+      `Restored ${local.length} options trade(s) from local backup because cloud options_trades was empty. Review cloud data before syncing.`
+    );
+    this.optionsTradesLoadState = {
+      status: "loaded",
+      error: null,
+      source: "local-merge",
+      supabaseCount: 0,
+      localCount: local.length,
+      finalCount: local.length,
+    };
+    if (process.env.NODE_ENV === "development") {
+      console.log("[Options] Final hydrated trades:", local.length);
+    }
+  }
+
+  private finalizeOptionsTradesLoadFromLocalOnly(): void {
+    const finalCount = this.cache.optionsTrades.length;
+    this.optionsTradesLoadState = {
+      status: "loaded",
+      error: null,
+      source: "local",
+      supabaseCount: 0,
+      localCount: finalCount,
+      finalCount,
+    };
+    if (process.env.NODE_ENV === "development") {
+      console.log("[Options] Local-only records:", finalCount);
+      console.log("[Options] Final hydrated trades:", finalCount);
+    }
+  }
+
+  private finalizeOptionsTradesLoadAfterBootstrapFailure(error: unknown): void {
+    const finalCount = this.cache.optionsTrades.length;
+    const localCount = finalCount;
+    if (finalCount > 0) {
+      this.optionsTradesLoadState = {
+        status: "loaded",
+        error: null,
+        source: "local-fallback",
+        supabaseCount: 0,
+        localCount,
+        finalCount,
+      };
+      if (process.env.NODE_ENV === "development") {
+        console.log("[Options] Final hydrated trades (local fallback):", finalCount);
+      }
+      return;
+    }
+
+    this.optionsTradesLoadState = {
+      status: "error",
+      error: formatPersistenceError(error),
+      source: null,
+      supabaseCount: 0,
+      localCount: 0,
+      finalCount: 0,
+    };
+    if (process.env.NODE_ENV === "development") {
+      console.log("[Options] Final hydrated trades:", 0);
+    }
+  }
+
   /** One-time migration: push local draft holdings to Supabase only when cloud is empty. */
   private mergeLocalCryptoHoldingsIfSupabaseEmpty(): void {
     if (typeof window === "undefined") return;
@@ -670,6 +819,7 @@ export class PersistenceManager {
   }
 
   queueOptionsTradesSync(): void {
+    this.persistOptionsTradesLocalBackup();
     this.enqueueSync(() =>
       this.client
         ? syncOptionsTrades(this.client, this.cache.optionsTrades)

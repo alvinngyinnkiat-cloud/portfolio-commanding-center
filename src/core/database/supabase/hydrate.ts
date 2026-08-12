@@ -170,9 +170,11 @@ export async function hydrateCacheFromSupabase(
   cache.cryptoTrades = cryptoTradesRes.error
     ? []
     : normalizeCryptoTrades(cryptoTradesRes.data?.map((row) => row.data) ?? []);
-  cache.optionsTrades = normalizeOptionsTradesForStorage(
-    optionsRes.data?.map((row) => row.data) ?? []
-  );
+  const optionsRows = optionsRes.data?.map((row) => row.data) ?? [];
+  if (process.env.NODE_ENV === "development") {
+    console.log("[Options] Supabase hydrate rows:", optionsRows.length);
+  }
+  cache.optionsTrades = normalizeOptionsTradesForStorage(optionsRows);
   cache.stockFxConversions = fxRes.error
     ? []
     : fxRes.data?.map((row) => row.data) ?? [];

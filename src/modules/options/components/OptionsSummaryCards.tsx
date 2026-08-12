@@ -23,11 +23,13 @@ import {
 } from "lucide-react";
 
 export function OptionsSummaryCards() {
-  const { optionsData } = usePortfolio();
+  const { optionsData, optionsTradesLoadState } = usePortfolio();
   const summary = optionsData?.summary;
   if (!summary) return null;
 
+  const tradesLoadedSuccessfully = optionsTradesLoadState.status === "loaded";
   const hasNoTrades =
+    tradesLoadedSuccessfully &&
     coerceNumber(summary.openTradeCount) === 0 &&
     coerceNumber(summary.closedTradeCount) === 0;
 
