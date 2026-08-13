@@ -189,6 +189,22 @@ describe("open-trade-dashboard", () => {
       expect(trend?.shortTrend?.label).toBe("Rising EMA20");
       expect(trend?.longTrend?.label).toBe("Gap Widening");
     });
+
+    it("inverts trend direction for sell call", () => {
+      const trend = buildTrendHealth(
+        {
+          ema20: 110,
+          ema20Prev: 105,
+          sma50: 108,
+          sma50Prev: 106,
+          sma200: 100,
+          sma200Prev: 99,
+        } as never,
+        "sellCall"
+      );
+      expect(trend?.shortTrend?.direction).toBe("negative");
+      expect(trend?.longTrend?.direction).toBe("negative");
+    });
   });
 
   describe("calculateUnrealizedPlPercent", () => {
@@ -218,14 +234,14 @@ describe("open-trade-dashboard", () => {
   });
 
   describe("supportsOpenTradeDashboard", () => {
-    it("includes buy call and buy put", () => {
+    it("includes buy call, buy put, and naked credits", () => {
       expect(supportsOpenTradeDashboard("buyCall")).toBe(true);
       expect(supportsOpenTradeDashboard("buyPut")).toBe(true);
+      expect(supportsOpenTradeDashboard("sellPut")).toBe(true);
+      expect(supportsOpenTradeDashboard("sellCall")).toBe(true);
     });
 
-    it("excludes naked and custom strategies", () => {
-      expect(supportsOpenTradeDashboard("sellPut")).toBe(false);
-      expect(supportsOpenTradeDashboard("sellCall")).toBe(false);
+    it("excludes custom strategies", () => {
       expect(supportsOpenTradeDashboard("custom")).toBe(false);
     });
   });
@@ -353,6 +369,120 @@ describe("open-trade-dashboard", () => {
       expect(metrics.breakevenPriceUsd).toBe(123);
       expect(metrics.breakevenDistancePct).toBeCloseTo(1.63, 1);
       expect(metrics.riskUsedPct).toBe(0);
+    });
+  });
+
+  describe("buildOpenTradeDashboardMetrics for sell put", () => {
+    it("matches acceptance example economics", () => {
+      const trade = {
+        id: "sell-put-1",
+        strategy: "sellPut",
+        status: "open",
+        contracts: 1,
+        shortStrikeUsd: 100,
+        openPremiumUsd: 300,
+        openFeesUsd: 0,
+        maxRiskUsd: 9700,
+        expirationDate: "2026-07-18",
+        underlyingPriceUsd: 110,
+        currentValueUsd: 100,
+        openingShortPutDelta: -0.25,
+        currentShortPutDelta: -0.18,
+      } as OptionsTrade;
+
+      const row = {
+        trade,
+        daysToExpiration: 20,
+        unrealizedPlUsd: 200,
+        tradeEconomics: {
+          breakevenUsd: 97,
+          maxRiskUsd: 9700,
+          maxProfitUsd: 300,
+          netCreditUsd: 300,
+        },
+        spreadMetrics: null,
+        ironCondorMetrics: null,
+        underlyingPrice: {
+          priceUsd: 110,
+          source: "manual_fallback" as const,
+          isWatchlistTicker: false,
+          priceAsOf: null,
+        },
+        resolvedTickerPrice: {
+          priceUsd: 110,
+          source: "manual_fallback" as const,
+          priceAsOf: null,
+        },
+        scannerRecord: null,
+        marketDataRecord: null,
+      };
+
+      const metrics = buildOpenTradeDashboardMetrics(row);
+      expect(metrics.supportsDashboard).toBe(true);
+      expect(metrics.breakevenPriceUsd).toBe(97);
+      expect(metrics.breakevenDistancePct).toBeCloseTo(13.4, 1);
+      expect(metrics.unrealizedPlUsd).toBe(200);
+      expect(metrics.maxProfitDisplay).toBe("300");
+      expect(metrics.maxRiskUsd).toBe(9700);
+      expect(metrics.deltaHealth?.putSide?.trend).toBe("improving");
+    });
+  });
+
+  describe("buildOpenTradeDashboardMetrics for sell call", () => {
+    it("matches acceptance example economics", () => {
+      const trade = {
+        id: "sell-call-1",
+        strategy: "sellCall",
+        status: "open",
+        contracts: 1,
+        shortStrikeUsd: 100,
+        openPremiumUsd: 300,
+        openFeesUsd: 0,
+        maxRiskUsd: 5000,
+        expirationDate: "2026-07-18",
+        underlyingPriceUsd: 90,
+        currentValueUsd: 100,
+        openingShortCallDelta: 0.25,
+        currentShortCallDelta: 0.18,
+      } as OptionsTrade;
+
+      const row = {
+        trade,
+        daysToExpiration: 20,
+        unrealizedPlUsd: 200,
+        tradeEconomics: {
+          breakevenUsd: 103,
+          maxRiskUsd: 5000,
+          maxProfitUsd: 300,
+          netCreditUsd: 300,
+        },
+        spreadMetrics: null,
+        ironCondorMetrics: null,
+        underlyingPrice: {
+          priceUsd: 90,
+          source: "manual_fallback" as const,
+          isWatchlistTicker: false,
+          priceAsOf: null,
+        },
+        resolvedTickerPrice: {
+          priceUsd: 90,
+          source: "manual_fallback" as const,
+          priceAsOf: null,
+        },
+        scannerRecord: null,
+        marketDataRecord: null,
+      };
+
+      const metrics = buildOpenTradeDashboardMetrics(row);
+      expect(metrics.supportsDashboard).toBe(true);
+      expect(metrics.breakevenPriceUsd).toBe(103);
+      expect(metrics.breakevenDistancePct).toBeCloseTo(12.62, 1);
+      expect(metrics.unrealizedPlUsd).toBe(200);
+      expect(metrics.maxProfitDisplay).toBe("300");
+      expect(metrics.maxRiskDisplay).toBe("Unlimited");
+      expect(metrics.riskUsedPct).toBeNull();
+      expect(metrics.unrealizedPlPct).toBeNull();
+      expect(metrics.deltaHealth?.callSide?.trend).toBe("improving");
     });
   });
 

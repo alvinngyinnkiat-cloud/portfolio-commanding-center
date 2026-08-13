@@ -111,6 +111,8 @@ export interface OpenTradeDashboardMetrics {
   /** Debit strategies — premium paid (remaining contracts). */
   premiumPaidUsd: number | null;
   maxProfitDisplay: string | null;
+  /** Naked sell call — theoretical risk is unlimited. */
+  maxRiskDisplay: string | null;
   isDebit: boolean;
   supportsDashboard: boolean;
 }

@@ -41,6 +41,8 @@ const DASHBOARD_STRATEGIES = new Set<OptionsStrategy>([
   "ironCondor",
   "buyCall",
   "buyPut",
+  "sellPut",
+  "sellCall",
 ]);
 
 export function supportsOpenTradeDashboard(strategy: OptionsStrategy): boolean {
@@ -299,6 +301,28 @@ function resolveBreakevenDashboard(
     };
   }
 
+  if (trade.strategy === "sellPut" && tradeEconomics?.breakevenUsd != null) {
+    return {
+      breakevenPriceUsd: tradeEconomics.breakevenUsd,
+      breakevenDistancePct: calculateBullPutBreakevenDistancePct(
+        currentPriceUsd,
+        tradeEconomics.breakevenUsd
+      ),
+      ironCondorBreakeven: null,
+    };
+  }
+
+  if (trade.strategy === "sellCall" && tradeEconomics?.breakevenUsd != null) {
+    return {
+      breakevenPriceUsd: tradeEconomics.breakevenUsd,
+      breakevenDistancePct: calculateBearCallBreakevenDistancePct(
+        currentPriceUsd,
+        tradeEconomics.breakevenUsd
+      ),
+      ironCondorBreakeven: null,
+    };
+  }
+
   if (trade.strategy === "ironCondor" && ironCondorMetrics) {
     const ironCondorBreakeven = buildIronCondorBreakevenDisplay(
       currentPriceUsd,
@@ -323,16 +347,27 @@ function resolveBreakevenDashboard(
 }
 
 export function buildTrendHealth(
-  indicators: ScannerIndicators | null | undefined
+  indicators: ScannerIndicators | null | undefined,
+  strategy?: OptionsStrategy
 ): DashboardTrendHealth | null {
   if (!indicators) return null;
+
+  const invertForShortCall =
+    strategy === "sellCall";
 
   let shortTrend: DashboardTrendHealth["shortTrend"] = null;
   if (indicators.ema20 != null && indicators.ema20Prev != null) {
     const rising = indicators.ema20 > indicators.ema20Prev;
     shortTrend = {
       label: rising ? "Rising EMA20" : "Falling EMA20",
-      direction: rising ? "positive" : "negative",
+      direction:
+        invertForShortCall
+          ? rising
+            ? "negative"
+            : "positive"
+          : rising
+            ? "positive"
+            : "negative",
     };
   }
 
@@ -348,7 +383,14 @@ export function buildTrendHealth(
     const widening = currentGap > previousGap;
     longTrend = {
       label: widening ? "Gap Widening" : "Gap Narrowing",
-      direction: widening ? "positive" : "negative",
+      direction:
+        invertForShortCall
+          ? widening
+            ? "negative"
+            : "positive"
+          : widening
+            ? "positive"
+            : "negative",
     };
   }
 
@@ -393,14 +435,17 @@ export function buildOpenTradeDashboardMetrics(
     : null;
 
   const maxRiskUsd = scaleMaxRiskForRemaining(trade);
+  const maxRiskUnlimited = trade.strategy === "sellCall";
   const isDebit = isDebitStrategy(trade.strategy);
-  const unrealizedPlPct = calculateUnrealizedPlPercent(
-    unrealizedPlUsd,
-    maxRiskUsd
-  );
-  const riskUsedPct = isDebit
-    ? calculateDebitRiskUsedPercent(unrealizedPlUsd, maxRiskUsd)
-    : calculateRiskUsedPercent(unrealizedPlUsd, maxRiskUsd);
+  const unrealizedPlPct =
+    maxRiskUnlimited
+      ? null
+      : calculateUnrealizedPlPercent(unrealizedPlUsd, maxRiskUsd);
+  const riskUsedPct = maxRiskUnlimited
+    ? null
+    : isDebit
+      ? calculateDebitRiskUsedPercent(unrealizedPlUsd, maxRiskUsd)
+      : calculateRiskUsedPercent(unrealizedPlUsd, maxRiskUsd);
 
   const effectiveTrade = tradeForRemainingContracts(trade);
   const entryCreditUsd =
@@ -426,7 +471,16 @@ export function buildOpenTradeDashboardMetrics(
         )
       );
     }
+  } else if (
+    supportsDashboard &&
+    (trade.strategy === "sellPut" || trade.strategy === "sellCall") &&
+    entryCreditUsd != null
+  ) {
+    maxProfitDisplay = String(entryCreditUsd);
   }
+
+  const maxRiskDisplay =
+    supportsDashboard && trade.strategy === "sellCall" ? "Unlimited" : null;
 
   return {
     dte: daysToExpiration,
@@ -444,10 +498,11 @@ export function buildOpenTradeDashboardMetrics(
     maxRiskUsd,
     riskUsedPct,
     deltaHealth: supportsDashboard ? buildDeltaHealth(trade) : null,
-    trendHealth: buildTrendHealth(scannerIndicators),
+    trendHealth: buildTrendHealth(scannerIndicators, trade.strategy),
     entryCreditUsd,
     premiumPaidUsd,
     maxProfitDisplay,
+    maxRiskDisplay,
     isDebit,
     supportsDashboard,
   };

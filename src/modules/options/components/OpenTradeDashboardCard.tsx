@@ -215,9 +215,13 @@ export function OpenTradeDashboardCard({
           : "—";
 
     const openingDeltaValue =
-      trade.strategy === "bullPut" || trade.strategy === "buyPut"
+      trade.strategy === "bullPut" ||
+      trade.strategy === "buyPut" ||
+      trade.strategy === "sellPut"
         ? trade.openingShortPutDelta
-        : trade.strategy === "bearCall" || trade.strategy === "buyCall"
+        : trade.strategy === "bearCall" ||
+            trade.strategy === "buyCall" ||
+            trade.strategy === "sellCall"
           ? trade.openingShortCallDelta
           : null;
 
@@ -257,6 +261,36 @@ export function OpenTradeDashboardCard({
               : "—",
         },
         { label: "Max Risk", value: formatUsd(dashboard.maxRiskUsd) },
+        { label: "Max Profit", value: maxProfitValue },
+        { label: "Breakeven", value: breakevenValue },
+        {
+          label: "Opening Delta",
+          value: openingDeltaValue != null ? formatDelta(openingDeltaValue) : "—",
+        },
+        ...commonTail,
+      ];
+    }
+
+    if (trade.strategy === "sellPut" || trade.strategy === "sellCall") {
+      const maxProfitValue =
+        dashboard.maxProfitDisplay != null
+          ? formatUsd(parseFloat(dashboard.maxProfitDisplay))
+          : dashboard.entryCreditUsd != null
+            ? formatUsd(dashboard.entryCreditUsd)
+            : "—";
+
+      return [
+        {
+          label: "Premium Received",
+          value:
+            dashboard.entryCreditUsd != null
+              ? formatUsd(dashboard.entryCreditUsd)
+              : "—",
+        },
+        {
+          label: "Max Risk",
+          value: dashboard.maxRiskDisplay ?? formatUsd(dashboard.maxRiskUsd),
+        },
         { label: "Max Profit", value: maxProfitValue },
         { label: "Breakeven", value: breakevenValue },
         {
@@ -336,17 +370,20 @@ export function OpenTradeDashboardCard({
               value={trade.underlyingPriceUsd}
               onSave={(v) => saveMonitoring({ underlyingPriceUsd: v })}
             />
-            {(trade.strategy === "bullPut" || trade.strategy === "bearCall") && (
+            {(trade.strategy === "bullPut" ||
+              trade.strategy === "bearCall" ||
+              trade.strategy === "sellPut" ||
+              trade.strategy === "sellCall") && (
               <InlineNumberInput
                 label="Current Delta"
                 value={
-                  trade.strategy === "bullPut"
+                  trade.strategy === "bullPut" || trade.strategy === "sellPut"
                     ? trade.currentShortPutDelta
                     : trade.currentShortCallDelta
                 }
                 onSave={(v) =>
                   saveMonitoring(
-                    trade.strategy === "bullPut"
+                    trade.strategy === "bullPut" || trade.strategy === "sellPut"
                       ? { currentShortPutDelta: v }
                       : { currentShortCallDelta: v }
                   )
@@ -494,7 +531,7 @@ export function OpenTradeDashboardCard({
             <p className="pt-1 text-xs text-slate-500">
               Max Risk{" "}
               <span className="text-slate-300">
-                {formatUsd(dashboard.maxRiskUsd)}
+                {dashboard.maxRiskDisplay ?? formatUsd(dashboard.maxRiskUsd)}
               </span>
             </p>
             <p className="text-xs text-slate-500">

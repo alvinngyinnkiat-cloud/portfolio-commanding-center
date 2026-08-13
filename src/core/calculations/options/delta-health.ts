@@ -4,11 +4,14 @@ import type {
   DeltaHealthOverallStatus,
   DeltaHealthTrend,
   DeltaSideHealth,
-  OptionsStrategy,
 } from "@/core/domain/types/options";
 import type { OptionsTrade } from "@/core/domain/types/options";
 
-export type DeltaInterpretationMode = "shortPremium" | "longCall" | "longPut";
+export type DeltaInterpretationMode =
+  | "shortPremium"
+  | "shortPremiumAbs"
+  | "longCall"
+  | "longPut";
 
 const DELTA_EPSILON = 1e-6;
 
@@ -20,6 +23,14 @@ export function deriveDeltaTrend(
   if (mode === "shortPremium") {
     if (current < opening - DELTA_EPSILON) return "improving";
     if (current > opening + DELTA_EPSILON) return "worsening";
+    return "stable";
+  }
+
+  if (mode === "shortPremiumAbs") {
+    const absOpening = Math.abs(opening);
+    const absCurrent = Math.abs(current);
+    if (absCurrent < absOpening - DELTA_EPSILON) return "improving";
+    if (absCurrent > absOpening + DELTA_EPSILON) return "worsening";
     return "stable";
   }
 
@@ -58,7 +69,7 @@ export function deltaTrendLabels(
         ? "Delta Stable"
         : "Delta Worsening";
 
-  if (mode === "shortPremium") {
+  if (mode === "shortPremium" || mode === "shortPremiumAbs") {
     const message =
       trend === "improving"
         ? "Risk Decreasing"
@@ -139,33 +150,44 @@ export function buildDeltaSideHealth(
   };
 }
 
-function shortPremiumModeForStrategy(strategy: OptionsStrategy): DeltaInterpretationMode {
-  return "shortPremium";
-}
 
 export function buildDeltaHealth(trade: OptionsTrade): DashboardDeltaHealth | null {
-  if (
-    trade.strategy === "bullPut" ||
-    trade.strategy === "sellPut"
-  ) {
+  if (trade.strategy === "bullPut") {
     const putSide = buildDeltaSideHealth(
       "",
       trade.openingShortPutDelta,
       trade.currentShortPutDelta,
-      shortPremiumModeForStrategy(trade.strategy)
+      "shortPremium"
     );
     return putSide ? { putSide, callSide: null, overallStatus: null, overallLabel: null } : null;
   }
 
-  if (
-    trade.strategy === "bearCall" ||
-    trade.strategy === "sellCall"
-  ) {
+  if (trade.strategy === "sellPut") {
+    const putSide = buildDeltaSideHealth(
+      "",
+      trade.openingShortPutDelta,
+      trade.currentShortPutDelta,
+      "shortPremiumAbs"
+    );
+    return putSide ? { putSide, callSide: null, overallStatus: null, overallLabel: null } : null;
+  }
+
+  if (trade.strategy === "bearCall") {
     const callSide = buildDeltaSideHealth(
       "",
       trade.openingShortCallDelta,
       trade.currentShortCallDelta,
-      shortPremiumModeForStrategy(trade.strategy)
+      "shortPremium"
+    );
+    return callSide ? { putSide: null, callSide, overallStatus: null, overallLabel: null } : null;
+  }
+
+  if (trade.strategy === "sellCall") {
+    const callSide = buildDeltaSideHealth(
+      "",
+      trade.openingShortCallDelta,
+      trade.currentShortCallDelta,
+      "shortPremiumAbs"
     );
     return callSide ? { putSide: null, callSide, overallStatus: null, overallLabel: null } : null;
   }
