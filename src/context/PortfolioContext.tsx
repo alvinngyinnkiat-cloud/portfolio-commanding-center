@@ -25,8 +25,8 @@ import {
 } from "@/core/database/supabase";
 import type {
   PersistenceStatus,
-  OptionsTradesLoadState,
 } from "@/core/database/supabase/persistence-manager";
+import type { OptionsTradesLoadState } from "@/core/database/options/options-load-state";
 import { PersistenceStatusBanner } from "@/shared/components/ui/PersistenceStatusBanner";
 
 interface PortfolioContextValue {
@@ -88,6 +88,7 @@ export function PortfolioProvider({ children }: { children: ReactNode }) {
       supabaseCount: 0,
       localCount: 0,
       finalCount: 0,
+      recoveryRequired: false,
     });
 
   const refresh = useCallback(() => {
@@ -225,6 +226,7 @@ export function PortfolioProvider({ children }: { children: ReactNode }) {
             supabaseCount: 0,
             localCount: 0,
             finalCount: 0,
+            recoveryRequired: false,
           }
         );
         setInitError(null);

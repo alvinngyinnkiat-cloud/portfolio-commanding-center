@@ -1,23 +1,19 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useState } from "react";
 import type { OptionsOpenTradeRow } from "@/core/domain/types/options";
-import type { OptionsRecoveryReport } from "@/core/database/options/options-recovery-diagnostics";
-import { getPersistenceManager } from "@/core/database/supabase";
 import { SectionHeader } from "@/shared/components/ui/SectionHeader";
 import { Tabs } from "@/shared/components/ui/Tabs";
 import { FxRateErrorBanner } from "@/shared/components/ui/FxRateErrorBanner";
 import { usePortfolio } from "@/context/PortfolioContext";
 import { OptionsSummaryCards } from "./OptionsSummaryCards";
+import { OptionsDataBackupPanel } from "./OptionsDataBackupPanel";
 import { ClientPortfolioPanel } from "./ClientPortfolioPanel";
 import { OpenTradesTab } from "./OpenTradesTab";
 import { ClosedTradesTab } from "./ClosedTradesTab";
 import { CapitalReadinessTab } from "./CapitalReadinessTab";
 import { RiskManagementTab } from "./RiskManagementTab";
 import { PerformanceAnalyticsTab } from "./PerformanceAnalyticsTab";
-import {
-  OptionsRecoveryPanel,
-} from "./OptionsRecoveryPanel";
 import {
   CloseTradeModal,
   OpenTradeModal,
@@ -50,51 +46,21 @@ export function OptionsView() {
   const [openForm, setOpenForm] = useState(false);
   const [editTrade, setEditTrade] = useState<OptionsOpenTradeRow | null>(null);
   const [closeRow, setCloseRow] = useState<OptionsOpenTradeRow | null>(null);
-  const [recoveryReport, setRecoveryReport] = useState<OptionsRecoveryReport | null>(
-    null
-  );
-  const [recoveryChecking, setRecoveryChecking] = useState(true);
-
-  const runRecoveryCheck = useCallback(async () => {
-    if (!optionsData) return;
-    setRecoveryChecking(true);
-    const manager = getPersistenceManager();
-    if (manager) {
-      setRecoveryReport(await manager.inspectOptionsRecovery());
-    } else {
-      const { runOptionsRecoveryDiagnostics } = await import(
-        "@/core/database/options/options-recovery-diagnostics"
-      );
-      setRecoveryReport(
-        await runOptionsRecoveryDiagnostics(null, optionsData.trades)
-      );
-    }
-    setRecoveryChecking(false);
-  }, [optionsData]);
-
-  useEffect(() => {
-    if (!isLoaded || !optionsData) return;
-    if (
-      optionsTradesLoadState.status !== "loaded" &&
-      optionsTradesLoadState.status !== "error"
-    ) {
-      return;
-    }
-    void runRecoveryCheck();
-  }, [isLoaded, optionsData, optionsTradesLoadState.status, runRecoveryCheck]);
 
   const activeTradeCount = optionsData?.trades.length ?? 0;
   const showVerifiedEmpty =
     optionsTradesLoadState.status === "loaded" &&
-    activeTradeCount === 0 &&
-    recoveryReport?.investigationComplete === true &&
-    recoveryReport.recoverableTrades.length === 0;
+    !optionsTradesLoadState.recoveryRequired &&
+    activeTradeCount === 0;
+  const showRecoveryRequired =
+    optionsTradesLoadState.status === "error" &&
+    optionsTradesLoadState.recoveryRequired;
 
   if (!isLoaded || optionsTradesLoadState.status === "loading" || !optionsData) {
     return <OptionsSkeleton />;
   }
 
-  if (optionsTradesLoadState.status === "error") {
+  if (optionsTradesLoadState.status === "error" && !optionsTradesLoadState.recoveryRequired) {
     return (
       <div className="space-y-6 pb-8">
         <header className="space-y-1">
@@ -111,11 +77,7 @@ export function OptionsView() {
               "Options trade records could not be loaded."}
           </p>
         </div>
-        <OptionsRecoveryPanel
-          report={recoveryReport}
-          checking={recoveryChecking}
-          onRecheck={() => void runRecoveryCheck()}
-        />
+        <OptionsDataBackupPanel />
       </div>
     );
   }
@@ -134,11 +96,19 @@ export function OptionsView() {
 
       {!optionsData.fxRateValid && <FxRateErrorBanner />}
 
-      <OptionsRecoveryPanel
-        report={recoveryReport}
-        checking={recoveryChecking}
-        onRecheck={() => void runRecoveryCheck()}
-      />
+      {showRecoveryRequired && (
+        <div className="rounded-2xl border border-amber-500/40 bg-amber-500/10 px-6 py-5">
+          <p className="text-sm font-medium text-amber-100">
+            Recovery required — active options data is empty but safety backups may exist.
+          </p>
+          <p className="mt-2 text-xs text-amber-100/80">
+            {optionsTradesLoadState.error ??
+              "Use Options Data Backup below to restore a previous version locally."}
+          </p>
+        </div>
+      )}
+
+      <OptionsDataBackupPanel />
 
       <OptionsSummaryCards showVerifiedEmpty={showVerifiedEmpty} />
 

@@ -18,6 +18,7 @@ export const STORAGE_KEYS = {
   cryptoTrades: "portfolio:crypto_trades",
   cryptoAllocationSettings: "portfolio:crypto_allocation_settings",
   optionsTrades: "portfolio:options_trades",
+  optionsTradesHistory: "portfolio:options_trades_history",
   optionsSettings: "portfolio:options_settings",
   stockFxConversions: "portfolio:stock_fx_conversions",
   /** Legacy v1 blob — migrated on first load */

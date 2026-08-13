@@ -118,7 +118,58 @@ export async function syncOptionsTrades(
   client: SupabaseClient,
   rows: PersistenceCache["optionsTrades"]
 ): Promise<void> {
+  if (rows.length === 0) return;
   await replaceTable(client, "options_trades", "id", rows);
+}
+
+export interface OptionsTradesSafeSyncResult {
+  inserted: number;
+  skipped: number;
+  invalid: number;
+}
+
+/** Upsert only records missing from Supabase — never deletes existing cloud rows. */
+export async function syncOptionsTradesSafeMerge(
+  client: SupabaseClient,
+  rows: PersistenceCache["optionsTrades"]
+): Promise<OptionsTradesSafeSyncResult> {
+  if (rows.length === 0) {
+    return { inserted: 0, skipped: 0, invalid: 0 };
+  }
+
+  const existingRes = await client.from("options_trades").select("id");
+  if (existingRes.error) throw existingRes.error;
+
+  const existingIds = new Set(
+    (existingRes.data ?? [])
+      .map((row) => row.id)
+      .filter((id): id is string => typeof id === "string")
+  );
+
+  const validRows = rows.filter(
+    (row) => typeof row.id === "string" && row.id.length > 0
+  );
+  const invalid = rows.length - validRows.length;
+  const toInsert = validRows.filter((row) => !existingIds.has(row.id));
+
+  if (toInsert.length === 0) {
+    return { inserted: 0, skipped: validRows.length, invalid };
+  }
+
+  const payload = toInsert.map((row) => ({
+    id: row.id,
+    data: row,
+    updated_at: new Date().toISOString(),
+  }));
+
+  const insertRes = await client.from("options_trades").upsert(payload);
+  if (insertRes.error) throw insertRes.error;
+
+  return {
+    inserted: toInsert.length,
+    skipped: validRows.length - toInsert.length,
+    invalid,
+  };
 }
 
 export async function syncStockFxConversions(
