@@ -33,10 +33,20 @@ export interface OptionsLocalSourceReport {
   looksLikeOptionsTrades: boolean;
 }
 
+export interface SupabaseTradeSummary {
+  rowId: string | null;
+  tradeId: string | null;
+  status: string | null;
+  tradeType: string | null;
+}
+
 export interface OptionsSupabaseRawReport {
   rowCount: number;
   error: string | null;
+  errorCode: string | null;
   sampleRowKeys: string[];
+  sampleRawRow: unknown | null;
+  tradeSummaries: SupabaseTradeSummary[];
   ownershipFieldValues: Record<string, unknown[]>;
   statusValues: string[];
   tradeTypeValues: string[];
@@ -242,7 +252,10 @@ export async function querySupabaseOptionsRaw(
     return {
       rowCount: 0,
       error: "Supabase client unavailable",
+      errorCode: null,
       sampleRowKeys: [],
+      sampleRawRow: null,
+      tradeSummaries: [],
       ownershipFieldValues: {},
       statusValues: [],
       tradeTypeValues: [],
@@ -259,24 +272,41 @@ export async function querySupabaseOptionsRaw(
   const rows = data ?? [];
   const statusValues = new Set<string>();
   const tradeTypeValues = new Set<string>();
+  const tradeSummaries: SupabaseTradeSummary[] = [];
 
   for (const row of rows) {
+    const record = row as Record<string, unknown>;
     const payload =
-      row && typeof row === "object" && "data" in row
-        ? (row as { data: OptionsTrade }).data
+      record && typeof record === "object" && "data" in record
+        ? (record.data as Record<string, unknown>)
         : null;
-    if (!payload) continue;
-    if (typeof payload.status === "string") statusValues.add(payload.status);
-    if (typeof payload.tradeType === "string") tradeTypeValues.add(payload.tradeType);
+    if (payload) {
+      if (typeof payload.status === "string") statusValues.add(payload.status);
+      if (typeof payload.tradeType === "string") tradeTypeValues.add(payload.tradeType);
+    }
+    tradeSummaries.push({
+      rowId: typeof record.id === "string" ? record.id : null,
+      tradeId:
+        typeof payload?.id === "string"
+          ? payload.id
+          : typeof record.id === "string"
+            ? record.id
+            : null,
+      status: typeof payload?.status === "string" ? payload.status : null,
+      tradeType: typeof payload?.tradeType === "string" ? payload.tradeType : null,
+    });
   }
 
   return {
     rowCount: rows.length,
     error: error?.message ?? null,
+    errorCode: error?.code ?? null,
     sampleRowKeys:
       rows[0] && typeof rows[0] === "object"
         ? Object.keys(rows[0] as object)
         : [],
+    sampleRawRow: rows[0] ?? null,
+    tradeSummaries,
     ownershipFieldValues: collectOwnershipFields(rows),
     statusValues: [...statusValues],
     tradeTypeValues: [...tradeTypeValues],

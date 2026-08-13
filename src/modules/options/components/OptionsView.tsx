@@ -17,7 +17,6 @@ import { RiskManagementTab } from "./RiskManagementTab";
 import { PerformanceAnalyticsTab } from "./PerformanceAnalyticsTab";
 import {
   OptionsRecoveryPanel,
-  OptionsRecoveryPreview,
 } from "./OptionsRecoveryPanel";
 import {
   CloseTradeModal,
@@ -47,7 +46,6 @@ export function OptionsView() {
     optionsTradesLoadState,
     initError,
     persistenceError,
-    refresh,
   } = usePortfolio();
   const [openForm, setOpenForm] = useState(false);
   const [editTrade, setEditTrade] = useState<OptionsOpenTradeRow | null>(null);
@@ -75,7 +73,11 @@ export function OptionsView() {
   }, [optionsData]);
 
   useEffect(() => {
-    if (!isLoaded || !optionsData || optionsTradesLoadState.status !== "loaded") {
+    if (!isLoaded || !optionsData) return;
+    if (
+      optionsTradesLoadState.status !== "loaded" &&
+      optionsTradesLoadState.status !== "error"
+    ) {
       return;
     }
     void runRecoveryCheck();
@@ -87,13 +89,6 @@ export function OptionsView() {
     activeTradeCount === 0 &&
     recoveryReport?.investigationComplete === true &&
     recoveryReport.recoverableTrades.length === 0;
-  const showRecoveryRequired =
-    optionsTradesLoadState.status === "loaded" &&
-    activeTradeCount === 0 &&
-    (recoveryChecking ||
-      !recoveryReport ||
-      recoveryReport.recoverableTrades.length > 0 ||
-      recoveryReport.allSourcesEmpty);
 
   if (!isLoaded || optionsTradesLoadState.status === "loading" || !optionsData) {
     return <OptionsSkeleton />;
@@ -115,11 +110,12 @@ export function OptionsView() {
               persistenceError ??
               "Options trade records could not be loaded."}
           </p>
-          <p className="mt-3 text-xs text-red-200/70">
-            Trade data was not confirmed empty — refresh the page or check cloud
-            persistence. US cash may still display from other modules.
-          </p>
         </div>
+        <OptionsRecoveryPanel
+          report={recoveryReport}
+          checking={recoveryChecking}
+          onRecheck={() => void runRecoveryCheck()}
+        />
       </div>
     );
   }
@@ -138,21 +134,11 @@ export function OptionsView() {
 
       {!optionsData.fxRateValid && <FxRateErrorBanner />}
 
-      {showRecoveryRequired && !showVerifiedEmpty && (
-        <OptionsRecoveryPanel
-          report={recoveryReport}
-          checking={recoveryChecking}
-          onRecheck={() => void runRecoveryCheck()}
-          onRestored={() => {
-            refresh();
-            void runRecoveryCheck();
-          }}
-        />
-      )}
-
-      {recoveryReport && recoveryReport.recoverableTrades.length > 0 && (
-        <OptionsRecoveryPreview report={recoveryReport} />
-      )}
+      <OptionsRecoveryPanel
+        report={recoveryReport}
+        checking={recoveryChecking}
+        onRecheck={() => void runRecoveryCheck()}
+      />
 
       <OptionsSummaryCards showVerifiedEmpty={showVerifiedEmpty} />
 
