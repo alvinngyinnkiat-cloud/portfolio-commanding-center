@@ -52,6 +52,59 @@ export async function syncGoals(
   await replaceTable(client, "goals", "id", rows);
 }
 
+/** Insert or update one snapshot row and verify it was persisted. */
+export async function insertPortfolioSnapshot(
+  client: SupabaseClient,
+  snapshot: DailySnapshot
+): Promise<DailySnapshot> {
+  const normalized = normalizeDailySnapshot(snapshot);
+
+  const res = await client.from("portfolio_snapshots").upsert(
+    {
+      date: normalized.date,
+      data: normalized,
+      updated_at: new Date().toISOString(),
+    },
+    { onConflict: "date" }
+  );
+
+  if (res.error) {
+    console.error("[Snapshot] Supabase save failed", {
+      message: res.error.message,
+      code: res.error.code,
+      details: res.error.details,
+      hint: res.error.hint,
+    });
+    throw res.error;
+  }
+
+  const verify = await client
+    .from("portfolio_snapshots")
+    .select("data")
+    .eq("date", normalized.date)
+    .maybeSingle();
+
+  if (verify.error) {
+    console.error("[Snapshot] Supabase verify failed", {
+      message: verify.error.message,
+      code: verify.error.code,
+      details: verify.error.details,
+      hint: verify.error.hint,
+    });
+    throw verify.error;
+  }
+
+  if (!verify.data?.data) {
+    const error = new Error(
+      `Snapshot verification failed — no row found for date ${normalized.date}.`
+    );
+    console.error("[Snapshot] Supabase verify failed", { message: error.message });
+    throw error;
+  }
+
+  return normalizeDailySnapshot(verify.data.data);
+}
+
 /** Sync snapshots to portfolio_snapshots — never wipes when rows is empty. */
 export async function syncSnapshots(
   client: SupabaseClient,

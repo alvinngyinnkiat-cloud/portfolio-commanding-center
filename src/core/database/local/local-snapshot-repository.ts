@@ -24,6 +24,10 @@ export class LocalSnapshotRepository implements SnapshotRepository {
     this.replaceAll(list);
   }
 
+  upsertLocalOnly(snapshot: DailySnapshot): void {
+    this.upsert(snapshot);
+  }
+
   delete(date: string): void {
     this.replaceAll(this.list().filter((s) => s.date !== date));
   }

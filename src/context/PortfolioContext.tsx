@@ -37,6 +37,8 @@ interface PortfolioContextValue {
   optionsData: OptionsTrackerData | null;
   services: PortfolioServices | null;
   refresh: () => void;
+  /** Refresh snapshot list only — does not reload stocks, crypto, options, or scanner. */
+  refreshSnapshotsOnly: () => void;
   /** Refresh crypto tracker + dashboard totals only — does not touch snapshots or other modules. */
   refreshCryptoOnly: () => void;
   /** Refresh scanner + options tracker only — does not touch crypto, stocks, or snapshots. */
@@ -130,6 +132,22 @@ export function PortfolioProvider({ children }: { children: ReactNode }) {
       setPersistenceError(manager.getLastError());
       setPersistenceWarning(manager.getLastWarning());
       setOptionsTradesLoadState(manager.getOptionsTradesLoadState());
+    }
+  }, [services]);
+
+  const refreshSnapshotsOnly = useCallback(() => {
+    if (!services) return;
+
+    try {
+      setData((prev) => {
+        if (!prev) return prev;
+        return {
+          ...prev,
+          snapshots: services.snapshots.list(),
+        };
+      });
+    } catch (error) {
+      console.error("[PortfolioProvider] snapshot list refresh failed", error);
     }
   }, [services]);
 
@@ -298,6 +316,7 @@ export function PortfolioProvider({ children }: { children: ReactNode }) {
         optionsData,
         services,
         refresh,
+        refreshSnapshotsOnly,
         refreshCryptoOnly,
         refreshScannerPricesOnly,
         refreshCurrentPrices,

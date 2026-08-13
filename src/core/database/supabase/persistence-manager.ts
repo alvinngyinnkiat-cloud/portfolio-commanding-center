@@ -1,3 +1,4 @@
+import type { DailySnapshot } from "@/core/domain/types";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import {
   getServerSupabaseClient,
@@ -25,6 +26,7 @@ import {
   syncStockFxConversions,
   syncSettingsRow,
   syncSnapshots,
+  insertPortfolioSnapshot,
   syncStockTransactions,
   syncWatchlist,
 } from "./sync";
@@ -792,6 +794,23 @@ export class PersistenceManager {
     if (this.lastError) {
       throw new Error(this.lastError);
     }
+  }
+
+  /** Direct insert + verify for manual snapshot capture — does not queue full snapshot sync. */
+  async savePortfolioSnapshotToSupabase(
+    snapshot: DailySnapshot
+  ): Promise<DailySnapshot> {
+    if (!this.client) {
+      throw new Error("Supabase client not configured");
+    }
+
+    const verified = await insertPortfolioSnapshot(this.client, snapshot);
+    const list = this.cache.snapshots;
+    const idx = list.findIndex((row) => row.date === verified.date);
+    if (idx >= 0) list[idx] = verified;
+    else list.push(verified);
+    list.sort((a, b) => a.date.localeCompare(b.date));
+    return verified;
   }
 
   queueSettingsSync(): void {

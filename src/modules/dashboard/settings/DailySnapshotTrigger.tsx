@@ -16,12 +16,15 @@ import {
 } from "@/core/database/snapshots/snapshot-backup";
 
 export function DailySnapshotTrigger() {
-  const { data, services, refresh, persistenceStatus } = usePortfolio();
+  const { data, services, refreshSnapshotsOnly, persistenceStatus } =
+    usePortfolio();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const fxRateValid = data?.fxRateValid ?? false;
   const usesSupabase =
     persistenceStatus === "supabase" || persistenceStatus === "supabase_migrated";
+
+  const [isCapturingSnapshot, setIsCapturingSnapshot] = useState(false);
 
   const [captureFeedback, setCaptureFeedback] = useState<{
     type: "success" | "error";
@@ -39,6 +42,8 @@ export function DailySnapshotTrigger() {
   const latest = snapshots[0];
 
   const handleCapture = async () => {
+    if (isCapturingSnapshot) return;
+
     setCaptureFeedback(null);
     if (!services) {
       setCaptureFeedback({
@@ -48,9 +53,17 @@ export function DailySnapshotTrigger() {
       return;
     }
 
+    setIsCapturingSnapshot(true);
     try {
-      const snapshot = services.snapshots.captureNow();
-      if (!snapshot) {
+      const manager = getPersistenceManager();
+      const result = await services.snapshots.captureNowAsync({
+        saveToSupabase:
+          usesSupabase && manager
+            ? (snapshot) => manager.savePortfolioSnapshotToSupabase(snapshot)
+            : undefined,
+      });
+
+      if (!result) {
         setCaptureFeedback({
           type: "error",
           message:
@@ -59,41 +72,29 @@ export function DailySnapshotTrigger() {
         return;
       }
 
-      appendSnapshotBackup(snapshot);
+      appendSnapshotBackup(result.snapshot);
+      refreshSnapshotsOnly();
 
-      if (usesSupabase) {
-        const manager = getPersistenceManager();
-        try {
-          if (manager) {
-            await manager.drainSyncQueue(15_000);
-          }
-          refresh();
-          setCaptureFeedback({
-            type: "success",
-            message: "Saved to Supabase ✓",
-          });
-        } catch (error) {
-          const message =
-            error instanceof Error ? error.message : "Unknown Supabase error";
-          refresh();
-          setCaptureFeedback({
-            type: "error",
-            message: `Saved locally only — Supabase failed: ${message}`,
-          });
-        }
-      } else {
-        refresh();
+      if (usesSupabase && !result.savedToSupabase) {
         setCaptureFeedback({
-          type: "success",
-          message: "Saved locally ✓",
+          type: "error",
+          message: `Snapshot saved locally only — Supabase failed: ${result.supabaseError ?? "Unknown error"}`,
         });
+        return;
       }
+
+      setCaptureFeedback({
+        type: "success",
+        message: usesSupabase ? "Saved to Supabase ✓" : "Saved locally ✓",
+      });
     } catch (error) {
       const message = error instanceof Error ? error.message : "Unknown error";
       setCaptureFeedback({
         type: "error",
         message: `Capture failed: ${message}`,
       });
+    } finally {
+      setIsCapturingSnapshot(false);
     }
   };
 
@@ -126,7 +127,7 @@ export function DailySnapshotTrigger() {
         }
       }
 
-      refresh();
+      refreshSnapshotsOnly();
       setImportFeedback(`Imported ${imported.length} snapshot(s). ${merged.length} total after dedupe.`);
     } catch (error) {
       const message = error instanceof Error ? error.message : "Import failed";
@@ -136,7 +137,7 @@ export function DailySnapshotTrigger() {
 
   const handleDelete = (date: string) => {
     services?.snapshots.delete(date);
-    refresh();
+    refreshSnapshotsOnly();
   };
 
   return (
@@ -164,11 +165,11 @@ export function DailySnapshotTrigger() {
       <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
         <Button
           onClick={() => void handleCapture()}
-          disabled={!fxRateValid}
+          disabled={!fxRateValid || isCapturingSnapshot}
           className="inline-flex items-center gap-2"
         >
           <Camera size={16} />
-          Capture Snapshot Now
+          {isCapturingSnapshot ? "Capturing…" : "Capture Snapshot Now"}
         </Button>
         <Button
           variant="secondary"

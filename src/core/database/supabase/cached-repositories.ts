@@ -137,6 +137,14 @@ class CachedSnapshotRepository implements SnapshotRepository {
     list.sort((a, b) => a.date.localeCompare(b.date));
     this.manager.queueSnapshotsSync();
   }
+  upsertLocalOnly(snapshot: Parameters<SnapshotRepository["upsertLocalOnly"]>[0]) {
+    const normalized = normalizeDailySnapshot(snapshot);
+    const list = this.manager.getCache().snapshots;
+    const idx = list.findIndex((row) => row.date === normalized.date);
+    if (idx >= 0) list[idx] = normalized;
+    else list.push(normalized);
+    list.sort((a, b) => a.date.localeCompare(b.date));
+  }
   delete(date: string) {
     this.manager.getCache().snapshots = this.manager
       .getCache()

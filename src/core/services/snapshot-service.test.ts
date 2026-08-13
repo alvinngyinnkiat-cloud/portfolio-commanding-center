@@ -26,6 +26,7 @@ function createService(existing: DailySnapshot[] = []) {
   const repo = {
     list: vi.fn(() => existing),
     upsert: vi.fn(),
+    upsertLocalOnly: vi.fn(),
     delete: vi.fn(),
     replaceAll: vi.fn(),
   };
@@ -78,5 +79,44 @@ describe("SnapshotService", () => {
 
     expect(imported).toHaveLength(2);
     expect(repo.replaceAll).toHaveBeenCalledOnce();
+  });
+
+  it("captureNowAsync saves to Supabase then updates local cache only", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(sgtWallTimeToDate(2026, 6, 30, 12, 0));
+
+    const { service, repo } = createService();
+    const saveToSupabase = vi.fn(async (snapshot: DailySnapshot) => ({
+      ...snapshot,
+      ownPortfolio: 10_500,
+    }));
+
+    const result = await service.captureNowAsync({ saveToSupabase });
+
+    expect(result?.savedToSupabase).toBe(true);
+    expect(result?.snapshot.ownPortfolio).toBe(10_500);
+    expect(saveToSupabase).toHaveBeenCalledOnce();
+    expect(repo.upsertLocalOnly).toHaveBeenCalledOnce();
+    expect(repo.upsert).not.toHaveBeenCalled();
+
+    vi.useRealTimers();
+  });
+
+  it("captureNowAsync falls back to local cache when Supabase fails", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(sgtWallTimeToDate(2026, 6, 30, 12, 0));
+
+    const { service, repo } = createService();
+    const result = await service.captureNowAsync({
+      saveToSupabase: async () => {
+        throw new Error("RLS policy violation");
+      },
+    });
+
+    expect(result?.savedToSupabase).toBe(false);
+    expect(result?.supabaseError).toBe("RLS policy violation");
+    expect(repo.upsertLocalOnly).toHaveBeenCalledOnce();
+
+    vi.useRealTimers();
   });
 });
