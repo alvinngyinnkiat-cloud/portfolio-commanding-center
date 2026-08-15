@@ -198,11 +198,16 @@ function MainStrategyPanel({ result }: { result: ScannerTickerResult }) {
   const checklist =
     mainSystem.strategy != null
       ? result.strategies[mainSystem.strategy].checklist
-      : indicators.marketStructure === "Bullish"
-        ? result.strategies.bullPut.checklist
-        : indicators.marketStructure === "Bearish"
-          ? result.strategies.bearCall.checklist
-          : result.strategies.ironCondor.checklist;
+      : result.strategies.bullPut.checklist;
+
+  const confidenceBadgeClass =
+    mainSystem.confidence === "HIGH"
+      ? "text-accent-green"
+      : mainSystem.confidence === "MEDIUM"
+        ? "text-amber-300"
+        : mainSystem.confidence === "LOW / COUNTER-STRUCTURE"
+          ? "text-orange-400"
+          : "text-slate-400";
 
   return (
     <StrategyPanel
@@ -210,6 +215,13 @@ function MainStrategyPanel({ result }: { result: ScannerTickerResult }) {
       output={output}
       metrics={
         <>
+          {mainSystem.confidence && (
+            <Metric
+              label="Confidence"
+              value={mainSystem.confidence}
+              valueClassName={confidenceBadgeClass}
+            />
+          )}
           <Metric label="Structure" value={indicators.marketStructure} />
           <Metric label="Momentum" value={indicators.momentum} />
           <Metric label="SO Value" value={formatNum(indicators.so, 2)} />
@@ -218,6 +230,30 @@ function MainStrategyPanel({ result }: { result: ScannerTickerResult }) {
         </>
       }
     >
+      {output !== "NO TRADE" && mainSystem.reasons.length > 0 && (
+        <div className="mb-3">
+          <p className="mb-2 text-[10px] font-semibold uppercase tracking-wide text-slate-500">
+            Reasons
+          </p>
+          <ul className="space-y-1.5">
+            {mainSystem.reasons.map((reason) => (
+              <li
+                key={reason}
+                className="flex gap-2 text-xs text-slate-300 before:shrink-0 before:text-accent-green before:content-['✓']"
+              >
+                {reason}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {mainSystem.structureWarning && (
+        <p className="mb-3 rounded-lg border border-orange-500/30 bg-orange-500/10 px-3 py-2 text-xs text-orange-200">
+          Warning: {mainSystem.structureWarning}
+        </p>
+      )}
+
       {output === "NO TRADE" && mainSystem.reasons.length > 0 && (
         <div className="mb-3">
           <p className="mb-2 text-[10px] font-semibold uppercase tracking-wide text-slate-500">
@@ -227,7 +263,7 @@ function MainStrategyPanel({ result }: { result: ScannerTickerResult }) {
             {mainSystem.reasons.map((reason) => (
               <li
                 key={reason}
-                className="flex gap-2 text-xs text-slate-400 before:shrink-0 before:content-['•']"
+                className="flex gap-2 text-xs text-slate-400 before:shrink-0 before:text-accent-red before:content-['✗']"
               >
                 {reason}
               </li>
@@ -802,11 +838,21 @@ function TradableBadge({ tradable }: { tradable: boolean }) {
   );
 }
 
-function Metric({ label, value }: { label: string; value: string }) {
+function Metric({
+  label,
+  value,
+  valueClassName,
+}: {
+  label: string;
+  value: string;
+  valueClassName?: string;
+}) {
   return (
     <div>
       <p className="text-[11px] uppercase tracking-wide text-slate-500">{label}</p>
-      <p className="mt-0.5 font-medium text-slate-200">{value}</p>
+      <p className={`mt-0.5 font-medium ${valueClassName ?? "text-slate-200"}`}>
+        {value}
+      </p>
     </div>
   );
 }

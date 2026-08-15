@@ -224,6 +224,12 @@ export interface MainSystemDisplay {
 
   reasons: string[];
 
+  /** Directional trades only — structure-aligned confidence tier. */
+  confidence?: "HIGH" | "MEDIUM" | "LOW / COUNTER-STRUCTURE" | null;
+
+  /** Warning when directional setup conflicts with market structure. */
+  structureWarning?: string | null;
+
 }
 
 
@@ -360,6 +366,9 @@ export interface ScannerRankedEntry {
   targetPremium: number | null;
 
   maxRiskUsd: number | null;
+
+  /** Main System confidence tier for directional rankings. */
+  confidence?: "HIGH" | "MEDIUM" | "LOW / COUNTER-STRUCTURE" | null;
 
 }
 

@@ -7,6 +7,10 @@ import type {
 } from "@/core/domain/types/scanner";
 import type { ScannerStrategy } from "@/core/domain/types/scanner";
 import { failedCheckLabels } from "./zone-checklist";
+import {
+  buildCounterStructureWarning,
+  deriveMainSystemConfidence,
+} from "./main-system-confidence";
 
 export function strategyOutputToKey(
   output: MainSystemDisplay["output"]
@@ -51,13 +55,33 @@ export interface MainSystemDecisionInput {
 }
 
 function buildNoTradeReasons(input: MainSystemDecisionInput): string[] {
-  let checklist = input.ironCondor.checklist;
-  if (input.marketStructure === "Bullish") {
-    checklist = input.bullPut.checklist;
-  } else if (input.marketStructure === "Bearish") {
-    checklist = input.bearCall.checklist;
+  const putFails = failedCheckLabels(input.bullPut.checklist);
+  const callFails = failedCheckLabels(input.bearCall.checklist);
+
+  if (
+    input.momentum === "Above EMA" ||
+    input.soStatus === "Rolling Up"
+  ) {
+    if (putFails.length > 0) return putFails;
   }
-  return failedCheckLabels(checklist);
+
+  if (
+    input.momentum === "Below EMA" ||
+    input.soStatus === "Rolling Down"
+  ) {
+    if (callFails.length > 0) return callFails;
+  }
+
+  const combined = [...putFails];
+  for (const reason of callFails) {
+    if (!combined.includes(reason)) combined.push(reason);
+  }
+
+  if (combined.length > 0) {
+    return combined.slice(0, 8);
+  }
+
+  return failedCheckLabels(input.ironCondor.checklist);
 }
 
 function passedCheckLabels(checklist: MainSystemDecisionInput["bullPut"]["checklist"]): string[] {
@@ -102,6 +126,8 @@ export function evaluateMainSystemDisplay(
       output: "NO TRADE",
       strategy: null,
       reasons: buildNoTradeReasons(input),
+      confidence: null,
+      structureWarning: null,
     };
   }
 
@@ -116,9 +142,18 @@ export function evaluateMainSystemDisplay(
     ironCondor: input.ironCondor,
   };
 
+  const output = winner.output;
+  const confidence = deriveMainSystemConfidence(output, input.marketStructure);
+  const structureWarning = buildCounterStructureWarning(
+    output,
+    input.marketStructure
+  );
+
   return {
-    output: winner.output,
+    output,
     strategy: winner.strategy,
     reasons: passedCheckLabels(strategyResults[winner.strategy].checklist),
+    confidence,
+    structureWarning,
   };
 }

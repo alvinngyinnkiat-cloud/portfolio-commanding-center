@@ -62,6 +62,7 @@ function RankingTable({ title, entries }: RankingTableProps) {
             <tr className="border-b border-surface-border/60 text-left text-xs uppercase tracking-wide text-slate-500">
               <th className="px-4 py-3">Ticker</th>
               <th className="px-4 py-3">Trade</th>
+              <th className="px-4 py-3">Confidence</th>
               <th className="px-4 py-3">Width</th>
               <th className="px-4 py-3">Premium</th>
               <th className="px-4 py-3">Risk</th>
@@ -71,7 +72,7 @@ function RankingTable({ title, entries }: RankingTableProps) {
             {entries.length === 0 ? (
               <tr>
                 <td
-                  colSpan={5}
+                  colSpan={6}
                   className="px-4 py-6 text-center text-slate-500"
                 >
                   No eligible opportunities today.
@@ -88,6 +89,9 @@ function RankingTable({ title, entries }: RankingTableProps) {
                   </td>
                   <td className="px-4 py-3 font-mono text-xs text-slate-300">
                     {entry.trade}
+                  </td>
+                  <td className="px-4 py-3 text-xs text-slate-300">
+                    {entry.confidence ?? "—"}
                   </td>
                   <td className="px-4 py-3 text-slate-300">
                     {entry.width ?? "—"}

@@ -34,9 +34,9 @@ describe("Main System zone validation — Module 4.4 QA", () => {
     });
 
     expect(bullPut.eligible).toBe(false);
-    expect(bullPut.checklist).toHaveLength(5);
+    expect(bullPut.checklist).toHaveLength(4);
 
-    const zoneItem = bullPut.checklist[4];
+    const zoneItem = bullPut.checklist[3];
     expect(zoneItem.label).toBe("Average Price outside Sell Put Zone");
     expect(zoneItem.passed).toBe(false);
     expect(zoneItem.detail).toBe("259.74 ∉ 102.10 → 128.81");
@@ -79,7 +79,7 @@ describe("Main System zone validation — Module 4.4 QA", () => {
 
     expect(bullPut.eligible).toBe(true);
 
-    const zoneItem = bullPut.checklist[4];
+    const zoneItem = bullPut.checklist[3];
     expect(zoneItem.label).toBe("Average Price inside Sell Put Zone");
     expect(zoneItem.passed).toBe(true);
     expect(zoneItem.detail).toBe("118.20 ∈ 102.10 → 128.81");
@@ -122,7 +122,7 @@ describe("Main System zone validation — Module 4.4 QA", () => {
 
     expect(bearCall.eligible).toBe(true);
 
-    const zoneItem = bearCall.checklist[4];
+    const zoneItem = bearCall.checklist[3];
     expect(zoneItem.label).toBe("Average Price inside Sell Call Zone");
     expect(zoneItem.passed).toBe(true);
     expect(zoneItem.detail).toBe("185.00 ∈ 170.00 → 200.00");

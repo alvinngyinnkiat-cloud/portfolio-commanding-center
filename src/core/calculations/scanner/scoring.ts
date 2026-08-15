@@ -54,11 +54,6 @@ export function scoreBullPut(input: {
 
   const checklist: RuleCheck[] = [
     {
-      label: "Bullish Structure",
-      passed: input.marketStructure === "Bullish",
-      detail: input.marketStructure,
-    },
-    {
       label: "Momentum Above EMA",
       passed: input.momentum === "Above EMA",
       detail: input.momentum,
@@ -97,11 +92,6 @@ export function scoreBearCall(input: {
   const avgPriceFalling = isAvgPriceFalling(input.avgPrice, input.avgPricePrev);
 
   const checklist: RuleCheck[] = [
-    {
-      label: "Bearish Structure",
-      passed: input.marketStructure === "Bearish",
-      detail: input.marketStructure,
-    },
     {
       label: "Momentum Below EMA",
       passed: input.momentum === "Below EMA",

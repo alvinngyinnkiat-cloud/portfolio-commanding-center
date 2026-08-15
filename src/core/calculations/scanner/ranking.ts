@@ -9,6 +9,7 @@ import type {
 } from "@/core/domain/types/scanner";
 
 import { buildSuggestedTradeFromResult } from "./suggested-trade";
+import { MAIN_SYSTEM_CONFIDENCE_RANK } from "./main-system-confidence";
 
 
 
@@ -48,7 +49,7 @@ function rankStrategy(
 
     .filter((row) => row.strategies[strategy].eligible)
 
-    .sort((a, b) => a.ticker.localeCompare(b.ticker))
+    .sort((a, b) => compareRankedRows(a, b, strategy))
 
     .slice(0, 5)
 
@@ -69,10 +70,32 @@ function rankStrategy(
 
         maxRiskUsd: suggested.maxRiskUsd,
 
+        confidence:
+          strategy === "ironCondor" ? null : row.mainSystem.confidence ?? null,
+
       };
 
     });
 
+}
+
+
+
+function compareRankedRows(
+  a: ScannerTickerResult,
+  b: ScannerTickerResult,
+  strategy: ScannerStrategy
+): number {
+  if (strategy !== "ironCondor") {
+    const confA = a.mainSystem.confidence;
+    const confB = b.mainSystem.confidence;
+    if (confA && confB && confA !== confB) {
+      return (
+        MAIN_SYSTEM_CONFIDENCE_RANK[confA] - MAIN_SYSTEM_CONFIDENCE_RANK[confB]
+      );
+    }
+  }
+  return a.ticker.localeCompare(b.ticker);
 }
 
 
@@ -100,5 +123,4 @@ export function countOpportunities(results: ScannerTickerResult[]): {
   };
 
 }
-
 

@@ -124,9 +124,6 @@ export function buildNoTradeReasons(input: {
   const insideMid = isInMidZone(input.avgPrice, input.midPrice, input.atr14);
 
   if (!sellPutValid) {
-    if (input.marketStructure !== "Bullish") {
-      reasons.push(`Bullish Structure = No (${input.marketStructure})`);
-    }
     if (input.momentum !== "Above EMA") {
       reasons.push(`Momentum Above EMA = No (${input.momentum})`);
     }
@@ -141,9 +138,6 @@ export function buildNoTradeReasons(input: {
   }
 
   if (!sellCallValid) {
-    if (input.marketStructure !== "Bearish") {
-      reasons.push(`Bearish Structure = No (${input.marketStructure})`);
-    }
     if (input.momentum !== "Below EMA") {
       reasons.push(`Momentum Below EMA = No (${input.momentum})`);
     }
