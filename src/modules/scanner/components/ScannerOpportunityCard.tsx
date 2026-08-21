@@ -223,6 +223,8 @@ function MainStrategyPanel({ result }: { result: ScannerTickerResult }) {
             />
           )}
           <Metric label="Structure" value={indicators.marketStructure} />
+          <Metric label="Previous EMA20" value={formatNum(indicators.ema20Prev)} />
+          <Metric label="Current EMA20" value={formatNum(indicators.ema20)} />
           <Metric label="Momentum" value={indicators.momentum} />
           <Metric label="SO Value" value={formatNum(indicators.so, 2)} />
           <Metric label="SO Status" value={indicators.soStatus} />
@@ -505,6 +507,12 @@ function simplifyNoTradeReason(
   if (reason.includes("Bearish Structure = No")) {
     return `Structure ${indicators.marketStructure}`;
   }
+  if (reason.includes("EMA20 not Rising")) {
+    return `Momentum ${indicators.momentum}`;
+  }
+  if (reason.includes("EMA20 not Dropping")) {
+    return `Momentum ${indicators.momentum}`;
+  }
   if (reason.includes("Momentum Above EMA = No")) {
     return `Momentum ${indicators.momentum}`;
   }
@@ -629,6 +637,8 @@ function ExpandedDetails({ result }: { result: ScannerTickerResult }) {
         <DetailGrid
           items={[
             ["Structure", indicators.marketStructure],
+            ["Previous EMA20", formatNum(indicators.ema20Prev)],
+            ["Current EMA20", formatNum(indicators.ema20)],
             ["Momentum", indicators.momentum],
           ]}
         />

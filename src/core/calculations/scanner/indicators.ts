@@ -3,7 +3,8 @@ import {
   getUsMarketDateString,
   isUsCashSessionClosed,
 } from "./us-market-date";
-import { deriveMarketStructure, deriveMomentum } from "./structure-momentum";
+import { deriveMarketStructure, deriveMainSystemMomentum } from "./structure-momentum";
+import { computeEma20Prev } from "./extended-indicators";
 
 export interface OhlcBar {
   date: string;
@@ -365,7 +366,7 @@ export function computeIndicators(
   low: number | null;
   avgPrice: number | null;
   marketStructure: "Bullish" | "Bearish" | "Neutral";
-  momentum: "Above EMA" | "Below EMA" | "At EMA";
+  momentum: "Rising" | "Dropping" | "Flat";
   trend: "Bullish" | "Bearish" | "Neutral";
   trendQualityBullPut: number;
   trendQualityBearCall: number;
@@ -391,7 +392,7 @@ export function computeIndicatorsFromVerifiedBars(
   low: number | null;
   avgPrice: number | null;
   marketStructure: "Bullish" | "Bearish" | "Neutral";
-  momentum: "Above EMA" | "Below EMA" | "At EMA";
+  momentum: "Rising" | "Dropping" | "Flat";
   trend: "Bullish" | "Bearish" | "Neutral";
   trendQualityBullPut: number;
   trendQualityBearCall: number;
@@ -406,7 +407,8 @@ export function computeIndicatorsFromVerifiedBars(
   const price = currentPrice ?? last?.close ?? null;
   const avgPrice = last ? (last.high + last.low) / 2 : null;
   const marketStructure = deriveMarketStructure(ema20, sma50Val, sma200Val);
-  const momentum = deriveMomentum(avgPrice, ema20);
+  const ema20Prev = computeEma20Prev(verifiedCandles);
+  const momentum = deriveMainSystemMomentum(ema20, ema20Prev);
 
   return {
     ema20,

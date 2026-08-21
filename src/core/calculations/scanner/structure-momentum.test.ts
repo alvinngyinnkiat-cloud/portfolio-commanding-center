@@ -1,13 +1,14 @@
 import { describe, expect, it } from "vitest";
 import {
+  deriveMainSystemMomentum,
   deriveMarketStructure,
-  deriveMomentum,
+  derivePriceEmaPosition,
   isValidSellCallSetup,
   isValidSellPutSetup,
 } from "./structure-momentum";
 
 describe("deriveMarketStructure", () => {
-  it("Test C: EMA20 > SMA50 > SMA200 → Bullish", () => {
+  it("Test A: EMA20 > SMA50 > SMA200 → Bullish", () => {
     expect(deriveMarketStructure(290, 283, 259)).toBe("Bullish");
   });
 
@@ -15,7 +16,7 @@ describe("deriveMarketStructure", () => {
     expect(deriveMarketStructure(250, 283, 259)).toBe("Neutral");
   });
 
-  it("returns Bearish when EMA20 < SMA50 < SMA200", () => {
+  it("Test E: EMA20 < SMA50 < SMA200 → Bearish", () => {
     expect(deriveMarketStructure(240, 250, 260)).toBe("Bearish");
   });
 
@@ -24,65 +25,62 @@ describe("deriveMarketStructure", () => {
   });
 });
 
-describe("deriveMomentum", () => {
-  it("Test A: Average Price > EMA20 → Above EMA", () => {
-    expect(deriveMomentum(295, 290)).toBe("Above EMA");
+describe("deriveMainSystemMomentum", () => {
+  it("returns Rising when current EMA20 is above previous", () => {
+    expect(deriveMainSystemMomentum(101, 100)).toBe("Rising");
   });
 
-  it("Test B: Average Price < EMA20 → Below EMA", () => {
-    expect(deriveMomentum(285, 290)).toBe("Below EMA");
+  it("returns Dropping when current EMA20 is below previous", () => {
+    expect(deriveMainSystemMomentum(100, 101)).toBe("Dropping");
   });
 
-  it("returns At EMA when average price equals EMA20", () => {
-    expect(deriveMomentum(290, 290)).toBe("At EMA");
+  it("returns Flat when EMA20 is unchanged", () => {
+    expect(deriveMainSystemMomentum(100, 100)).toBe("Flat");
   });
 });
 
-describe("Module 4.1 QA scenarios", () => {
-  const ema20 = 290;
-  const sma50 = 283;
-  const sma200 = 259;
-
-  it("Test A: Bullish structure + Above EMA — Sell Put can pass", () => {
-    const marketStructure = deriveMarketStructure(ema20, sma50, sma200);
-    const momentum = deriveMomentum(295, ema20);
-
-    expect(marketStructure).toBe("Bullish");
-    expect(momentum).toBe("Above EMA");
-    expect(
-      isValidSellPutSetup({
-        marketStructure,
-        momentum,
-        soStatus: "Rolling Up",
-        avgPrice: 295,
-        avgPricePrev: 290,
-      })
-    ).toBe(true);
+describe("derivePriceEmaPosition", () => {
+  it("returns Above EMA when average price is above EMA20", () => {
+    expect(derivePriceEmaPosition(295, 290)).toBe("Above EMA");
   });
 
-  it("Test B: Bullish structure + Below EMA — Sell Put and Sell Call fail", () => {
-    const marketStructure = deriveMarketStructure(ema20, sma50, sma200);
-    const momentum = deriveMomentum(285, ema20);
+  it("returns Below EMA when average price is below EMA20", () => {
+    expect(derivePriceEmaPosition(285, 290)).toBe("Below EMA");
+  });
+});
 
-    expect(marketStructure).toBe("Bullish");
-    expect(momentum).toBe("Below EMA");
+describe("Iron Condor directional guards", () => {
+  it("Sell Put IC guard still requires price above EMA20", () => {
     expect(
       isValidSellPutSetup({
-        marketStructure,
-        momentum,
+        marketStructure: "Bullish",
+        ema20: 290,
+        avgPrice: 295,
+        avgPricePrev: 294,
         soStatus: "Rolling Up",
+      })
+    ).toBe(true);
+
+    expect(
+      isValidSellPutSetup({
+        marketStructure: "Bullish",
+        ema20: 290,
         avgPrice: 285,
-        avgPricePrev: 280,
+        avgPricePrev: 294,
+        soStatus: "Rolling Up",
       })
     ).toBe(false);
+  });
+
+  it("Sell Call IC guard still requires price below EMA20", () => {
     expect(
       isValidSellCallSetup({
-        marketStructure,
-        momentum,
-        soStatus: "Rolling Down",
+        marketStructure: "Bearish",
+        ema20: 290,
         avgPrice: 285,
-        avgPricePrev: 290,
+        avgPricePrev: 286,
+        soStatus: "Rolling Down",
       })
-    ).toBe(false);
+    ).toBe(true);
   });
 });

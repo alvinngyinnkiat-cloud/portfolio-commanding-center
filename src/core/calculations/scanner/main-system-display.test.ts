@@ -32,7 +32,7 @@ function baseResult(
       emaDiff: 1,
       emaDiffPct: 1,
       marketStructure: "Neutral",
-      momentum: "At EMA",
+      momentum: "Flat",
       trend: "Neutral",
       trendQualityScore: 10,
     },

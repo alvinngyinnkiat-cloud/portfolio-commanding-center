@@ -20,7 +20,7 @@ export type ScannerTrend = "Bullish" | "Bearish" | "Neutral";
 
 
 
-export type ScannerMomentum = "Above EMA" | "Below EMA" | "At EMA";
+export type ScannerMomentum = "Rising" | "Dropping" | "Flat";
 
 
 

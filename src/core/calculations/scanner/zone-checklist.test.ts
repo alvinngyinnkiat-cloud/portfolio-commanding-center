@@ -10,7 +10,9 @@ describe("Main System zone validation — Module 4.4 QA", () => {
   const basePutInput = {
     soStatus: "Rolling Up" as const,
     marketStructure: "Bullish" as const,
-    momentum: "Above EMA" as const,
+    momentum: "Rising" as const,
+    ema20: 120,
+    ema20Prev: 118,
     avgPricePrev: 115,
     primarySupport: 102.1,
     atr14: 26.71,
@@ -20,7 +22,9 @@ describe("Main System zone validation — Module 4.4 QA", () => {
   const baseCallInput = {
     soStatus: "Rolling Down" as const,
     marketStructure: "Bearish" as const,
-    momentum: "Below EMA" as const,
+    momentum: "Dropping" as const,
+    ema20: 195,
+    ema20Prev: 198,
     avgPricePrev: 190,
     primaryResistance: 200,
     atr14: 30,
@@ -36,7 +40,7 @@ describe("Main System zone validation — Module 4.4 QA", () => {
     expect(bullPut.eligible).toBe(false);
     expect(bullPut.checklist).toHaveLength(4);
 
-    const zoneItem = bullPut.checklist[3];
+    const zoneItem = bullPut.checklist[0];
     expect(zoneItem.label).toBe("Average Price outside Sell Put Zone");
     expect(zoneItem.passed).toBe(false);
     expect(zoneItem.detail).toBe("259.74 ∉ 102.10 → 128.81");
@@ -47,7 +51,7 @@ describe("Main System zone validation — Module 4.4 QA", () => {
       ironCondor: scoreIronCondor({
         so: 50,
         marketStructure: "Neutral",
-        momentum: "At EMA",
+        ema20: 120,
         soStatus: "Strong",
         avgPrice: 259.74,
         avgPricePrev: 255,
@@ -57,7 +61,7 @@ describe("Main System zone validation — Module 4.4 QA", () => {
         rangeWidth: 60,
       }),
       marketStructure: "Bullish",
-      momentum: "Above EMA",
+      momentum: "Rising",
       so: 20,
       soStatus: "Rolling Up",
       avgPrice: 259.74,
@@ -79,7 +83,7 @@ describe("Main System zone validation — Module 4.4 QA", () => {
 
     expect(bullPut.eligible).toBe(true);
 
-    const zoneItem = bullPut.checklist[3];
+    const zoneItem = bullPut.checklist[0];
     expect(zoneItem.label).toBe("Average Price inside Sell Put Zone");
     expect(zoneItem.passed).toBe(true);
     expect(zoneItem.detail).toBe("118.20 ∈ 102.10 → 128.81");
@@ -90,7 +94,7 @@ describe("Main System zone validation — Module 4.4 QA", () => {
       ironCondor: scoreIronCondor({
         so: 50,
         marketStructure: "Neutral",
-        momentum: "At EMA",
+        ema20: 120,
         soStatus: "Strong",
         avgPrice: 118.2,
         avgPricePrev: 115,
@@ -100,7 +104,7 @@ describe("Main System zone validation — Module 4.4 QA", () => {
         rangeWidth: 60,
       }),
       marketStructure: "Bullish",
-      momentum: "Above EMA",
+      momentum: "Rising",
       so: 20,
       soStatus: "Rolling Up",
       avgPrice: 118.2,
@@ -122,7 +126,7 @@ describe("Main System zone validation — Module 4.4 QA", () => {
 
     expect(bearCall.eligible).toBe(true);
 
-    const zoneItem = bearCall.checklist[3];
+    const zoneItem = bearCall.checklist[0];
     expect(zoneItem.label).toBe("Average Price inside Sell Call Zone");
     expect(zoneItem.passed).toBe(true);
     expect(zoneItem.detail).toBe("185.00 ∈ 170.00 → 200.00");
@@ -133,7 +137,7 @@ describe("Main System zone validation — Module 4.4 QA", () => {
       ironCondor: scoreIronCondor({
         so: 50,
         marketStructure: "Neutral",
-        momentum: "At EMA",
+        ema20: 195,
         soStatus: "Strong",
         avgPrice: 185,
         avgPricePrev: 190,
@@ -143,7 +147,7 @@ describe("Main System zone validation — Module 4.4 QA", () => {
         rangeWidth: 60,
       }),
       marketStructure: "Bearish",
-      momentum: "Below EMA",
+      momentum: "Dropping",
       so: 80,
       soStatus: "Rolling Down",
       avgPrice: 185,

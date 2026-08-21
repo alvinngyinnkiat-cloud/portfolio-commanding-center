@@ -41,14 +41,15 @@ export function buildSellPutChecklistReasons(input: {
   soStatus: SoStatus;
   marketStructure: ScannerTrend;
   momentum: ScannerMomentum;
+  ema20: number | null;
+  ema20Prev: number | null;
   avgPrice: number | null;
   avgPricePrev: number | null;
 }): string[] {
   const avgPriceRising = isAvgPriceRising(input.avgPrice, input.avgPricePrev);
 
   return [
-    `Bullish Structure = ${yesNo(input.marketStructure === "Bullish")}`,
-    `Momentum Above EMA = ${yesNo(input.momentum === "Above EMA")}`,
+    `EMA20 Momentum Rising = ${yesNo(input.momentum === "Rising")} (${fmt(input.ema20)} vs ${fmt(input.ema20Prev)})`,
     `Current Average Price > Previous Average Price = ${yesNo(avgPriceRising)} (${fmt(input.avgPrice)} vs ${fmt(input.avgPricePrev)})`,
     `SO Rolling Up = ${yesNo(input.soStatus === "Rolling Up")}`,
     fmtSo(input.so),
@@ -60,14 +61,15 @@ export function buildSellCallChecklistReasons(input: {
   soStatus: SoStatus;
   marketStructure: ScannerTrend;
   momentum: ScannerMomentum;
+  ema20: number | null;
+  ema20Prev: number | null;
   avgPrice: number | null;
   avgPricePrev: number | null;
 }): string[] {
   const avgPriceFalling = isAvgPriceFalling(input.avgPrice, input.avgPricePrev);
 
   return [
-    `Bearish Structure = ${yesNo(input.marketStructure === "Bearish")}`,
-    `Momentum Below EMA = ${yesNo(input.momentum === "Below EMA")}`,
+    `EMA20 Momentum Dropping = ${yesNo(input.momentum === "Dropping")} (${fmt(input.ema20)} vs ${fmt(input.ema20Prev)})`,
     `Current Average Price < Previous Average Price = ${yesNo(avgPriceFalling)} (${fmt(input.avgPrice)} vs ${fmt(input.avgPricePrev)})`,
     `SO Rolling Down = ${yesNo(input.soStatus === "Rolling Down")}`,
     fmtSo(input.so),
@@ -99,6 +101,7 @@ export function buildNoTradeReasons(input: {
   soStatus: SoStatus;
   marketStructure: ScannerTrend;
   momentum: ScannerMomentum;
+  ema20: number | null;
   avgPrice: number | null;
   avgPricePrev: number | null;
   midPrice: number | null;
@@ -108,24 +111,33 @@ export function buildNoTradeReasons(input: {
   const reasons: string[] = [];
   const sellPutValid = isValidSellPutSetup({
     marketStructure: input.marketStructure,
-    momentum: input.momentum,
-    soStatus: input.soStatus,
+    ema20: input.ema20,
     avgPrice: input.avgPrice,
     avgPricePrev: input.avgPricePrev,
+    soStatus: input.soStatus,
   });
   const sellCallValid = isValidSellCallSetup({
     marketStructure: input.marketStructure,
-    momentum: input.momentum,
-    soStatus: input.soStatus,
+    ema20: input.ema20,
     avgPrice: input.avgPrice,
     avgPricePrev: input.avgPricePrev,
+    soStatus: input.soStatus,
   });
   const soInRange = input.so != null && input.so >= 40 && input.so <= 60;
   const insideMid = isInMidZone(input.avgPrice, input.midPrice, input.atr14);
 
-  if (!sellPutValid) {
-    if (input.momentum !== "Above EMA") {
-      reasons.push(`Momentum Above EMA = No (${input.momentum})`);
+  const sellPutDirectional =
+    input.momentum === "Rising" &&
+    isAvgPriceRising(input.avgPrice, input.avgPricePrev) &&
+    input.soStatus === "Rolling Up";
+  const sellCallDirectional =
+    input.momentum === "Dropping" &&
+    isAvgPriceFalling(input.avgPrice, input.avgPricePrev) &&
+    input.soStatus === "Rolling Down";
+
+  if (!sellPutDirectional) {
+    if (input.momentum !== "Rising") {
+      reasons.push(`EMA20 not Rising (${input.momentum})`);
     }
     if (!isAvgPriceRising(input.avgPrice, input.avgPricePrev)) {
       reasons.push(
@@ -137,9 +149,9 @@ export function buildNoTradeReasons(input: {
     }
   }
 
-  if (!sellCallValid) {
-    if (input.momentum !== "Below EMA") {
-      reasons.push(`Momentum Below EMA = No (${input.momentum})`);
+  if (!sellCallDirectional) {
+    if (input.momentum !== "Dropping") {
+      reasons.push(`EMA20 not Dropping (${input.momentum})`);
     }
     if (!isAvgPriceFalling(input.avgPrice, input.avgPricePrev)) {
       reasons.push(

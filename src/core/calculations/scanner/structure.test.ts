@@ -48,7 +48,7 @@ describe("scoreIronCondor", () => {
     const result = scoreIronCondor({
       so: 50,
       marketStructure: "Bullish",
-      momentum: "Below EMA",
+      ema20: 105,
       soStatus: "Strong",
       avgPrice: 100,
       avgPricePrev: 101,

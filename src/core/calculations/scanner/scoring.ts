@@ -44,6 +44,8 @@ export function scoreBullPut(input: {
   soStatus: SoStatus;
   marketStructure: ScannerTrend;
   momentum: ScannerMomentum;
+  ema20: number | null;
+  ema20Prev: number | null;
   avgPrice: number | null;
   avgPricePrev: number | null;
   primarySupport: number | null;
@@ -51,29 +53,32 @@ export function scoreBullPut(input: {
   sellPutRange: { low: number; high: number } | null;
 }): ScannerStrategyResult {
   const avgPriceRising = isAvgPriceRising(input.avgPrice, input.avgPricePrev);
+  const momentumRising = input.momentum === "Rising";
 
   const checklist: RuleCheck[] = [
-    {
-      label: "Momentum Above EMA",
-      passed: input.momentum === "Above EMA",
-      detail: input.momentum,
-    },
-    {
-      label: "Average Price > Previous Average Price",
-      passed: avgPriceRising,
-      detail: `${fmt(input.avgPrice)} vs ${fmt(input.avgPricePrev)}`,
-    },
-    {
-      label: "SO Rolling Up",
-      passed: input.soStatus === "Rolling Up",
-      detail: input.soStatus,
-    },
     buildSellPutZoneCheck({
       avgPrice: input.avgPrice,
       primarySupport: input.primarySupport,
       atr14: input.atr14,
       sellPutRange: input.sellPutRange,
     }),
+    {
+      label: momentumRising ? "EMA20 Momentum Rising" : "EMA20 not Rising",
+      passed: momentumRising,
+      detail: `${fmt(input.ema20)} vs ${fmt(input.ema20Prev)}`,
+    },
+    {
+      label: avgPriceRising
+        ? "Average Price > Previous Average Price"
+        : "Current Average Price not higher than Previous",
+      passed: avgPriceRising,
+      detail: `${fmt(input.avgPrice)} vs ${fmt(input.avgPricePrev)}`,
+    },
+    {
+      label: input.soStatus === "Rolling Up" ? "SO Rolling Up" : "SO not Rolling Up",
+      passed: input.soStatus === "Rolling Up",
+      detail: input.soStatus,
+    },
   ];
 
   return buildResult(checklist);
@@ -83,6 +88,8 @@ export function scoreBearCall(input: {
   soStatus: SoStatus;
   marketStructure: ScannerTrend;
   momentum: ScannerMomentum;
+  ema20: number | null;
+  ema20Prev: number | null;
   avgPrice: number | null;
   avgPricePrev: number | null;
   primaryResistance: number | null;
@@ -90,29 +97,33 @@ export function scoreBearCall(input: {
   sellCallRange: { low: number; high: number } | null;
 }): ScannerStrategyResult {
   const avgPriceFalling = isAvgPriceFalling(input.avgPrice, input.avgPricePrev);
+  const momentumDropping = input.momentum === "Dropping";
 
   const checklist: RuleCheck[] = [
-    {
-      label: "Momentum Below EMA",
-      passed: input.momentum === "Below EMA",
-      detail: input.momentum,
-    },
-    {
-      label: "Average Price < Previous Average Price",
-      passed: avgPriceFalling,
-      detail: `${fmt(input.avgPrice)} vs ${fmt(input.avgPricePrev)}`,
-    },
-    {
-      label: "SO Rolling Down",
-      passed: input.soStatus === "Rolling Down",
-      detail: input.soStatus,
-    },
     buildSellCallZoneCheck({
       avgPrice: input.avgPrice,
       primaryResistance: input.primaryResistance,
       atr14: input.atr14,
       sellCallRange: input.sellCallRange,
     }),
+    {
+      label: momentumDropping ? "EMA20 Momentum Dropping" : "EMA20 not Dropping",
+      passed: momentumDropping,
+      detail: `${fmt(input.ema20)} vs ${fmt(input.ema20Prev)}`,
+    },
+    {
+      label: avgPriceFalling
+        ? "Average Price < Previous Average Price"
+        : "Current Average Price not lower than Previous",
+      passed: avgPriceFalling,
+      detail: `${fmt(input.avgPrice)} vs ${fmt(input.avgPricePrev)}`,
+    },
+    {
+      label:
+        input.soStatus === "Rolling Down" ? "SO Rolling Down" : "SO not Rolling Down",
+      passed: input.soStatus === "Rolling Down",
+      detail: input.soStatus,
+    },
   ];
 
   return buildResult(checklist);
@@ -121,7 +132,7 @@ export function scoreBearCall(input: {
 export function scoreIronCondor(input: {
   so: number | null;
   marketStructure: ScannerTrend;
-  momentum: ScannerMomentum;
+  ema20: number | null;
   soStatus: SoStatus;
   avgPrice: number | null;
   avgPricePrev: number | null;
@@ -139,17 +150,17 @@ export function scoreIronCondor(input: {
   });
   const sellPutValid = isValidSellPutSetup({
     marketStructure: input.marketStructure,
-    momentum: input.momentum,
-    soStatus: input.soStatus,
+    ema20: input.ema20,
     avgPrice: input.avgPrice,
     avgPricePrev: input.avgPricePrev,
+    soStatus: input.soStatus,
   });
   const sellCallValid = isValidSellCallSetup({
     marketStructure: input.marketStructure,
-    momentum: input.momentum,
-    soStatus: input.soStatus,
+    ema20: input.ema20,
     avgPrice: input.avgPrice,
     avgPricePrev: input.avgPricePrev,
+    soStatus: input.soStatus,
   });
 
   const checklist: RuleCheck[] = [

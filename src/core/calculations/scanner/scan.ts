@@ -25,7 +25,7 @@ import { buildRecentChartCandles } from "./chart-candles";
 import { evaluateMainSystemDisplay } from "./main-system-display";
 import {
   deriveMarketStructure,
-  deriveMomentum,
+  deriveMainSystemMomentum,
 } from "./structure-momentum";
 import {
   computeAvgPricePrev,
@@ -139,12 +139,17 @@ export function scanTicker(input: ScanTickerInput): ScannerTickerResult {
     indicatorValues.sma50,
     indicatorValues.sma200
   );
-  const momentum = deriveMomentum(indicatorValues.avgPrice, indicatorValues.ema20);
+  const momentum = deriveMainSystemMomentum(
+    indicatorValues.ema20,
+    ema20Prev
+  );
 
   const bullPut = scoreBullPut({
     soStatus,
     marketStructure,
     momentum,
+    ema20: indicatorValues.ema20,
+    ema20Prev,
     avgPrice: indicatorValues.avgPrice,
     avgPricePrev,
     primarySupport: structure.primarySupport,
@@ -156,6 +161,8 @@ export function scanTicker(input: ScanTickerInput): ScannerTickerResult {
     soStatus,
     marketStructure,
     momentum,
+    ema20: indicatorValues.ema20,
+    ema20Prev,
     avgPrice: indicatorValues.avgPrice,
     avgPricePrev,
     primaryResistance: structure.primaryResistance,
@@ -166,7 +173,7 @@ export function scanTicker(input: ScanTickerInput): ScannerTickerResult {
   const ironCondor = scoreIronCondor({
     so: indicatorValues.so,
     marketStructure,
-    momentum,
+    ema20: indicatorValues.ema20,
     soStatus,
     avgPrice: indicatorValues.avgPrice,
     avgPricePrev,
@@ -283,7 +290,7 @@ function emptyIndicators(): ScannerTickerResult["indicators"] {
     emaDiff: null,
     emaDiffPct: null,
     marketStructure: "Neutral",
-    momentum: "At EMA",
+    momentum: "Flat",
     trend: "Neutral",
     trendQualityScore: 0,
   };

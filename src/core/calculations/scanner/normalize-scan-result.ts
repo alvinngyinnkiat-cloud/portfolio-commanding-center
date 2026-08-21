@@ -8,7 +8,7 @@ import type {
 } from "@/core/domain/types/scanner";
 import { buildRankings } from "./ranking";
 import { evaluateMainSystemDisplay } from "./main-system-display";
-import { deriveMarketStructure, deriveMomentum } from "./structure-momentum";
+import { deriveMarketStructure, deriveMainSystemMomentum } from "./structure-momentum";
 import {
   scoreBearCall,
   scoreBullPut,
@@ -35,14 +35,14 @@ function normalizeTrend(value: ScannerTrend | "Mixed" | undefined): ScannerTrend
 }
 
 function normalizeMomentum(
-  value: ScannerMomentum | undefined,
-  avgPrice: number | null,
-  ema20: number | null
+  value: ScannerMomentum | "Above EMA" | "Below EMA" | "At EMA" | undefined,
+  ema20: number | null,
+  ema20Prev: number | null
 ): ScannerMomentum {
-  if (value) {
+  if (value === "Rising" || value === "Dropping" || value === "Flat") {
     return value;
   }
-  return deriveMomentum(avgPrice, ema20);
+  return deriveMainSystemMomentum(ema20, ema20Prev);
 }
 
 function normalizeMarketStructure(
@@ -68,8 +68,8 @@ function rescoreStrategies(raw: ScannerTickerResult): ScannerTickerResult["strat
   );
   const momentum = normalizeMomentum(
     indicators.momentum,
-    indicators.avgPrice,
-    indicators.ema20
+    indicators.ema20,
+    indicators.ema20Prev
   );
 
   return {
@@ -77,6 +77,8 @@ function rescoreStrategies(raw: ScannerTickerResult): ScannerTickerResult["strat
       soStatus: indicators.soStatus,
       marketStructure,
       momentum,
+      ema20: indicators.ema20,
+      ema20Prev: indicators.ema20Prev,
       avgPrice: indicators.avgPrice,
       avgPricePrev: indicators.avgPricePrev,
       primarySupport: structure.primarySupport,
@@ -87,6 +89,8 @@ function rescoreStrategies(raw: ScannerTickerResult): ScannerTickerResult["strat
       soStatus: indicators.soStatus,
       marketStructure,
       momentum,
+      ema20: indicators.ema20,
+      ema20Prev: indicators.ema20Prev,
       avgPrice: indicators.avgPrice,
       avgPricePrev: indicators.avgPricePrev,
       primaryResistance: structure.primaryResistance,
@@ -96,7 +100,7 @@ function rescoreStrategies(raw: ScannerTickerResult): ScannerTickerResult["strat
     ironCondor: scoreIronCondor({
       so: indicators.so,
       marketStructure,
-      momentum,
+      ema20: indicators.ema20,
       soStatus: indicators.soStatus,
       avgPrice: indicators.avgPrice,
       avgPricePrev: indicators.avgPricePrev,
@@ -138,8 +142,8 @@ export function reconcileMainSystemFromResult(
   );
   const momentum = normalizeMomentum(
     raw.indicators.momentum,
-    raw.indicators.avgPrice,
-    raw.indicators.ema20
+    raw.indicators.ema20,
+    raw.indicators.ema20Prev
   );
 
   return evaluateMainSystemDisplay({
@@ -193,7 +197,11 @@ function normalizeTicker(raw: ScannerTickerResult): ScannerTickerResult {
     sma50,
     sma200
   );
-  const momentum = normalizeMomentum(raw.indicators?.momentum, avgPrice, ema20);
+  const momentum = normalizeMomentum(
+    raw.indicators?.momentum,
+    ema20,
+    raw.indicators?.ema20Prev ?? null
+  );
   const indicators = {
     ema20,
     ema20Prev: raw.indicators?.ema20Prev ?? null,

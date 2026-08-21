@@ -17,16 +17,17 @@ describe("display reasons", () => {
       so: 18.5,
       soStatus: "Rolling Up",
       marketStructure: "Bullish",
-      momentum: "Above EMA",
+      momentum: "Rising",
+      ema20: 299,
+      ema20Prev: 297,
       avgPrice: 298.5,
       avgPricePrev: 295.0,
     });
 
-    expect(reasons[0]).toBe("Bullish Structure = Yes");
-    expect(reasons[1]).toBe("Momentum Above EMA = Yes");
-    expect(reasons[2]).toContain("Current Average Price > Previous Average Price = Yes");
-    expect(reasons[3]).toBe("SO Rolling Up = Yes");
-    expect(reasons[4]).toBe("SO Value = 18.5");
+    expect(reasons[0]).toContain("EMA20 Momentum Rising = Yes");
+    expect(reasons[1]).toContain("Current Average Price > Previous Average Price = Yes");
+    expect(reasons[2]).toBe("SO Rolling Up = Yes");
+    expect(reasons[3]).toBe("SO Value = 18.5");
   });
 
   it("builds Sell Call checklist reasons", () => {
@@ -34,16 +35,17 @@ describe("display reasons", () => {
       so: 82.0,
       soStatus: "Rolling Down",
       marketStructure: "Bearish",
-      momentum: "Below EMA",
+      momentum: "Dropping",
+      ema20: 348,
+      ema20Prev: 350,
       avgPrice: 350,
       avgPricePrev: 355,
     });
 
-    expect(reasons[0]).toBe("Bearish Structure = Yes");
-    expect(reasons[1]).toBe("Momentum Below EMA = Yes");
-    expect(reasons[2]).toContain("Current Average Price < Previous Average Price = Yes");
-    expect(reasons[3]).toBe("SO Rolling Down = Yes");
-    expect(reasons[4]).toBe("SO Value = 82.0");
+    expect(reasons[0]).toContain("EMA20 Momentum Dropping = Yes");
+    expect(reasons[1]).toContain("Current Average Price < Previous Average Price = Yes");
+    expect(reasons[2]).toBe("SO Rolling Down = Yes");
+    expect(reasons[3]).toBe("SO Value = 82.0");
   });
 
   it("builds Iron Condor checklist reasons", () => {
@@ -70,7 +72,8 @@ describe("display reasons", () => {
       so: 52.4,
       soStatus: "Strong",
       marketStructure: "Neutral",
-      momentum: "At EMA",
+      momentum: "Flat",
+      ema20: 324,
       avgPrice: 322.86,
       avgPricePrev: 320.0,
       midPrice: 324.18,
@@ -79,7 +82,7 @@ describe("display reasons", () => {
     });
 
     expect(reasons.length).toBeGreaterThan(0);
-    expect(reasons.join(" ")).toMatch(/Bullish Structure|Bearish Structure|Momentum/);
+    expect(reasons.join(" ")).toMatch(/EMA20|Average Price|SO/);
   });
 
   it("builds quantitative Iron Condor reasons (deprecated alias)", () => {
@@ -130,7 +133,9 @@ describe("evaluateMainSystemDisplay Cases A-D", () => {
     bullPut: scoreBullPut({
       soStatus: "Strong",
       marketStructure: "Neutral",
-      momentum: "At EMA",
+      momentum: "Flat",
+      ema20: 324,
+      ema20Prev: 324,
       avgPrice: 322.86,
       avgPricePrev: 320.0,
       primarySupport: 293.89,
@@ -140,7 +145,9 @@ describe("evaluateMainSystemDisplay Cases A-D", () => {
     bearCall: scoreBearCall({
       soStatus: "Strong",
       marketStructure: "Neutral",
-      momentum: "At EMA",
+      momentum: "Flat",
+      ema20: 324,
+      ema20Prev: 324,
       avgPrice: 322.86,
       avgPricePrev: 320.0,
       primaryResistance: 354.46,
@@ -150,7 +157,7 @@ describe("evaluateMainSystemDisplay Cases A-D", () => {
     ironCondor: scoreIronCondor({
       so: 52.4,
       marketStructure: "Neutral",
-      momentum: "At EMA",
+      ema20: 324,
       soStatus: "Strong",
       avgPrice: 322.86,
       avgPricePrev: 320.0,
@@ -164,7 +171,7 @@ describe("evaluateMainSystemDisplay Cases A-D", () => {
   const baseInput = {
     ...baseStrategies,
     marketStructure: "Neutral" as const,
-    momentum: "At EMA" as const,
+    momentum: "Flat" as const,
     so: 52.4,
     soStatus: "Strong" as const,
     avgPrice: 322.86,
@@ -178,7 +185,9 @@ describe("evaluateMainSystemDisplay Cases A-D", () => {
     const bullPut = scoreBullPut({
       soStatus: "Rolling Up",
       marketStructure: "Bullish",
-      momentum: "Above EMA",
+      momentum: "Rising",
+      ema20: 299,
+      ema20Prev: 297,
       avgPrice: 298.5,
       avgPricePrev: 295.0,
       primarySupport: 293.89,
@@ -190,7 +199,7 @@ describe("evaluateMainSystemDisplay Cases A-D", () => {
       ...baseInput,
       bullPut,
       marketStructure: "Bullish",
-      momentum: "Above EMA",
+      momentum: "Rising",
       so: 18.5,
       soStatus: "Rolling Up",
       avgPrice: 298.5,
@@ -211,7 +220,9 @@ describe("evaluateMainSystemDisplay Cases A-D", () => {
     const bearCall = scoreBearCall({
       soStatus: "Rolling Down",
       marketStructure: "Bearish",
-      momentum: "Below EMA",
+      momentum: "Dropping",
+      ema20: 348,
+      ema20Prev: 350,
       avgPrice: 350,
       avgPricePrev: 355,
       primaryResistance: 354.46,
@@ -223,7 +234,7 @@ describe("evaluateMainSystemDisplay Cases A-D", () => {
       ...baseInput,
       bearCall,
       marketStructure: "Bearish",
-      momentum: "Below EMA",
+      momentum: "Dropping",
       so: 82.0,
       soStatus: "Rolling Down",
       avgPrice: 350,
@@ -254,7 +265,7 @@ describe("evaluateMainSystemDisplay Cases A-D", () => {
       ironCondor: scoreIronCondor({
         so: 75,
         marketStructure: "Neutral",
-        momentum: "At EMA",
+        ema20: 324,
         soStatus: "Strong",
         avgPrice: 322.86,
         avgPricePrev: 320.0,
@@ -277,7 +288,9 @@ describe("evaluateMainSystemDisplay Cases A-D", () => {
     const bullPut = scoreBullPut({
       soStatus: "Rolling Up",
       marketStructure: "Bullish",
-      momentum: "Above EMA",
+      momentum: "Rising",
+      ema20: 299,
+      ema20Prev: 297,
       avgPrice: 298.5,
       avgPricePrev: 295.0,
       primarySupport: 293.89,
@@ -290,7 +303,7 @@ describe("evaluateMainSystemDisplay Cases A-D", () => {
       bullPut,
       ironCondor: baseStrategies.ironCondor,
       marketStructure: "Bullish",
-      momentum: "Above EMA",
+      momentum: "Rising",
       so: 18.5,
       soStatus: "Rolling Up",
       avgPrice: 298.5,

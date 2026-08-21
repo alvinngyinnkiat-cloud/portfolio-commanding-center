@@ -59,14 +59,14 @@ function buildNoTradeReasons(input: MainSystemDecisionInput): string[] {
   const callFails = failedCheckLabels(input.bearCall.checklist);
 
   if (
-    input.momentum === "Above EMA" ||
+    input.momentum === "Rising" ||
     input.soStatus === "Rolling Up"
   ) {
     if (putFails.length > 0) return putFails;
   }
 
   if (
-    input.momentum === "Below EMA" ||
+    input.momentum === "Dropping" ||
     input.soStatus === "Rolling Down"
   ) {
     if (callFails.length > 0) return callFails;

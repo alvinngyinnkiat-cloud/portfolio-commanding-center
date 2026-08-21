@@ -18,11 +18,31 @@ export function deriveMarketStructure(
   return "Neutral";
 }
 
-/** Price momentum relative to EMA20. */
-export function deriveMomentum(
+/** Main System momentum — EMA20 direction vs previous session. */
+export function deriveMainSystemMomentum(
+  ema20: number | null,
+  ema20Prev: number | null
+): ScannerMomentum {
+  if (ema20 == null || ema20Prev == null) {
+    return "Flat";
+  }
+  if (ema20 > ema20Prev) {
+    return "Rising";
+  }
+  if (ema20 < ema20Prev) {
+    return "Dropping";
+  }
+  return "Flat";
+}
+
+/** @deprecated Iron Condor gating only — average price position vs EMA20. */
+export type ScannerPriceEmaPosition = "Above EMA" | "Below EMA" | "At EMA";
+
+/** Average price position relative to EMA20 — used by Iron Condor directional guards. */
+export function derivePriceEmaPosition(
   avgPrice: number | null,
   ema20: number | null
-): ScannerMomentum {
+): ScannerPriceEmaPosition {
   if (avgPrice == null || ema20 == null) {
     return "At EMA";
   }
@@ -35,20 +55,28 @@ export function deriveMomentum(
   return "At EMA";
 }
 
+/** @deprecated Use derivePriceEmaPosition for Iron Condor; deriveMainSystemMomentum for Main System. */
+export function deriveMomentum(
+  avgPrice: number | null,
+  ema20: number | null
+): ScannerPriceEmaPosition {
+  return derivePriceEmaPosition(avgPrice, ema20);
+}
+
 export interface SellPutSetupInput {
   marketStructure: ScannerTrend;
-  momentum: ScannerMomentum;
-  soStatus: SoStatus;
+  ema20: number | null;
   avgPrice: number | null;
   avgPricePrev: number | null;
+  soStatus: SoStatus;
 }
 
 export interface SellCallSetupInput {
   marketStructure: ScannerTrend;
-  momentum: ScannerMomentum;
-  soStatus: SoStatus;
+  ema20: number | null;
   avgPrice: number | null;
   avgPricePrev: number | null;
+  soStatus: SoStatus;
 }
 
 export function isAvgPriceRising(
@@ -73,19 +101,21 @@ export function isAvgPriceFalling(
   );
 }
 
+/** Iron Condor guard — legacy directional setup including structure + price vs EMA20. */
 export function isValidSellPutSetup(input: SellPutSetupInput): boolean {
   return (
     input.marketStructure === "Bullish" &&
-    input.momentum === "Above EMA" &&
+    derivePriceEmaPosition(input.avgPrice, input.ema20) === "Above EMA" &&
     isAvgPriceRising(input.avgPrice, input.avgPricePrev) &&
     input.soStatus === "Rolling Up"
   );
 }
 
+/** Iron Condor guard — legacy directional setup including structure + price vs EMA20. */
 export function isValidSellCallSetup(input: SellCallSetupInput): boolean {
   return (
     input.marketStructure === "Bearish" &&
-    input.momentum === "Below EMA" &&
+    derivePriceEmaPosition(input.avgPrice, input.ema20) === "Below EMA" &&
     isAvgPriceFalling(input.avgPrice, input.avgPricePrev) &&
     input.soStatus === "Rolling Down"
   );

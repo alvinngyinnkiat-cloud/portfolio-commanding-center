@@ -574,7 +574,7 @@ export class ScannerRefreshOrchestrator {
           emaDiff: null,
           emaDiffPct: null,
           marketStructure: "Neutral",
-          momentum: "At EMA",
+          momentum: "Flat",
           trend: "Neutral",
           trendQualityScore: 0,
         },

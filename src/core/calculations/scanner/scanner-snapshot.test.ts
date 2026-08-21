@@ -35,7 +35,7 @@ function makeResult(
       emaDiff: 0,
       emaDiffPct: 0,
       marketStructure: "Bullish",
-      momentum: "Above EMA",
+      momentum: "Rising",
       trend: "Bullish",
       trendQualityScore: 1,
     },
