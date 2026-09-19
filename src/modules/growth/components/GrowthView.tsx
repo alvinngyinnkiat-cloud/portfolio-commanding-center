@@ -2,6 +2,7 @@
 
 import { useMemo } from "react";
 import { usePortfolio } from "@/context/PortfolioContext";
+import { resolveClientContributionSgd } from "@/core/calculations/dashboard-historical-contributions";
 import { FxRateErrorBanner } from "@/shared/components/ui/FxRateErrorBanner";
 import {
   buildBestWorstMonths,
@@ -26,22 +27,37 @@ export function GrowthView() {
   const { data, isLoaded } = usePortfolio();
 
   const reporting = useMemo(() => {
-    if (!data?.metrics || !data.fxRateValid) return null;
+    if (!data?.metrics || !data.fxRateValid || !data.inputs) return null;
 
     const snapshots = data.snapshots;
-    const monthlyRows = buildMonthlyPerformanceTable(snapshots);
+    const clientContributionSgd = resolveClientContributionSgd(data.inputs);
+    const monthlyRows = buildMonthlyPerformanceTable(
+      snapshots,
+      clientContributionSgd
+    );
 
     return {
-      attribution: buildGrowthAttribution(data.metrics),
-      summary: buildGrowthSummary(snapshots, data.metrics),
-      chartData: buildPortfolioGrowthChartData(snapshots),
+      attribution: buildGrowthAttribution(data.metrics, clientContributionSgd),
+      summary: buildGrowthSummary(
+        snapshots,
+        data.metrics,
+        clientContributionSgd
+      ),
+      chartData: buildPortfolioGrowthChartData(
+        snapshots,
+        clientContributionSgd
+      ),
       monthlyRows,
-      contributionAnalytics: buildContributionAnalytics(data.contributions),
+      contributionAnalytics: buildContributionAnalytics(
+        data.contributions,
+        clientContributionSgd
+      ),
       bestWorst: buildBestWorstMonths(monthlyRows),
       journey: buildPortfolioJourney(
         snapshots,
         data.contributions,
-        data.metrics
+        data.metrics,
+        clientContributionSgd
       ),
       hasEnoughSnapshots: hasSufficientSnapshotData(snapshots.length),
     };

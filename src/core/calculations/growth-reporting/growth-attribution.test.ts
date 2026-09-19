@@ -55,7 +55,7 @@ function metrics(
 
 describe("growth attribution", () => {
   it("computes investment gain as own portfolio minus contribution", () => {
-    const attribution = buildGrowthAttribution(metrics());
+    const attribution = buildGrowthAttribution(metrics(), 0);
 
     expect(attribution.ownPortfolio).toBe(32_045);
     expect(attribution.totalContribution).toBe(16_200);
@@ -64,7 +64,7 @@ describe("growth attribution", () => {
   });
 
   it("computes contribution and investment gain percentages", () => {
-    const attribution = buildGrowthAttribution(metrics());
+    const attribution = buildGrowthAttribution(metrics(), 0);
 
     expect(attribution.contributionPercent).toBeCloseTo(50.55, 1);
     expect(attribution.investmentGainPercent).toBeCloseTo(49.45, 1);
@@ -73,7 +73,8 @@ describe("growth attribution", () => {
 
   it("handles negative investment gain as investment loss", () => {
     const attribution = buildGrowthAttribution(
-      metrics({ totalPortfolioValue: 15_000, totalContribution: 16_200 })
+      metrics({ totalPortfolioValue: 15_000, totalContribution: 16_200 }),
+      0
     );
 
     expect(attribution.investmentGain).toBe(-1_200);
@@ -85,7 +86,7 @@ describe("growth attribution", () => {
   });
 
   it("donut chart slices reconcile with own portfolio when gain is positive", () => {
-    const attribution = buildGrowthAttribution(metrics());
+    const attribution = buildGrowthAttribution(metrics(), 0);
     const slices = buildGrowthAttributionChartSlices(attribution);
     const sliceTotal = slices.reduce((sum, slice) => sum + slice.value, 0);
 
@@ -95,7 +96,8 @@ describe("growth attribution", () => {
 
   it("donut chart renders loss slice when gain is negative", () => {
     const attribution = buildGrowthAttribution(
-      metrics({ totalPortfolioValue: 15_000, totalContribution: 16_200 })
+      metrics({ totalPortfolioValue: 15_000, totalContribution: 16_200 }),
+      0
     );
     const slices = buildGrowthAttributionChartSlices(attribution);
 

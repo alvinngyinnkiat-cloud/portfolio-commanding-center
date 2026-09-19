@@ -76,7 +76,7 @@ export function GrowthSummaryCards({ summary }: GrowthSummaryCardsProps) {
           icon={<Wallet size={18} />}
         />
         <SummaryCard
-          label="Total Contribution"
+          label="Own Contribution"
           value={formatSgd(summary.totalContribution)}
           icon={<PiggyBank size={18} />}
         />

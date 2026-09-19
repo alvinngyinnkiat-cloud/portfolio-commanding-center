@@ -1,4 +1,5 @@
 import type { PortfolioMetrics } from "@/core/domain/types";
+import { deriveOwnPortfolioPerformance } from "./own-contribution";
 
 export interface GrowthAttributionData {
   ownPortfolio: number;
@@ -20,13 +21,18 @@ const CONTRIBUTION_COLOR = "#22c55e";
 const GAIN_COLOR = "#3b82f6";
 const LOSS_COLOR = "#ef4444";
 
-/** Read-only attribution from current dashboard metrics. */
+/** Read-only attribution from current dashboard metrics (own portfolio leg only). */
 export function buildGrowthAttribution(
-  metrics: PortfolioMetrics
+  metrics: PortfolioMetrics,
+  clientContributionSgd: number
 ): GrowthAttributionData {
   const ownPortfolio = metrics.totalPortfolioValue;
-  const totalContribution = metrics.totalContribution;
-  const investmentGain = ownPortfolio - totalContribution;
+  const { ownContribution: totalContribution, profitLoss: investmentGain } =
+    deriveOwnPortfolioPerformance(
+      ownPortfolio,
+      metrics.totalContribution,
+      clientContributionSgd
+    );
 
   const contributionPercent =
     ownPortfolio !== 0 ? (totalContribution / ownPortfolio) * 100 : 0;

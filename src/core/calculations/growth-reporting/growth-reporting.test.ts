@@ -98,7 +98,8 @@ describe("growth reporting read-only analytics", () => {
   it("reads snapshot total P/L from stored fields only", () => {
     expect(
       readSnapshotTotalPl(
-        snapshot({ date: "2026-01-01", ownPortfolio: 15_000, totalContribution: 10_000 })
+        snapshot({ date: "2026-01-01", ownPortfolio: 15_000, totalContribution: 10_000 }),
+        0
       )
     ).toBe(5_000);
   });
@@ -108,7 +109,7 @@ describe("growth reporting read-only analytics", () => {
       snapshot({ date: "2025-01-01", ownPortfolio: 8_000 }),
       snapshot({ date: "2026-06-01", ownPortfolio: 9_500 }),
     ];
-    const summary = buildGrowthSummary(snapshots, metrics());
+    const summary = buildGrowthSummary(snapshots, metrics(), 0);
 
     expect(summary?.currentOwnPortfolio).toBe(10_000);
     expect(summary?.totalPL).toBe(2_000);
@@ -116,7 +117,8 @@ describe("growth reporting read-only analytics", () => {
   });
 
   it("groups monthly performance from snapshots", () => {
-    const rows = buildMonthlyPerformanceTable([
+    const rows = buildMonthlyPerformanceTable(
+      [
       snapshot({
         date: "2026-01-05",
         ownPortfolio: 10_000,
@@ -137,7 +139,9 @@ describe("growth reporting read-only analytics", () => {
         ownPortfolio: 11_000,
         totalContribution: 9_500,
       }),
-    ]);
+    ],
+      0
+    );
 
     expect(rows).toHaveLength(2);
     expect(rows[0].monthlyGrowthDollars).toBe(500);
@@ -181,10 +185,13 @@ describe("growth reporting read-only analytics", () => {
   });
 
   it("builds portfolio growth chart series from snapshots", () => {
-    const chart = buildPortfolioGrowthChartData([
+    const chart = buildPortfolioGrowthChartData(
+      [
       snapshot({ date: "2026-01-01", ownPortfolio: 10_000, totalContribution: 8_000 }),
       snapshot({ date: "2026-02-01", ownPortfolio: 11_000, totalContribution: 9_000 }),
-    ]);
+    ],
+      0
+    );
 
     expect(chart).toHaveLength(2);
     expect(chart[0].totalPL).toBe(2_000);
@@ -202,12 +209,15 @@ describe("growth reporting read-only analytics", () => {
   });
 
   it("identifies best and worst months", () => {
-    const rows = buildMonthlyPerformanceTable([
+    const rows = buildMonthlyPerformanceTable(
+      [
       snapshot({ date: "2026-01-05", ownPortfolio: 10_000, totalContribution: 8_000 }),
       snapshot({ date: "2026-01-25", ownPortfolio: 10_800, totalContribution: 8_500 }),
       snapshot({ date: "2026-02-05", ownPortfolio: 10_500, totalContribution: 9_000 }),
       snapshot({ date: "2026-02-25", ownPortfolio: 10_200, totalContribution: 9_200 }),
-    ]);
+    ],
+      0
+    );
     const bestWorst = buildBestWorstMonths(rows);
 
     expect(bestWorst.bestByDollars?.value).toBe(800);
@@ -226,7 +236,8 @@ describe("growth reporting read-only analytics", () => {
           amountSgd: 5_000,
         },
       ],
-      metrics({ totalPortfolioValue: 10_000 })
+      metrics({ totalPortfolioValue: 10_000 }),
+      0
     );
 
     expect(journey.firstSnapshotDate).toBe("2025-06-01");

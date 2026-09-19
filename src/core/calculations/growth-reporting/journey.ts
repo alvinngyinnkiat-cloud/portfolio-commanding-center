@@ -9,7 +9,8 @@ import { buildContributionAnalytics } from "./contribution-analytics";
 export function buildPortfolioJourney(
   snapshots: DailySnapshot[],
   contributions: ContributionTransaction[],
-  metrics: PortfolioMetrics | null
+  metrics: PortfolioMetrics | null,
+  clientContributionSgd: number
 ): PortfolioJourneyData {
   const earliestSnapshot = findEarliestSnapshot(snapshots);
   const contributionDates = contributions
@@ -24,7 +25,10 @@ export function buildPortfolioJourney(
       .filter((d): d is string => d != null)
       .sort()[0] ?? null;
 
-  const analytics = buildContributionAnalytics(contributions);
+  const analytics = buildContributionAnalytics(
+    contributions,
+    clientContributionSgd
+  );
   const currentPortfolioValue = metrics?.totalPortfolioValue ?? 0;
   const totalGrowthSinceStart =
     earliestSnapshot != null

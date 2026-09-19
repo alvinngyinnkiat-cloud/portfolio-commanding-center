@@ -1,6 +1,7 @@
 import type { ContributionTransaction } from "@/core/domain/types";
 import { parseLocalDate } from "@/shared/lib/date";
 import type { ContributionAnalyticsData } from "./types";
+import { deriveOwnContributionSgd } from "./own-contribution";
 
 function netCategoryContributionSgd(
   contributions: ContributionTransaction[],
@@ -22,16 +23,20 @@ function formatMonthLabel(monthKey: string): string {
   });
 }
 
-/** SGD-keyed contribution analytics from transaction amounts only. */
+/** SGD-keyed contribution analytics — own deposits only (excludes client capital). */
 export function buildContributionAnalytics(
-  contributions: ContributionTransaction[]
+  contributions: ContributionTransaction[],
+  clientContributionSgd = 0
 ): ContributionAnalyticsData {
   const stockContributionSgd = netCategoryContributionSgd(contributions, "stock");
   const cryptoContributionSgd = netCategoryContributionSgd(
     contributions,
     "crypto"
   );
-  const totalContributionSgd = stockContributionSgd + cryptoContributionSgd;
+  const totalContributionSgd = deriveOwnContributionSgd(
+    stockContributionSgd + cryptoContributionSgd,
+    clientContributionSgd
+  );
 
   const byMonth = new Map<
     string,

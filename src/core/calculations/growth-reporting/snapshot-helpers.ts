@@ -1,8 +1,16 @@
 import type { DailySnapshot } from "@/core/domain/types";
+import { readSnapshotOwnContributionSgd } from "./own-contribution";
 
-/** Read stored snapshot P/L — ownPortfolio and totalContribution captured at snapshot time. */
-export function readSnapshotTotalPl(snapshot: DailySnapshot): number {
-  return snapshot.ownPortfolio - snapshot.totalContribution;
+/** Own P/L at snapshot time — own portfolio value minus own contribution only. */
+export function readSnapshotTotalPl(
+  snapshot: DailySnapshot,
+  clientContributionSgd: number
+): number {
+  const ownContribution = readSnapshotOwnContributionSgd(
+    snapshot,
+    clientContributionSgd
+  );
+  return snapshot.ownPortfolio - ownContribution;
 }
 
 export function sortSnapshotsAsc(snapshots: DailySnapshot[]): DailySnapshot[] {

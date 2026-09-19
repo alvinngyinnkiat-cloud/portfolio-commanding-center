@@ -25,7 +25,7 @@ const LINES = [
   },
   {
     key: "totalContribution" as const,
-    label: "Total Contribution",
+    label: "Own Contribution",
     color: "#22c55e",
   },
   { key: "totalPL" as const, label: "Total P/L", color: "#f59e0b" },

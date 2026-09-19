@@ -3,6 +3,7 @@ import type { PortfolioMetrics } from "@/core/domain/types";
 import { addLocalMonths, toLocalDateString } from "@/shared/lib/date";
 import type { GrowthDelta, GrowthPeriodKey, GrowthSummaryData } from "./types";
 import { findEarliestSnapshot, findSnapshotAtOrBefore } from "./snapshot-helpers";
+import { deriveOwnPortfolioPerformance } from "./own-contribution";
 
 const PERIOD_MONTHS: Record<Exclude<GrowthPeriodKey, "sinceStart">, number> = {
   "1m": 1,
@@ -45,11 +46,17 @@ function historicalOwnPortfolioForPeriod(
 
 export function buildGrowthSummary(
   snapshots: DailySnapshot[],
-  metrics: PortfolioMetrics | null
+  metrics: PortfolioMetrics | null,
+  clientContributionSgd: number
 ): GrowthSummaryData | null {
   if (!metrics) return null;
 
   const currentOwn = metrics.totalPortfolioValue;
+  const ownPerformance = deriveOwnPortfolioPerformance(
+    currentOwn,
+    metrics.totalContribution,
+    clientContributionSgd
+  );
   const periods: GrowthPeriodKey[] = [
     "sinceStart",
     "1m",
@@ -67,9 +74,9 @@ export function buildGrowthSummary(
   return {
     currentOwnPortfolio: metrics.totalPortfolioValue,
     currentTotalPortfolio: metrics.totalPortfolio,
-    totalContribution: metrics.totalContribution,
-    totalPL: metrics.totalPL,
-    totalPLPercent: metrics.totalPLPercent,
+    totalContribution: ownPerformance.ownContribution,
+    totalPL: ownPerformance.profitLoss,
+    totalPLPercent: ownPerformance.returnPercent,
     periodGrowth,
   };
 }

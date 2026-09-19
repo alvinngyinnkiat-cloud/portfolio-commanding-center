@@ -53,7 +53,7 @@ export function PortfolioJourneySection({ journey }: PortfolioJourneySectionProp
         />
         <SummaryCard
           compact
-          label="Total Contributions"
+          label="Own Contributions"
           value={formatSgd(journey.totalContributionsSgd)}
           icon={<PiggyBank size={16} />}
         />

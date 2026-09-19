@@ -45,7 +45,7 @@ export function GrowthAttributionSection({
           />
           <SummaryCard
             compact
-            label="Total Contribution"
+            label="Own Contribution"
             value={formatSgd(attribution.totalContribution)}
             icon={<PiggyBank size={16} />}
           />

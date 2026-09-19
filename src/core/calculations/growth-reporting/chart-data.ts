@@ -1,15 +1,22 @@
 import type { DailySnapshot } from "@/core/domain/types";
 import type { PortfolioGrowthChartPoint } from "./types";
+import {
+  readSnapshotOwnContributionSgd,
+} from "./own-contribution";
 import { readSnapshotTotalPl, sortSnapshotsAsc } from "./snapshot-helpers";
 
 export function buildPortfolioGrowthChartData(
-  snapshots: DailySnapshot[]
+  snapshots: DailySnapshot[],
+  clientContributionSgd: number
 ): PortfolioGrowthChartPoint[] {
   return sortSnapshotsAsc(snapshots).map((snapshot) => ({
     date: snapshot.date,
     ownPortfolio: snapshot.ownPortfolio,
     totalPortfolio: snapshot.totalPortfolio,
-    totalContribution: snapshot.totalContribution,
-    totalPL: readSnapshotTotalPl(snapshot),
+    totalContribution: readSnapshotOwnContributionSgd(
+      snapshot,
+      clientContributionSgd
+    ),
+    totalPL: readSnapshotTotalPl(snapshot, clientContributionSgd),
   }));
 }

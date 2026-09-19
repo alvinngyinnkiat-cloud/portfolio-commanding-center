@@ -35,7 +35,7 @@ export function ContributionAnalyticsSection({
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         <SummaryCard
           compact
-          label="Total Contribution"
+          label="Own Contribution"
           value={formatSgd(analytics.totalContributionSgd)}
           icon={<PiggyBank size={16} />}
         />

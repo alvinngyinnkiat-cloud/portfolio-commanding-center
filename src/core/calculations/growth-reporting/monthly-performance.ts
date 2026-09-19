@@ -1,5 +1,6 @@
 import type { DailySnapshot } from "@/core/domain/types";
 import type { MonthlyPerformanceRow } from "./types";
+import { readSnapshotOwnContributionSgd } from "./own-contribution";
 import {
   groupSnapshotsByMonth,
   sortSnapshotsAsc,
@@ -14,7 +15,8 @@ function formatMonthLabel(monthKey: string): string {
 }
 
 export function buildMonthlyPerformanceTable(
-  snapshots: DailySnapshot[]
+  snapshots: DailySnapshot[],
+  clientContributionSgd: number
 ): MonthlyPerformanceRow[] {
   const groups = groupSnapshotsByMonth(snapshots);
   const rows: MonthlyPerformanceRow[] = [];
@@ -26,7 +28,8 @@ export function buildMonthlyPerformanceTable(
 
     const monthlyGrowthDollars = last.ownPortfolio - first.ownPortfolio;
     const monthlyContributionAdded =
-      last.totalContribution - first.totalContribution;
+      readSnapshotOwnContributionSgd(last, clientContributionSgd) -
+      readSnapshotOwnContributionSgd(first, clientContributionSgd);
     const monthlyPLChange = monthlyGrowthDollars - monthlyContributionAdded;
     const monthlyGrowthPercent =
       first.ownPortfolio !== 0

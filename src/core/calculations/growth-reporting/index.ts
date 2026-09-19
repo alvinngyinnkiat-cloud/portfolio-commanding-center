@@ -7,6 +7,7 @@ export * from "./best-worst";
 export * from "./journey";
 export * from "./chart-data";
 export * from "./growth-attribution";
+export * from "./own-contribution";
 
 export const GROWTH_REPORTING_MIN_SNAPSHOTS = 2;
 
