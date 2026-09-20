@@ -3,6 +3,7 @@ import type { DailySnapshot } from "@/core/domain/types";
 import {
   createDailySnapshot,
   getSnapshotChartValue,
+  normalizeDailySnapshot,
 } from "./snapshots";
 import { emptyModuleContributionInputs } from "./portfolio-test-helpers";
 import { calculatePortfolioMetrics } from "./portfolio";
@@ -177,5 +178,55 @@ describe("createDailySnapshot", () => {
     );
     expect(snapshot.personalCashSgd).toBeCloseTo(usCashSgd, 2);
     expect(snapshot.totalCashSgd).toBeCloseTo(usCashSgd, 2);
+  });
+
+  it("records client portfolio from metrics.clientPortfolio at capture", () => {
+    const inputs = {
+      usStocksEtfUsd: 10_000,
+      sgStocksSgd: 0,
+      cryptoSgd: 0,
+      cryptoHoldingCount: 0,
+      usdTradingCashUsd: 0,
+      sgdTradingCashSgd: 0,
+      cryptoCashSgd: 0,
+      usAvailableTradingCashUsd: 0,
+      sgAvailableTradingCashSgd: 0,
+      clientPortfolioUsd: 3_000,
+      clientPortfolioSgd: 4_050,
+      fxRate: 1.35,
+      contributions: [],
+      ...emptyModuleContributionInputs(),
+      usMarketValueSgd: 13_500,
+      totalStockValueSgd: 13_500,
+      totalCryptoValueSgd: 0,
+      cryptoHoldingsValueSgd: 0,
+    };
+    const metrics = calculatePortfolioMetrics(inputs);
+    const snapshot = createDailySnapshot(inputs, metrics, {
+      snapshotType: "manual",
+    });
+
+    expect(snapshot.clientPortfolio).toBe(metrics.clientPortfolio);
+    expect(snapshot.ownPortfolio).toBe(metrics.ownPortfolio);
+    expect(snapshot.ownPortfolio + (snapshot.clientPortfolio ?? 0)).toBeCloseTo(
+      metrics.totalPortfolio,
+      2
+    );
+  });
+});
+
+describe("normalizeDailySnapshot client portfolio", () => {
+  it("leaves client portfolio null on legacy rows without the field", () => {
+    const normalized = normalizeDailySnapshot({
+      date: "2025-01-01",
+      ownPortfolio: 45_000,
+      usStocksEtfSgd: 40_000,
+      sgStocksSgd: 0,
+      cryptoSgd: 0,
+      personalCashSgd: 5_000,
+      cashSgd: 5_000,
+    });
+
+    expect(normalized.clientPortfolio).toBeNull();
   });
 });

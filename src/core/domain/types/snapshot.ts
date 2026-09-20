@@ -14,7 +14,8 @@ export interface DailySnapshot {
   snapshotType: SnapshotType;
   ownPortfolio: number;
   totalPortfolio: number;
-  clientPortfolio: number;
+  /** Client equity (SGD) at capture; null on legacy snapshots before this field was stored. */
+  clientPortfolio: number | null;
   totalContribution: number;
   /** US Stock Holdings Value (SGD) at capture — excludes US Cash (counted in Personal Cash) */
   usStocksEtfSgd: number;

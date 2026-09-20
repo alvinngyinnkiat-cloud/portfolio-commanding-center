@@ -2,7 +2,13 @@
 
 import { useMemo, useRef, useState } from "react";
 import { usePortfolio } from "@/context/PortfolioContext";
-import { formatSgd, formatDate, formatDateTime } from "@/shared/lib/format";
+import { formatSgd, formatDate, formatDateTime, formatPercent } from "@/shared/lib/format";
+import {
+  computeMyPortfolioChange,
+  pickSnapshotComparisonPair,
+} from "@/core/calculations/snapshot-comparison";
+import { formatSnapshotClientPortfolioSgd } from "@/core/calculations/snapshot-display";
+import { compareDateDescWithCreatedAt } from "@/shared/lib/sort";
 import { Button } from "@/shared/components/ui/Button";
 import { FxRateErrorBanner } from "@/shared/components/ui/FxRateErrorBanner";
 import { Camera, Download, Upload } from "lucide-react";
@@ -35,11 +41,14 @@ export function DailySnapshotTrigger() {
 
   const snapshots = useMemo(
     () =>
-      [...(data?.snapshots ?? [])].sort((a, b) => b.date.localeCompare(a.date)),
+      [...(data?.snapshots ?? [])].sort(compareDateDescWithCreatedAt),
     [data?.snapshots]
   );
 
-  const latest = snapshots[0];
+  const comparison = useMemo(
+    () => pickSnapshotComparisonPair(snapshots),
+    [snapshots]
+  );
 
   const handleCapture = async () => {
     if (isCapturingSnapshot) return;
@@ -196,14 +205,61 @@ export function DailySnapshotTrigger() {
         />
       </div>
 
-      {latest && (
-        <div className="rounded-xl border border-surface-border/60 bg-surface/50 px-4 py-3 text-sm">
-          <span className="text-slate-500">Latest snapshot · </span>
-          <span className="text-slate-300">{formatDate(latest.date)}</span>
-          <span className="text-slate-500"> · My Portfolio </span>
-          <span className="font-semibold text-white">
-            {formatSgd(latest.ownPortfolio)}
-          </span>
+      {comparison && (
+        <div className="rounded-xl border border-surface-border/60 bg-surface/50 px-4 py-4 text-sm space-y-3">
+          <p className="text-slate-400">
+            <span className="text-slate-500">Latest snapshot · </span>
+            <span className="text-slate-200">{formatDate(comparison.latest.date)}</span>
+          </p>
+          <div>
+            <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">
+              My Portfolio
+            </p>
+            <p className="text-lg font-semibold text-white">
+              {formatSgd(comparison.latest.ownPortfolio)}
+            </p>
+            {comparison.previous ? (
+              (() => {
+                const change = computeMyPortfolioChange(
+                  comparison.latest,
+                  comparison.previous
+                );
+                if (change.dollars > 0) {
+                  return (
+                    <p className="mt-1 text-accent-green">
+                      ↑ +{formatSgd(change.dollars)} (
+                      {formatPercent(change.percent ?? 0)})
+                    </p>
+                  );
+                }
+                if (change.dollars < 0) {
+                  return (
+                    <p className="mt-1 text-accent-red">
+                      ↓ {formatSgd(change.dollars)} (
+                      {formatPercent(change.percent ?? 0)})
+                    </p>
+                  );
+                }
+                return (
+                  <p className="mt-1 text-yellow-400">
+                    — S$0.00 (0.00%)
+                  </p>
+                );
+              })()
+            ) : (
+              <p className="mt-1 text-slate-500">
+                No previous snapshot for comparison
+              </p>
+            )}
+          </div>
+          <div>
+            <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">
+              Client Portfolio
+            </p>
+            <p className="font-semibold text-white">
+              {formatSnapshotClientPortfolioSgd(comparison.latest)}
+            </p>
+          </div>
         </div>
       )}
 
@@ -222,6 +278,7 @@ export function DailySnapshotTrigger() {
               <th className="px-4 py-3">Created At</th>
               <th className="px-4 py-3">Type</th>
               <th className="px-4 py-3">My Portfolio</th>
+              <th className="px-4 py-3">Client Portfolio</th>
               <th className="px-4 py-3">US Stock Holdings Value (SGD)</th>
               <th className="px-4 py-3">SG Stocks</th>
               <th className="px-4 py-3">Crypto</th>
@@ -232,7 +289,7 @@ export function DailySnapshotTrigger() {
           <tbody>
             {snapshots.length === 0 ? (
               <tr>
-                <td colSpan={9} className="px-4 py-8 text-center text-slate-500">
+                <td colSpan={10} className="px-4 py-8 text-center text-slate-500">
                   No snapshots yet. Capture one to start tracking daily worth.
                 </td>
               </tr>
@@ -253,6 +310,9 @@ export function DailySnapshotTrigger() {
                   </td>
                   <td className="px-4 py-3 font-medium text-white">
                     {formatSgd(snapshot.ownPortfolio)}
+                  </td>
+                  <td className="px-4 py-3 text-slate-300">
+                    {formatSnapshotClientPortfolioSgd(snapshot)}
                   </td>
                   <td className="px-4 py-3 text-slate-300">
                     {formatSgd(snapshot.usStocksEtfSgd)}

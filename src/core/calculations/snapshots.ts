@@ -47,6 +47,18 @@ function num(value: unknown, fallback = 0): number {
   return typeof value === "number" && !Number.isNaN(value) ? value : fallback;
 }
 
+function resolveClientPortfolioSgd(
+  raw: Partial<DailySnapshot>
+): number | null {
+  if (raw.clientPortfolio === undefined || raw.clientPortfolio === null) {
+    return null;
+  }
+  if (typeof raw.clientPortfolio !== "number" || Number.isNaN(raw.clientPortfolio)) {
+    return null;
+  }
+  return raw.clientPortfolio;
+}
+
 function normalizeSnapshotType(raw: unknown): SnapshotType {
   return raw === "automatic" ? "automatic" : "manual";
 }
@@ -162,11 +174,16 @@ export function normalizeDailySnapshot(
   raw: Partial<DailySnapshot> & { date: string }
 ): DailySnapshot {
   const breakdown = raw.breakdown;
-  const clientPortfolio = num(raw.clientPortfolio);
+  const clientPortfolio = resolveClientPortfolioSgd(raw);
+  const clientPortfolioForCash = clientPortfolio ?? 0;
   const usStocksEtfSgd = num(raw.usStocksEtfSgd, breakdown?.usStocksEtfSgd);
   const sgStocksSgd = num(raw.sgStocksSgd, breakdown?.sgStocksSgd);
   const cryptoHoldingsValueSgd = resolveSnapshotCryptoHoldingsSgd(raw);
-  const totalCashSgd = resolveSnapshotTotalCashSgd(raw, breakdown, clientPortfolio);
+  const totalCashSgd = resolveSnapshotTotalCashSgd(
+    raw,
+    breakdown,
+    clientPortfolioForCash
+  );
   const personalCashSgd = totalCashSgd;
   const netOptionsMarketValueSgd = resolveSnapshotNetOptionsSgd(raw);
   const nonUsAssetTotalSgd =
@@ -176,7 +193,10 @@ export function normalizeDailySnapshot(
     raw.ownPortfolio !== undefined
       ? num(raw.ownPortfolio)
       : usStocksEtfSgd + nonUsAssetTotalSgd;
-  const totalPortfolio = ownPortfolio + clientPortfolio;
+  const totalPortfolio =
+    raw.totalPortfolio !== undefined
+      ? num(raw.totalPortfolio)
+      : ownPortfolio + clientPortfolioForCash;
 
   return {
     date: raw.date,
