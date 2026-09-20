@@ -1,12 +1,16 @@
 "use client";
 
-import { useMemo, useRef, useState } from "react";
+import { Fragment, useMemo, useRef, useState } from "react";
 import { usePortfolio } from "@/context/PortfolioContext";
 import { formatSgd, formatDate, formatDateTime, formatPercent } from "@/shared/lib/format";
 import {
+  buildCanonicalSnapshotTimeline,
   computeMyPortfolioChange,
+  computeSnapshotDailyChanges,
+  getPreviousDistinctDateSnapshot,
   pickSnapshotComparisonPair,
 } from "@/core/calculations/snapshot-comparison";
+import { SnapshotTableDailyChangeRow } from "./SnapshotTableDailyChangeRow";
 import { formatSnapshotClientPortfolioSgd } from "@/core/calculations/snapshot-display";
 import { compareDateDescWithCreatedAt } from "@/shared/lib/sort";
 import { Button } from "@/shared/components/ui/Button";
@@ -47,6 +51,11 @@ export function DailySnapshotTrigger() {
 
   const comparison = useMemo(
     () => pickSnapshotComparisonPair(snapshots),
+    [snapshots]
+  );
+
+  const snapshotTimeline = useMemo(
+    () => buildCanonicalSnapshotTimeline(snapshots),
     [snapshots]
   );
 
@@ -294,49 +303,63 @@ export function DailySnapshotTrigger() {
                 </td>
               </tr>
             ) : (
-              snapshots.map((snapshot) => (
-                <tr
-                  key={snapshot.date}
-                  className="border-b border-surface-border/40 last:border-0 hover:bg-surface/30"
-                >
-                  <td className="px-4 py-3 text-slate-300">
-                    {formatDate(snapshot.date)}
-                  </td>
-                  <td className="px-4 py-3 text-slate-400 text-xs">
-                    {formatDateTime(snapshot.createdAt)}
-                  </td>
-                  <td className="px-4 py-3 text-slate-300">
-                    {snapshot.snapshotType}
-                  </td>
-                  <td className="px-4 py-3 font-medium text-white">
-                    {formatSgd(snapshot.ownPortfolio)}
-                  </td>
-                  <td className="px-4 py-3 text-slate-300">
-                    {formatSnapshotClientPortfolioSgd(snapshot)}
-                  </td>
-                  <td className="px-4 py-3 text-slate-300">
-                    {formatSgd(snapshot.usStocksEtfSgd)}
-                  </td>
-                  <td className="px-4 py-3 text-slate-300">
-                    {formatSgd(snapshot.sgStocksSgd)}
-                  </td>
-                  <td className="px-4 py-3 text-slate-300">
-                    {formatSgd(snapshot.cryptoSgd)}
-                  </td>
-                  <td className="px-4 py-3 text-slate-300">
-                    {formatSgd(snapshot.personalCashSgd)}
-                  </td>
-                  <td className="px-4 py-3">
-                    <Button
-                      size="sm"
-                      variant="danger"
-                      onClick={() => handleDelete(snapshot.date)}
-                    >
-                      Delete
-                    </Button>
-                  </td>
-                </tr>
-              ))
+              snapshots.map((snapshot) => {
+                const canonical =
+                  snapshotTimeline.find((row) => row.date === snapshot.date) ??
+                  snapshot;
+                const previous = getPreviousDistinctDateSnapshot(
+                  snapshotTimeline,
+                  canonical.date
+                );
+                const dailyChanges = computeSnapshotDailyChanges(
+                  canonical,
+                  previous
+                );
+
+                return (
+                  <Fragment key={snapshot.date}>
+                    <tr className="border-b border-surface-border/40 hover:bg-surface/30">
+                      <td className="px-4 py-3 text-slate-300">
+                        {formatDate(snapshot.date)}
+                      </td>
+                      <td className="px-4 py-3 text-slate-400 text-xs">
+                        {formatDateTime(snapshot.createdAt)}
+                      </td>
+                      <td className="px-4 py-3 text-slate-300">
+                        {snapshot.snapshotType}
+                      </td>
+                      <td className="px-4 py-3 font-medium text-white">
+                        {formatSgd(snapshot.ownPortfolio)}
+                      </td>
+                      <td className="px-4 py-3 text-slate-300">
+                        {formatSnapshotClientPortfolioSgd(snapshot)}
+                      </td>
+                      <td className="px-4 py-3 text-slate-300">
+                        {formatSgd(snapshot.usStocksEtfSgd)}
+                      </td>
+                      <td className="px-4 py-3 text-slate-300">
+                        {formatSgd(snapshot.sgStocksSgd)}
+                      </td>
+                      <td className="px-4 py-3 text-slate-300">
+                        {formatSgd(snapshot.cryptoSgd)}
+                      </td>
+                      <td className="px-4 py-3 text-slate-300">
+                        {formatSgd(snapshot.personalCashSgd)}
+                      </td>
+                      <td className="px-4 py-3">
+                        <Button
+                          size="sm"
+                          variant="danger"
+                          onClick={() => handleDelete(snapshot.date)}
+                        >
+                          Delete
+                        </Button>
+                      </td>
+                    </tr>
+                    <SnapshotTableDailyChangeRow changes={dailyChanges} />
+                  </Fragment>
+                );
+              })
             )}
           </tbody>
         </table>
